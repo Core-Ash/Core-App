@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans:
+    "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--accent);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-accent: var(--accent);
+  --color-sidebar-accent-foreground: var(--foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  color-scheme: dark;
+  --background: #101014;
+  --foreground: #efeff4;
+  --card: #18181f;
+  --card-foreground: #efeff4;
+  --primary: #ad9dfb;
+  --primary-foreground: #18122f;
+  --muted: #22222b;
+  --muted-foreground: #a2a2b3;
+  --accent: #24242e;
+  --destructive: #f798a4;
+  --border: #2b2b36;
+  --input: #363641;
+  --ring: #ad9dfb;
+  --sidebar: #15151b;
+  --radius: 0.625rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    min-width: 320px;
+  }
+  body {
+    @apply m-0 bg-background font-sans text-foreground antialiased;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: #ad9dfb40;
+    color: #fff;
+  }
+}
+
+.auth-page {
+  background:
+    radial-gradient(ellipse at 50% 30%, #50407824, transparent 55%),
+    radial-gradient(ellipse at 12% 80%, #34385913, transparent 45%),
+    var(--background);
+}
+
+.auth-page::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(#ad9dfb05 1px, transparent 1px),
+    linear-gradient(90deg, #ad9dfb05 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at center, black, transparent 70%);
+}
+
+.auth-card {
+  background: linear-gradient(150deg, #1c1b25, #17171e 55%);
+  box-shadow:
+    0 24px 100px #0004,
+    inset 0 1px 0 #ffffff06;
+}
+
+.welcome-panel {
+  background:
+    radial-gradient(ellipse at 100% 0, #58407822, transparent 60%),
+    linear-gradient(110deg, #1c1928, #191720 65%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
