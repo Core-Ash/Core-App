@@ -97,6 +97,20 @@ pnpm run preview
 
 `build` generates the static frontend in `dist/`. `preview` is for local inspection of that build, not a production server. A production host must serve `dist/` over HTTPS and rewrite non-file SPA routes (such as `/app` and `/login`) to `index.html`. Nothing is deployed by this repository's scripts.
 
+### Vercel production authentication
+
+The root `vercel.json` forwards `/api/auth/*` to the existing Core-auth service at `https://core-auth-production.up.railway.app/api/auth/*` before applying the SPA fallback. Other `/api/*` paths are excluded from that fallback. Authentication responses are not cached. The browser uses the frontend origin for authentication, preserving secure, HTTP-only cookies without relying on cross-site cookies. The proxy does not implement authentication or change cookie attributes.
+
+For **Production**, set this public build-time variable as **Config** in Vercel:
+
+```env
+VITE_AUTH_URL=https://core-app-weld.vercel.app/api/auth
+```
+
+Keep the frontend origin in Core-auth's `TRUSTED_ORIGINS`. Both the variable and `vercel.json` must be included in a new deployment; redeploying old source that lacks the file leaves `/api/auth/get-session` returning a Vercel 404. Preview deployments need their own same-origin authentication URL and an explicitly trusted frontend origin; the production URL above is not a same-origin URL for previews. Vite's local proxy and `pnpm preview` do not apply Vercel rewrites.
+
+After deployment, an unauthenticated `GET https://core-app-weld.vercel.app/api/auth/get-session` should return `200` with JSON `null`, matching Core-auth. Then verify sign-in, reload/session restoration, and logout in a browser with an authorized test account; the anonymous response alone does not prove cookie persistence.
+
 Vitest and Testing Library cover sign-up validation and service errors, verified/absent/unavailable post-sign-up sessions, safe session retries, sign-in with blocked cookies, routing, startup and background session behavior, expiry, redirect safety, logout, and configuration safety. Test fixtures are isolated from the application; there is no mock authentication mode in the frontend.
 
 Live connectivity is now verified against the supplied Core-auth URL: health returns 200, anonymous session lookup returns `200 null`, invalid credentials return `401 INVALID_EMAIL_OR_PASSWORD`, invalid registration data returns 400, and anonymous sign-out returns 200. Chrome verified both submit buttons, form validation, real error feedback, and same-origin proxy requests without runtime errors. No test account or authenticated session was created.

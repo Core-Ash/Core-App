@@ -40,6 +40,16 @@ Keep proxy settings in the development-specific file so a production build does 
 
 ## Before deploying the frontend
 
+### Vercel same-origin proxy
+
+The production frontend is `https://core-app-weld.vercel.app`. Live checks on November 13, 2026 confirmed that Core-auth now returns credentialed CORS headers for this exact origin. The frontend bundle has also been updated to use `https://core-app-weld.vercel.app/api/auth`, but the observed deployment returns a Vercel `404 NOT_FOUND` for `/api/auth/get-session`; the direct Railway endpoint still returns `200 null`. This identifies the missing deployed proxy as the current session-check blocker.
+
+The root `vercel.json` now provides a fixed `/api/auth/*` rewrite to the existing Railway service, disables caching for those requests, and sends non-API SPA routes to `index.html`. Set Vercel's **Production** `VITE_AUTH_URL` to `https://core-app-weld.vercel.app/api/auth` as public **Config**, then deploy source containing this file. Keep the production frontend origin in Core-auth's existing trusted-origin list. Do not reuse this absolute production auth URL for preview deployments that need same-origin cookies.
+
+This configuration is prepared locally; it does not change Railway or deploy itself. After deployment, verify JSON `200 null` through the Vercel endpoint, followed by authenticated sign-in, reload, and logout in a real browser. Successful authenticated cookie persistence remains unverified.
+
+### Service requirements
+
 - Set `VITE_AUTH_URL` at build time to the intended public HTTPS auth base URL. Never use a `.railway.internal` hostname in the browser.
 - Confirm Core-auth's `BETTER_AUTH_URL` and add the exact deployed frontend origin to `TRUSTED_ORIGINS`, preserving existing origins. Its Hono CORS and Better Auth origin checks must both allow that origin with credentials.
 - Preserve Secure and HTTP-only cookie protections. Prefer same-site HTTPS custom domains or a same-origin production reverse proxy to avoid third-party cookie restrictions. The Vite dev proxy is unused by builds and preview. See [Better Auth cookie guidance](https://better-auth.com/docs/concepts/cookies).
