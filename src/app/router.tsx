@@ -6,7 +6,9 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
 import { RegisterPage } from "@/features/auth/RegisterPage";
 import { SessionRedirect } from "@/features/auth/SessionRedirect";
-import { HomePage } from "@/features/home/HomePage";
+import { UnavailablePage } from "@/features/home/UnavailablePage";
+import { CommunityPage } from "@/features/community/CommunityPage";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 
 export function AppRoutes() {
   return (
@@ -18,7 +20,17 @@ export function AppRoutes() {
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/app" element={<HomePage />} />
+          <Route path="/app" element={<CommunityPage />} />
+          <Route path="/app/communities" element={<CommunityPage />} />
+          <Route
+            path="/app/messages"
+            element={<UnavailablePage feature="messages" />}
+          />
+          <Route
+            path="/app/friends"
+            element={<UnavailablePage feature="friends" />}
+          />
+          <Route path="/app/settings" element={<SettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<NotFoundPage />} />

@@ -1,6 +1,6 @@
 # Core Web
 
-The React web frontend for **Core**, a communication platform. This template includes matching sign-in and sign-up screens, cookie-based Better Auth integration, protected routing, and a responsive home dashboard. Servers, direct messages, friends, and settings are explicitly marked as future features.
+The React web frontend for **Core**, a gaming communication platform. The signed-in landing page follows the supplied Core Gaming reference: community rail, channel sidebar, chat, and member activity. Matching authentication screens retain cookie-based Better Auth integration and protected routing. Community conversations and activity are explicit visual samples; messages entered in the preview stay in memory. Voice, real messaging, friends, and community management remain unavailable. See [the reference UI guide](docs/gaming-ui-preview.md) for behavior and integration boundaries.
 
 ## Local development
 
@@ -60,13 +60,17 @@ These are service configuration requirements; no other repository or Railway dep
 
 ## Routes
 
-| Route          | Behavior                                                       |
-| -------------- | -------------------------------------------------------------- |
-| `/`            | Wait for the session, then redirect to `/app` or `/login`.     |
-| `/login`       | Guest login; authenticated visitors redirect to `/app`.        |
-| `/register`    | Guest registration; authenticated visitors redirect to `/app`. |
-| `/app`         | Protected home with actual session profile information.        |
-| Any other path | Public 404 page.                                               |
+| Route              | Behavior                                                                         |
+| ------------------ | -------------------------------------------------------------------------------- |
+| `/`                | Wait for the session, then redirect to `/app` or `/login`.                       |
+| `/login`           | Guest login; authenticated visitors redirect to `/app`.                          |
+| `/register`        | Guest registration; authenticated visitors redirect to `/app`.                   |
+| `/app`             | Protected default Core Gaming chat preview with actual session profile.          |
+| `/app/communities` | Protected community design preview with sample channels and local-only messages. |
+| `/app/messages`    | Protected direct-message unavailable state.                                      |
+| `/app/friends`     | Protected friends unavailable state.                                             |
+| `/app/settings`    | Protected, read-only session profile and sign out.                               |
+| Any other path     | Public 404 page.                                                                 |
 
 Client route guards control presentation. The existing auth service remains the authority for sessions, and future backend endpoints must enforce authorization independently.
 
@@ -77,9 +81,12 @@ Client route guards control presentation. The existing auth service remains the 
 - `src/components/ui/`: reusable shadcn/ui primitives, adapted to Core's theme. `components.json` configures the CLI for future additions.
 - `src/components/common/` and `layout/`: branding, avatars, shared states, and responsive navigation. The mobile drawer includes focus trapping, Escape dismissal, and focus restoration.
 - `src/features/auth/`: the official-client session provider, guards, login, and logout.
-- `src/features/home/`: session-backed welcome dashboard and clearly labeled placeholders.
+- `src/features/home/`: unavailable states for future friends and direct messages.
 - `src/lib/`: configuration, auth client, and class-name utilities.
-- `src/styles/globals.css`: dark theme tokens and shared styling. Imports use `@/` for `src/`.
+- `src/features/community/`: channel UI and isolated, typed visual samples; no backend client.
+- `src/styles/theme.css`: centralized palette, self-hosted Inter, and Tailwind theme tokens.
+- `src/styles/app.css`: reference application shell and chat styling.
+- `src/styles/auth.css`: authentication-page styling; `globals.css` imports styles and base rules. Imports use `@/` for `src/`.
 
 **All future application data must flow through the Rust backend.** The frontend must never connect to PostgreSQL. Better Auth owns identity and sessions; the Rust API owns business logic and authorization. There are no backend API calls in this template. Inspect the Rust authentication contract before adding cookies, token exchange, or authorization headers to future requests.
 

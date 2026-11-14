@@ -83,6 +83,7 @@ export function LoginPage() {
 
   return (
     <AuthLayout
+      mode="login"
       title="Welcome back."
       description="Your people, your conversations, your space."
       footer={
@@ -91,7 +92,7 @@ export function LoginPage() {
           <Link
             to="/register"
             state={{ from: getReturnPath(location.state) }}
-            className="rounded-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-sm font-medium text-link outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             Sign up
           </Link>

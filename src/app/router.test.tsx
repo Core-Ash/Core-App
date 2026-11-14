@@ -29,12 +29,29 @@ function renderRoutes(path: string, auth: AuthContextValue) {
 }
 
 describe("authentication routing", () => {
+  it.each([
+    "/app/communities?community=outpost&channel=clips",
+    "/app/friends",
+    "/app/messages",
+    "/app/settings",
+  ])("protects the new workspace destination %s", async (path) => {
+    renderRoutes(path, signedOutState);
+    expect(
+      await screen.findByRole("heading", { name: "Welcome back." }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      JSON.stringify({ from: path }).slice(1, -1),
+    );
+    expect(screen.queryByText("Design preview")).not.toBeInTheDocument();
+  });
   it("waits for the initial session check before showing protected content", () => {
     const view = renderRoutes("/app", { ...signedOutState, pending: true });
     expect(screen.getByRole("status")).toHaveTextContent(
       "Restoring your session",
     );
-    expect(screen.queryByText(/Welcome back/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "general" }),
+    ).not.toBeInTheDocument();
     view.unmount();
   });
   it("redirects signed-out users and preserves their intended destination", async () => {
@@ -47,11 +64,11 @@ describe("authentication routing", () => {
     );
   });
   it.each(["/login", "/register"])(
-    "redirects signed-in users from %s to their home",
+    "redirects signed-in users from %s to their default channel",
     async (path) => {
       renderRoutes(path, { ...signedOutState, session: sessionFixture });
       expect(
-        await screen.findByRole("heading", { name: "Welcome back, Alex." }),
+        await screen.findByRole("heading", { name: "general" }),
       ).toBeInTheDocument();
       expect(screen.getByTestId("location")).toHaveTextContent('"path":"/app"');
     },
@@ -104,7 +121,9 @@ describe("authentication routing", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "couldn't check your session",
     );
-    expect(screen.queryByText("Welcome back, Alex.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "general" }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
   });
@@ -114,7 +133,7 @@ describe("authentication routing", () => {
       session: sessionFixture,
     });
     expect(
-      screen.getByRole("heading", { name: "Welcome back, Alex." }),
+      screen.getByRole("heading", { name: "general" }),
     ).toBeInTheDocument();
     view.rerender(
       <AuthContext.Provider value={signedOutState}>
@@ -127,7 +146,9 @@ describe("authentication routing", () => {
     expect(
       await screen.findByRole("heading", { name: "Welcome back." }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Welcome back, Alex.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "general" }),
+    ).not.toBeInTheDocument();
   });
   it("keeps the not-found page public", () => {
     renderRoutes("/missing", { ...signedOutState, pending: true });

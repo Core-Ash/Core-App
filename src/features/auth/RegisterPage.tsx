@@ -139,7 +139,7 @@ export function RegisterPage() {
     <Link
       to="/login"
       state={{ from: getReturnPath(location.state) }}
-      className="rounded-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+      className="rounded-sm font-medium text-link outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
     >
       Sign in
     </Link>
@@ -147,6 +147,7 @@ export function RegisterPage() {
 
   return (
     <AuthLayout
+      mode="register"
       title={completion ? "Registration received." : "Create your account."}
       description={
         completion
