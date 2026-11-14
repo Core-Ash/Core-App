@@ -95,20 +95,23 @@ describe("official session provider", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("treats an expired unauthorized session as signed out", () => {
-    harness.useSession.mockReturnValue({
-      data: null,
-      isPending: false,
-      error: { status: 401 },
-      refetch: vi.fn(),
-    });
-    render(
-      <AuthProvider>
-        <SessionStatus />
-      </AuthProvider>,
-    );
-    expect(screen.getByText("Signed out")).toBeInTheDocument();
-  });
+  it.each([null, sessionFixture])(
+    "treats an expired unauthorized session as signed out, even with stale data",
+    (data) => {
+      harness.useSession.mockReturnValue({
+        data,
+        isPending: false,
+        error: { status: 401 },
+        refetch: vi.fn(),
+      });
+      render(
+        <AuthProvider>
+          <SessionStatus />
+        </AuthProvider>,
+      );
+      expect(screen.getByText("Signed out")).toBeInTheDocument();
+    },
+  );
 
   it("hides a stale session if the service fails to revalidate it", () => {
     harness.useSession.mockReturnValue({

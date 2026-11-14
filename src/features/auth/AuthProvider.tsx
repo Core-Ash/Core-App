@@ -19,7 +19,7 @@ function ConfiguredAuthProvider({
     <AuthContext.Provider
       value={{
         client,
-        session: data,
+        session: error?.status === 401 ? null : data,
         pending: initializing && isPending,
         error: Boolean(error && error.status !== 401),
         configurationError: null,

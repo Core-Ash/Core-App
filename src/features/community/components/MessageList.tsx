@@ -1,31 +1,46 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, MessageSquare, Search } from "lucide-react";
 import { EmptyState } from "@/components/common/EmptyState";
-import type {
-  PreviewChannel,
-  PreviewMessage,
-} from "@/features/community/preview/types";
+import type { ChatMessageData } from "@/features/community/types";
 import { ChatMessage } from "@/features/community/components/ChatMessage";
 
 export function MessageList({
   messages,
   channel,
   searching,
+  preview = true,
+  historyControls,
 }: {
-  messages: readonly PreviewMessage[];
-  channel: PreviewChannel;
+  messages: readonly ChatMessageData[];
+  channel: { name: string };
   searching: boolean;
+  preview?: boolean;
+  historyControls?: ReactNode;
 }) {
   const scrollArea = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
   const [awayFromBottom, setAwayFromBottom] = useState(false);
+  const previous = useRef<{ first?: string; last?: string; height: number }>({
+    height: 0,
+  });
 
   useLayoutEffect(() => {
     const element = scrollArea.current;
-    if (element && (followLatest.current || messages.at(-1)?.local)) {
-      element.scrollTop = element.scrollHeight;
+    if (element) {
+      const first = messages[0]?.id;
+      const last = messages.at(-1)?.id;
+      if (
+        !searching &&
+        previous.current.first &&
+        first !== previous.current.first &&
+        last === previous.current.last
+      ) {
+        element.scrollTop += element.scrollHeight - previous.current.height;
+      } else if (followLatest.current || messages.at(-1)?.local)
+        element.scrollTop = element.scrollHeight;
+      previous.current = { first, last, height: element.scrollHeight };
     }
-  }, [messages]);
+  }, [messages, searching]);
 
   return (
     <div className="message-list-container">
@@ -44,6 +59,7 @@ export function MessageList({
           setAwayFromBottom(!followLatest.current);
         }}
       >
+        {historyControls}
         {searching && (
           <p className="search-results" role="status">
             {messages.length} matching{" "}
@@ -59,7 +75,9 @@ export function MessageList({
             description={
               searching
                 ? "Try another name or a different search term."
-                : "No sample messages yet. Try the composer to leave a message in this local preview."
+                : preview
+                  ? "No sample messages yet. Try the composer to leave a message in this local preview."
+                  : "Be the first to send a message in this channel."
             }
           />
         ) : (
@@ -84,6 +102,7 @@ export function MessageList({
                     key={message.id}
                     message={message}
                     grouped={grouped}
+                    preview={preview}
                   />
                 );
               })}

@@ -20,8 +20,19 @@ import {
 } from "@/features/community/preview/use-preview-selection";
 import { MemberAvatar } from "@/features/community/components/MemberAvatar";
 import { CommunityEmblem } from "@/features/community/components/CommunityEmblem";
+import { useOptionalAppData } from "@/app/app-data-context";
+import { LiveCommunitySidebar } from "@/features/community/components/LiveCommunitySidebar";
 
 export function CommunitySidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const data = useOptionalAppData();
+  return data?.configured ? (
+    <LiveCommunitySidebar onNavigate={onNavigate} />
+  ) : (
+    <PreviewCommunitySidebar onNavigate={onNavigate} />
+  );
+}
+
+function PreviewCommunitySidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { community, channel, view } = usePreviewSelection();
   const picker = useRef<HTMLDetailsElement>(null);
   return (

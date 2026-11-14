@@ -42,7 +42,7 @@ export function AppLayout() {
               Workspace navigation
             </Dialog.Title>
             <Dialog.Description className="sr-only">
-              Choose a sample community or channel, or open account settings.
+              Choose a community or channel, or open account settings.
             </Dialog.Description>
             <div className="navigation-dialog-header">
               <span>Navigation</span>

@@ -3,9 +3,11 @@ import { LoaderCircle, LogOut } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "./auth-context";
+import { useOptionalAppData } from "@/app/app-data-context";
 
 export function LogoutButton() {
   const { client, refresh } = useAuth();
+  const appData = useOptionalAppData();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +22,7 @@ export function LogoutButton() {
         setError("Couldn't sign out. Please try again.");
         return;
       }
+      appData?.clearPrivateData();
       await refresh();
       navigate("/login", { replace: true });
     } catch {

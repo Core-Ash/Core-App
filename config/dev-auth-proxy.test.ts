@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getDevAuthProxyHttps, getDevAuthProxyTarget } from "./dev-auth-proxy";
+import {
+  getDevApiProxyTarget,
+  getDevAuthProxyHttps,
+  getDevAuthProxyTarget,
+} from "./dev-auth-proxy";
 
 describe("development auth proxy configuration", () => {
   it("defaults to local HTTPS and requires an explicit opt-out for localhost HTTP", () => {
@@ -43,5 +47,21 @@ describe("development auth proxy configuration", () => {
       expect((error as Error).message).not.toContain("sensitive-password");
       expect((error as Error).message).toContain("must be an HTTPS origin");
     }
+  });
+});
+
+describe("development Rust proxy configuration", () => {
+  it("permits an explicit local HTTP or public HTTPS origin", () => {
+    expect(getDevApiProxyTarget(undefined)).toBeUndefined();
+    expect(getDevApiProxyTarget("http://localhost:3000")).toBe(
+      "http://localhost:3000",
+    );
+    expect(getDevApiProxyTarget("https://api.example.com")).toBe(
+      "https://api.example.com",
+    );
+    expect(() => getDevApiProxyTarget("http://api.example.com")).toThrow();
+    expect(() =>
+      getDevApiProxyTarget("https://user:secret@api.example.com"),
+    ).toThrow();
   });
 });

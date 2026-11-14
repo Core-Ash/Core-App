@@ -15,6 +15,8 @@ import { MessageList } from "@/features/community/components/MessageList";
 import { previewMessages } from "@/features/community/preview/preview-data";
 import { usePreviewSelection } from "@/features/community/preview/use-preview-selection";
 import type { PreviewMessage } from "@/features/community/preview/types";
+import { useOptionalAppData } from "@/app/app-data-context";
+import { LiveCommunityPage } from "@/features/community/LiveCommunityPage";
 
 function CommunityWorkspace({ user }: { user: AuthUser }) {
   const { community, channel, view, channelKey } = usePreviewSelection();
@@ -171,6 +173,8 @@ function CommunityWorkspace({ user }: { user: AuthUser }) {
 
 export function CommunityPage() {
   const { session } = useAuth();
+  const data = useOptionalAppData();
+  if (data?.configured) return <LiveCommunityPage />;
   return session ? (
     <CommunityWorkspace key={session.user.id} user={session.user} />
   ) : null;

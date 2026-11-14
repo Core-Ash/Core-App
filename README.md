@@ -1,129 +1,97 @@
-# Core Web
+﻿# Core Web
 
-The React web frontend for **Core**, a gaming communication platform. The signed-in landing page follows the supplied Core Gaming reference: community rail, channel sidebar, chat, and member activity. Matching authentication screens retain cookie-based Better Auth integration and protected routing. Community conversations and activity are explicit visual samples; messages entered in the preview stay in memory. Voice, real messaging, friends, and community management remain unavailable. See [the reference UI guide](docs/gaming-ui-preview.md) for behavior and integration boundaries.
+React + TypeScript frontend for Core. Better Auth owns authentication and sessions; the Rust REST API owns application profiles, communities, channels, messages, and authorization. The frontend never connects to PostgreSQL.
 
-## Local development
+The existing Core layout is preserved. With `VITE_API_URL` configured, the workspace loads real communities, text channels, and paginated messages, supports their creation and message sending, and shows the Rust application profile. With that variable empty, the existing, explicitly labelled design preview remains available. A configured but unavailable backend shows an error; it never falls back to sample data.
 
-Use Node.js **22.13+ (22.x)** or **24.x**, with **pnpm 10.12.4** (pinned in `package.json`). The `pnpm-lock.yaml` file records the installed dependencies. If pnpm is not installed, follow the [pnpm installation guide](https://pnpm.io/installation) and install the pinned version.
+## Run locally
+
+Use Node **22.13+ (22.x)** or **24.x** and **pnpm 10.12.4**, pinned in `package.json`. On Windows, use `pnpm.cmd` if PowerShell blocks the pnpm script.
 
 ```sh
 pnpm install --frozen-lockfile
 ```
 
-Copy `.env.example` to `.env.local` (`Copy-Item .env.example .env.local` in PowerShell, or `cp .env.example .env.local` in a Unix shell), then configure:
+Copy `.env.example` to `.env.local`. For local services, using the example ports from their repositories:
 
 ```env
-VITE_AUTH_URL=https://your-auth-service.example.com
-VITE_API_URL=
+VITE_AUTH_URL=http://localhost:3001/api/auth
+VITE_API_URL=http://localhost:3000
 ```
+
+Set the actual ports your services use. Use the same hostname for both services, and allow `http://localhost:5173` on both. Local Core-auth must use development cookie settings, and Rust's configured cookie name must match. Then run:
 
 ```sh
 pnpm run dev
 ```
 
-Open the local URL printed by Vite, normally `http://localhost:5173`. On Windows, use `pnpm.cmd` if PowerShell blocks the `pnpm.ps1` script. Use pnpm for dependency changes and commit `pnpm-lock.yaml`; avoid mixing package managers.
+Open Vite's printed URL. Existing process environment and mode-specific Vite files can override `.env.local`; restart after changes. For HTTPS development proxies and full service requirements, see [backend integration](docs/backend-integration.md).
 
-| Variable        | Purpose                                                                                                     |
-| --------------- | ----------------------------------------------------------------------------------------------------------- |
-| `VITE_AUTH_URL` | Required for sign-in and sign-up. Core-auth's public HTTPS origin, or its complete authentication base URL. |
-| `VITE_API_URL`  | Reserved for future Rust backend integration. Currently unused; it can remain empty.                        |
+## Configuration
 
-The supplied Core-auth public URL is now configured in this workspace's ignored `.env.local`. Development-specific settings live in `.env.development.local`: the browser calls `http://localhost:5173/api/auth`, and Vite proxies those calls to Core-auth over HTTPS. This uses the service's already-allowed local origin and keeps cookies first-party. Production builds use the public auth URL from `.env.local`, not the development proxy URL. See the [connection notes](docs/core-auth-connection.md) for verified behavior and deployment requirements.
+| Variable                 | Purpose                                                                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `VITE_AUTH_URL`          | Required for authentication. Public HTTPS Better Auth origin/full base URL, or explicit `/api/auth` for the same-origin proxy. HTTP localhost is permitted in development.     |
+| `VITE_API_URL`           | Rust origin or origin with `/api/v1`; explicit `/api/v1` selects the same-origin proxy. Empty retains the labelled design preview. HTTP localhost is permitted in development. |
+| `CORE_AUTH_PROXY_TARGET` | Vercel server-only environment variable: public HTTPS Core-auth origin, without `/api/auth`.                                                                                   |
+| `CORE_API_PROXY_TARGET`  | Vercel server-only environment variable: public HTTPS Rust origin, without `/api/v1`.                                                                                          |
+| `DEV_AUTH_PROXY_TARGET`  | Optional Vite development proxy: HTTPS Core-auth origin.                                                                                                                       |
+| `DEV_API_PROXY_TARGET`   | Optional Vite development proxy: HTTPS Rust origin or HTTP localhost origin.                                                                                                   |
+| `DEV_AUTH_PROXY_HTTPS`   | Defaults to `true`; controls local HTTPS for either development proxy.                                                                                                         |
 
-Vite exposes `VITE_` variables to the browser **at build time**. Restart the development server after editing them, and rebuild for changes to production configuration. Never put database URLs, Better Auth secrets, API keys, or other private credentials here. Actual `.env` files are ignored by Git.
+`VITE_` values are public and embedded at build time. HTTPS is required for absolute production service URLs; Railway private hostnames and known private production hosts are rejected. Real environment files are ignored by Git. Never place database credentials, auth secrets, or session tokens in these variables.
 
-Without a valid auth URL, both auth pages show a setup message. Their submit buttons remain clickable for form validation and show an explicit configuration error on a valid submission; no authentication requests are made. Buttons are disabled only while a request is in progress. HTTPS is required outside localhost. Railway's private `.railway.internal` hostnames are explicitly rejected in browser configuration. Real environment files remain ignored by Git.
+## Vercel
 
-`DEV_AUTH_PROXY_TARGET` is a server-only HTTPS origin. `DEV_AUTH_PROXY_HTTPS` defaults to `true`; the current local setup explicitly uses `false` because Core-auth already trusts `http://localhost:5173`, while its HTTPS localhost origin is not currently allowed. The proxy listens on localhost, verifies the upstream HTTPS certificate, and preserves Origin and cookie attributes. For local HTTPS, allow `https://localhost:5173` on Core-auth, set `DEV_AUTH_PROXY_HTTPS=true`, and use that HTTPS origin in the development-only `VITE_AUTH_URL`. This option never relaxes production HTTPS requirements or strips cookie flags.
+Configure both public build-time paths and server-only upstream origins for each environment:
 
-## Authentication
+```env
+VITE_AUTH_URL=/api/auth
+VITE_API_URL=/api/v1
+CORE_AUTH_PROXY_TARGET=https://your-core-auth-service.up.railway.app
+CORE_API_PROXY_TARGET=https://your-core-service.up.railway.app
+```
 
-`src/lib/auth-client.ts` creates the official `better-auth/react` client with credentialed requests. `AuthProvider` uses the client's `useSession()` hook as the session source. Startup restores the session from the service; focus changes and a 60-second interval revalidate an active session. No application code reads, writes, or forwards session tokens.
+The Vercel function in `api/[...path].ts` proxies the two fixed service prefixes. `vercel.json` applies SPA fallback only outside `/api/` and disables API caching. There are no hardcoded production upstreams. `pnpm preview` serves the static build and does not run Vercel functions.
 
-Sign-in calls `signIn.email()`; sign-up calls `signUp.email()` with the trimmed name/email and the unchanged password. Both use the official client's `getSession()` to confirm a cookie-backed session before refreshing the React session hook and navigating. A successful response without a persistent session cannot unlock `/app`. Sign-in reports a cookie/session problem instead of silently returning to the login screen.
+Both services must allow the exact frontend origin. Keep Core-auth's cookie host-only with `Path=/`, `HttpOnly`, `Secure`, and suitable `SameSite`; configure Rust to accept the exact primary session cookie name and validate it with Core-auth. The proxy preserves browser Cookie, Origin, CSRF headers, and all auth Set-Cookie attributes. See the [deployment and cookie checklist](docs/backend-integration.md#vercel-and-cookie-routing).
 
-Registration validates all four fields, including exact password confirmation. Core-auth's inspected policy is **12–128 characters** (12 configured by the service, 128 from its unchanged Better Auth default); server validation remains authoritative. Keep `src/features/auth/register-validation.ts` aligned if that policy changes. The current service does not require email verification for sign-in, and normally creates a session after registration. The frontend still checks the actual session rather than assuming this behavior. Without a session it displays a confirmation and a sign-in link, mentions any required verification, and never claims that an email was delivered. A failed session check can be retried without repeating account creation. Core-auth's current verification/reset email delivery callbacks are stubs.
+Changes here are source preparation only. No deployment or other repository changes are performed.
 
-Logout calls `signOut()`, refreshes the session, and returns to `/login`. Guards wait for the initial session lookup; later background checks preserve guest form input. Unauthorized sessions are treated as signed out, while other service/network errors display a retry screen and hide protected content. An intended `/app` destination is preserved across sign-in/sign-up links, including its search and hash. API errors are mapped to safe UI messages rather than printing server details or responses.
+## Authentication and private data
 
-The client uses Better Auth's default `/api/auth` base path when given an origin. Core-auth is mounted there. For a different server base path, set `VITE_AUTH_URL` to the full path, such as `https://auth.example.com/custom/auth`. Confirm the actual deployed service configuration before connecting. This frontend requires email/password authentication and sign-up to remain enabled on that service. Password recovery, email delivery, social login, and an authentication server are outside this frontend's scope.
+`src/lib/auth-client.ts` remains the official Better Auth React client. Session initialization completes before redirects; login and registration confirm a cookie-backed session through `getSession()` before navigating. Registration retains Core-auth's inspected 12–128 character password policy and never assumes that a successful response proves a session or email delivery. Verification/reset email delivery is still a Core-auth responsibility.
 
-Check these settings on the **existing auth service**:
+The API client sends credentialed requests and `X-Core-CSRF: 1` on writes. Rust independently verifies the session and permissions. A Rust 401 triggers a coalesced official Better Auth session check without replaying the request. An active auth session produces an integration error; confirmed expiration refreshes the official session state and returns to sign-in. A 403 reports permission denial and retains sign-in.
 
-- Its public Better Auth base URL and base path must match the frontend configuration.
-- Enable email/password authentication. If email verification is required, accounts must complete that process through the service's existing flow.
-- Add the exact frontend origins to Better Auth's `trustedOrigins`. The current local proxy uses the already-allowed **http://localhost:5173**. An HTTPS local origin must be added before switching to it; preserve other existing origins.
-- Configure credentialed CORS for those exact origins, including preflight handling and `Access-Control-Allow-Credentials: true`. A wildcard origin cannot be used with credentials.
-- Keep production session cookies HTTP-only and secure. If frontend and auth are on different **sites**, cookie delivery may require `SameSite=None; Secure`; browser third-party cookie restrictions can still prevent it. Prefer same-site custom domains or an appropriately secured same-origin proxy when necessary. Do not disable CSRF/origin validation to work around cookie issues.
+Each auth user/session pair gets a new in-memory TanStack Query client and abort scope. Logout, expiration, account changes, and auth service errors cancel reads/writes and discard private caches. Successful sign-out clears private frontend data before the session refresh completes. Nothing persists application data or credentials to localStorage.
 
-These are service configuration requirements; no other repository or Railway deployment is modified here. See the official [Better Auth client documentation](https://better-auth.com/docs/concepts/client), [session management](https://better-auth.com/docs/concepts/session-management), and [cookie guidance](https://better-auth.com/docs/concepts/cookies).
+New identities explicitly set up their application profile with the existing idempotent `POST /api/v1/me`. An email collision requires administrative linking; the frontend never supplies a caller ID or links by email.
 
-## Routes
+## Scope and structure
 
-| Route              | Behavior                                                                         |
-| ------------------ | -------------------------------------------------------------------------------- |
-| `/`                | Wait for the session, then redirect to `/app` or `/login`.                       |
-| `/login`           | Guest login; authenticated visitors redirect to `/app`.                          |
-| `/register`        | Guest registration; authenticated visitors redirect to `/app`.                   |
-| `/app`             | Protected default Core Gaming chat preview with actual session profile.          |
-| `/app/communities` | Protected community design preview with sample channels and local-only messages. |
-| `/app/messages`    | Protected direct-message unavailable state.                                      |
-| `/app/friends`     | Protected friends unavailable state.                                             |
-| `/app/settings`    | Protected, read-only session profile and sign out.                               |
-| Any other path     | Public 404 page.                                                                 |
+- `src/app/`: routing and session-scoped data provider.
+- `src/features/auth/`: Better Auth session provider, guards, login, registration, logout.
+- `src/lib/api/`: credentialed fetch client, safe errors, runtime response validation, actual Rust endpoint adapters.
+- `src/features/community/api/`: query keys, typed hooks, selection, and mutations.
+- `src/features/community/`: the live workspace and isolated, labelled visual preview.
+- `src/components/`: shared UI and existing responsive layout; `src/styles/` owns theme tokens and styling.
+- `api/`, `server/`: Vercel transport proxy; no auth implementation or database access.
+- `src/test/`: unit-test fixtures, never an application authentication mode.
 
-Client route guards control presentation. The existing auth service remains the authority for sessions, and future backend endpoints must enforce authorization independently.
+Routes `/app` and `/app/communities` show the workspace; `/app/settings` shows the profile and sign-out. `/login` and `/register` remain guest routes. Direct messages and friends remain unavailable.
 
-## Architecture and conventions
+The current Rust contract has no member/profile directory or avatars, permissions-discovery endpoint, update endpoints, reactions, voice, uploads, events, or live message events. Other message authors are identified by their actual member UUID; only your own avatar can come from your Better Auth identity. Search filters loaded message history. Use **Refresh history** to see new messages; there is no polling or WebSocket implementation. See [supported contracts and gaps](docs/backend-integration.md#supported-contracts-and-gaps).
 
-- React, strict TypeScript, Vite, React Router, Tailwind CSS, source-owned shadcn/ui components with Radix primitives, and Lucide icons.
-- `src/app/`: application entry and routing.
-- `src/components/ui/`: reusable shadcn/ui primitives, adapted to Core's theme. `components.json` configures the CLI for future additions.
-- `src/components/common/` and `layout/`: branding, avatars, shared states, and responsive navigation. The mobile drawer includes focus trapping, Escape dismissal, and focus restoration.
-- `src/features/auth/`: the official-client session provider, guards, login, and logout.
-- `src/features/home/`: unavailable states for future friends and direct messages.
-- `src/lib/`: configuration, auth client, and class-name utilities.
-- `src/features/community/`: channel UI and isolated, typed visual samples; no backend client.
-- `src/styles/theme.css`: centralized palette, self-hosted Inter, and Tailwind theme tokens.
-- `src/styles/app.css`: reference application shell and chat styling.
-- `src/styles/auth.css`: authentication-page styling; `globals.css` imports styles and base rules. Imports use `@/` for `src/`.
-
-**All future application data must flow through the Rust backend.** The frontend must never connect to PostgreSQL. Better Auth owns identity and sessions; the Rust API owns business logic and authorization. There are no backend API calls in this template. Inspect the Rust authentication contract before adding cookies, token exchange, or authorization headers to future requests.
-
-React Router 7 is the newest major compatible with the installed Node 22.14 environment; Router 8 requires Node 22.22+. TypeScript 6 is used because the current TypeScript ESLint tooling supports versions below 6.1. Dependencies were resolved from stable releases without bypassing peer or engine constraints.
-
-## Verification and production build
+## Verification
 
 ```sh
 pnpm run typecheck
 pnpm run lint
 pnpm test
 pnpm run build
-pnpm run preview
 ```
 
-`build` generates the static frontend in `dist/`. `preview` is for local inspection of that build, not a production server. A production host must serve `dist/` over HTTPS and rewrite non-file SPA routes (such as `/app` and `/login`) to `index.html`. Nothing is deployed by this repository's scripts.
+Tests mock network responses while exercising production auth/data code, including account isolation, cancellation, 401/403 handling, nonce retries, cursor pagination, onboarding, creation, and proxy cookie/header behavior. They preserve the existing login, registration, routing, and preview tests.
 
-### Vercel production authentication
-
-The root `vercel.json` forwards `/api/auth/*` to the existing Core-auth service at `https://core-auth-production.up.railway.app/api/auth/*` before applying the SPA fallback. Other `/api/*` paths are excluded from that fallback. Authentication responses are not cached. The browser uses the frontend origin for authentication, preserving secure, HTTP-only cookies without relying on cross-site cookies. The proxy does not implement authentication or change cookie attributes.
-
-For **Production**, set this public build-time variable as **Config** in Vercel:
-
-```env
-VITE_AUTH_URL=https://core-app-weld.vercel.app/api/auth
-```
-
-Keep the frontend origin in Core-auth's `TRUSTED_ORIGINS`. Both the variable and `vercel.json` must be included in a new deployment; redeploying old source that lacks the file leaves `/api/auth/get-session` returning a Vercel 404. Preview deployments need their own same-origin authentication URL and an explicitly trusted frontend origin; the production URL above is not a same-origin URL for previews. Vite's local proxy and `pnpm preview` do not apply Vercel rewrites.
-
-After deployment, an unauthenticated `GET https://core-app-weld.vercel.app/api/auth/get-session` should return `200` with JSON `null`, matching Core-auth. Then verify sign-in, reload/session restoration, and logout in a browser with an authorized test account; the anonymous response alone does not prove cookie persistence.
-
-Vitest and Testing Library cover sign-up validation and service errors, verified/absent/unavailable post-sign-up sessions, safe session retries, sign-in with blocked cookies, routing, startup and background session behavior, expiry, redirect safety, logout, and configuration safety. Test fixtures are isolated from the application; there is no mock authentication mode in the frontend.
-
-Live connectivity is now verified against the supplied Core-auth URL: health returns 200, anonymous session lookup returns `200 null`, invalid credentials return `401 INVALID_EMAIL_OR_PASSWORD`, invalid registration data returns 400, and anonymous sign-out returns 200. Chrome verified both submit buttons, form validation, real error feedback, and same-origin proxy requests without runtime errors. No test account or authenticated session was created.
-
-Successful registration, valid sign-in, actual session-cookie persistence, and authenticated logout remain **unverified** without an existing authorized account or approved test registration. Runtime Railway variables remain unread; the earlier variable-list request was rejected because it retrieves secrets with public settings. The connection was established through the provided URL and observable public responses instead; no service configuration was changed. See the [connection notes](docs/core-auth-connection.md) for remaining requirements.
-
-Once a public endpoint or approved same-origin proxy is available, verify new/existing-email registration, invalid inputs and mismatched passwords, valid/invalid sign-in, reload on `/app`, authenticated access to `/login` and `/register`, direct protected access, logout, post-logout access, session expiration, and real browser cookies/CORS. Successful registration and sign-in require an authorized test account or controlled test-user creation; neither is fabricated locally or exercised against production without working service access.
-
-The initial dependency audit reports a moderate `minimatch` advisory in development-only ESLint tooling. The patched major removes public APIs, while upstream tooling still requests older majors, so no cross-major transitive override or forced downgrade is applied. Recheck updates with `pnpm audit`; this issue is not included in the production bundle. Advisory: [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+Anonymous local service checks confirmed a responding Better Auth session endpoint and a Rust `/api/v1/me` response of **401** without a cookie. Successful live registration/sign-in, cookie persistence and renewal through both services, authenticated Rust reads/writes, and authenticated logout remain **unverified**. No account was created and no deployment was performed. Follow the [live verification steps](docs/backend-integration.md#verification-status) with an authorized account before release.

@@ -1,5 +1,7 @@
 # Core Gaming reference UI
 
+This document describes the preserved **design preview**, selected when `VITE_API_URL` is empty. A configured Rust backend uses the same visual layout with real data and explicit unavailable states; see [backend integration](backend-integration.md). The preview never serves as a fallback for a failing configured backend.
+
 The supplied `Tmavé herní centrum Core Gaming.png` is the visual reference for the signed-in interface. The default dashboard has been replaced by the four-panel communication view: a community icon rail, Core Gaming channel sidebar, chat, and member activity. There are no promotional cards or welcome sections on the default page.
 
 ## Routes and styling
@@ -24,7 +26,7 @@ The composer adds messages only to React state, labeled **Only visible to you**.
 
 Voice, microphone/deafen actions, image/file uploads, GIFs, pinned messages, notifications, community creation, and real member activity remain unavailable. Their controls are disabled with accessible explanations. The interface never accesses the microphone or claims to establish a voice connection.
 
-The inspected Rust source includes community/channel/message endpoints, but this frontend still lacks an established contract connecting that API's identity handling to Better Auth. This UI change does not invent that contract, use `VITE_API_URL`, or modify the Rust backend, auth service, database, environment files, Railway, or Vercel. Real integration requires separately verified service behavior.
+The live workspace now uses the inspected Rust Better Auth session middleware and documented profile/community/channel/message contracts. Preview data remains isolated from live data. No backend/auth repository, service settings, or deployment is changed by this frontend implementation.
 
 ## Reference assets and verification
 

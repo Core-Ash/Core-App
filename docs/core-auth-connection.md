@@ -1,60 +1,25 @@
-# Core-auth connection
+﻿# Core-auth connection
 
-Updated November 13, 2026. The frontend is configured to reach the existing Core-auth service. Public health/session endpoints and error flows have been verified; successful registration and authenticated session persistence remain unverified.
+The authoritative setup is now [backend integration](backend-integration.md). It covers the same-origin routes for **both** Core-auth and Rust, required runtime/build variables, CSRF, cookie names, trust lists, and verification limits.
 
-## Service and observed behavior
+## Current implementation
 
-- Railway workspace **Core**, project **accurate-adventure**, environment **production**, service **Core-auth**.
-- The user supplied **https://core-auth-production.up.railway.app**. That URL responds over HTTPS; the earlier absence of a domain in CLI metadata is no longer a connection blocker.
-- Better Auth is mounted at `/api/auth/*`. The inspected source enables email/password sign-in and sign-up, with a **12–128-character** password policy. It does not require verification for sign-in; its email-delivery callbacks were stubs at the inspected commit.
-- Credentialed CORS permits **http://localhost:5173**. A preflight for **https://localhost:5173** did not include an allowed-origin header, so that origin is not used for the current local setup.
-- Health returned **200**, anonymous session lookup returned **200 null**, invalid sign-in returned **401 INVALID_EMAIL_OR_PASSWORD**, invalid registration returned **400**, and anonymous sign-out returned **200**.
-- Chrome verified that both buttons are clickable, field validation works, and invalid sign-in reaches the real service through the local proxy and displays the expected error. No browser runtime errors were observed.
-- No production account was created, and no existing user's credentials or session were used. Real session-cookie attributes and persistence after successful authentication still need an authorized account test.
-- No Railway settings, other repository, or database were changed. Service variables remain unread: the earlier full variable-list request was rejected because it retrieves secrets together with public settings. It was not retried or bypassed.
+`src/lib/auth-client.ts` uses the official Better Auth React client. An absolute auth origin/full base URL remains supported; explicit `VITE_AUTH_URL=/api/auth` resolves to the browser's own origin. Missing or invalid configuration never falls back to an auth endpoint implicitly.
 
-## Current workspace configuration
+The service's inspected source mounts `/api/auth/*`, enables email/password authentication, configures a 12-character minimum (128-character Better Auth maximum), and does not require email verification for sign-in. Verification and password-reset delivery callbacks remain stubs in that source. Deployment configuration may differ and must be checked before release.
 
-The ignored `.env.local` contains the supplied public auth URL for production builds:
+Login and registration confirm the actual cookie-backed session before navigation. The React session hook remains authoritative. Initialization, background rechecks, service failures, expired sessions, guest/protected redirects, and sign-out retain their existing tests. A stale cached user accompanied by an official 401 is treated as signed out.
 
-```env
-VITE_AUTH_URL=https://core-auth-production.up.railway.app
-VITE_API_URL=
-```
+## Cookie transport
 
-The ignored `.env.development.local` overrides only development:
+Use the environment-configured Vercel function for `/api/auth/*` and `/api/v1/*`, or a controlled same-site domain arrangement. A host-only cookie on one Railway hostname does not reach another hostname automatically.
 
-```env
-VITE_AUTH_URL=http://localhost:5173/api/auth
-DEV_AUTH_PROXY_TARGET=https://core-auth-production.up.railway.app
-DEV_AUTH_PROXY_HTTPS=false
-```
+The previous hardcoded auth-only Vercel rewrite has been replaced with a configurable transport proxy. Set **both** server-only upstream origins as well as the public same-origin paths; an old deployment without the new function or variables cannot use it. Static `pnpm preview` does not execute the proxy.
 
-Run `pnpm dev` and open **http://localhost:5173**. Restart Vite after editing environment files. The current dev server was restarted with `pnpm dev --force` to refresh stale optimized dependencies left after the package-manager migration.
+Keep the frontend origin in Core-auth's trusted origins and Rust's Origin/CSRF allowlist. Preserve `HttpOnly`, `Secure`, `SameSite`, and `Path=/`. Rust must accept the exact configured primary session cookie and validate it through Core-auth; it does not use Core-auth's JWT access tokens for this browser flow. No token storage or token exchange was added.
 
-The browser uses the same-origin `/api/auth` proxy. Its fixed upstream is the real Core-auth HTTPS origin. Upstream certificate verification remains enabled, browser Origin is preserved, and no cookie flags are rewritten. This avoids cross-site cookie delivery for local requests. The local HTTP origin matches the service's existing trusted origin; the proxy binds to localhost and is not a production hosting solution.
+## Verification
 
-The proxy defaults to local HTTPS. To use HTTPS instead, first allow **https://localhost:5173** on Core-auth, then change the development URL to `https://localhost:5173/api/auth` and `DEV_AUTH_PROXY_HTTPS` to `true`. The Vite basic-SSL plugin generates a self-signed localhost certificate; a trusted local certificate can replace it. See [Vite's HTTPS options](https://vite.dev/config/server-options.html#server-https).
+In this integration task, anonymous requests to the configured local Better Auth session endpoint returned HTTP 200, and Rust `/api/v1/me` returned HTTP 401 without credentials. Network-mocked tests cover official-client 401 rechecks and session isolation as well as the existing auth flows.
 
-Keep proxy settings in the development-specific file so a production build does not embed localhost as the auth URL. The server-only `DEV_` settings are not exposed as frontend environment variables.
-
-## Before deploying the frontend
-
-### Vercel same-origin proxy
-
-The production frontend is `https://core-app-weld.vercel.app`. Live checks on November 13, 2026 confirmed that Core-auth now returns credentialed CORS headers for this exact origin. The frontend bundle has also been updated to use `https://core-app-weld.vercel.app/api/auth`, but the observed deployment returns a Vercel `404 NOT_FOUND` for `/api/auth/get-session`; the direct Railway endpoint still returns `200 null`. This identifies the missing deployed proxy as the current session-check blocker.
-
-The root `vercel.json` now provides a fixed `/api/auth/*` rewrite to the existing Railway service, disables caching for those requests, and sends non-API SPA routes to `index.html`. Set Vercel's **Production** `VITE_AUTH_URL` to `https://core-app-weld.vercel.app/api/auth` as public **Config**, then deploy source containing this file. Keep the production frontend origin in Core-auth's existing trusted-origin list. Do not reuse this absolute production auth URL for preview deployments that need same-origin cookies.
-
-This configuration is prepared locally; it does not change Railway or deploy itself. After deployment, verify JSON `200 null` through the Vercel endpoint, followed by authenticated sign-in, reload, and logout in a real browser. Successful authenticated cookie persistence remains unverified.
-
-### Service requirements
-
-- Set `VITE_AUTH_URL` at build time to the intended public HTTPS auth base URL. Never use a `.railway.internal` hostname in the browser.
-- Confirm Core-auth's `BETTER_AUTH_URL` and add the exact deployed frontend origin to `TRUSTED_ORIGINS`, preserving existing origins. Its Hono CORS and Better Auth origin checks must both allow that origin with credentials.
-- Preserve Secure and HTTP-only cookie protections. Prefer same-site HTTPS custom domains or a same-origin production reverse proxy to avoid third-party cookie restrictions. The Vite dev proxy is unused by builds and preview. See [Better Auth cookie guidance](https://better-auth.com/docs/concepts/cookies).
-- If changing the auth base URL, review its JWT issuer dependency before applying a separately authorized service configuration restart/deployment.
-- Verify new-user and duplicate-email registration, valid login, reload/session restoration, guest/protected redirects, logout, and post-logout access with an authorized test account. Do not report those scenarios as passing until exercised.
-- The inspected Rust backend has separate authentication and no Better Auth proxy/JWT verification. Future Rust integration remains a separate task; this frontend makes no application API calls.
-
-The original source inspection matched Core-auth commit `5f77a85bf56dee50a8ea1590ed3e84ecfe42b0f6` and Core-Backend commit `64a3b0d7cc11751ff93db7ddfd8d5b5c81bf7c4f`. Authentication and database rules remain owned by those services.
+Successful live sign-in/registration, real cookie scope and persistence, authenticated Rust reads/writes, renewal, logout, and Vercel deployment remain unverified. No account was created, production was not deployed, and no service settings or other repositories were changed. Follow the [live verification steps](backend-integration.md#verification-status) using an authorized account.

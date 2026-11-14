@@ -15,7 +15,7 @@ import {
 import { useOutletContext } from "react-router";
 import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
 import { Tooltip } from "@/components/ui/tooltip";
-import type { CommunityView } from "@/features/community/preview/types";
+import type { CommunityView } from "@/features/community/types";
 
 interface ChatHeaderProps {
   name: string;
@@ -26,6 +26,7 @@ interface ChatHeaderProps {
   membersOpen: boolean;
   onToggleMembers: () => void;
   membersButtonRef: Ref<HTMLButtonElement>;
+  preview?: boolean;
 }
 
 export function ChatHeader({
@@ -37,6 +38,7 @@ export function ChatHeader({
   membersOpen,
   onToggleMembers,
   membersButtonRef,
+  preview = true,
 }: ChatHeaderProps) {
   const [mobileSearch, setMobileSearch] = useState(false);
   const searchToggle = useRef<HTMLButtonElement>(null);
@@ -58,20 +60,20 @@ export function ChatHeader({
           <h1>{name}</h1>
         </div>
         <div className="chat-header-tools">
-          <Tooltip content="Notifications unavailable in preview">
+          <Tooltip content="Notifications unavailable">
             <button
               className="icon-button notification-control"
               disabled
-              aria-label="Notifications unavailable in preview"
+              aria-label="Notifications unavailable"
             >
               <Bell size={25} aria-hidden="true" />
             </button>
           </Tooltip>
-          <Tooltip content="Pinned messages unavailable in preview">
+          <Tooltip content="Pinned messages unavailable">
             <button
               className="icon-button pin-control"
               disabled
-              aria-label="Pinned messages unavailable in preview"
+              aria-label="Pinned messages unavailable"
             >
               <Pin size={25} aria-hidden="true" />
             </button>
@@ -93,7 +95,11 @@ export function ChatHeader({
             <>
               <label className="header-search">
                 <Search size={21} aria-hidden="true" />
-                <span className="sr-only">Search messages in this channel</span>
+                <span className="sr-only">
+                  {preview
+                    ? "Search messages in this channel"
+                    : "Search loaded messages in this channel"}
+                </span>
                 <input
                   type="search"
                   placeholder={`Search in ${communityName}...`}
@@ -113,11 +119,11 @@ export function ChatHeader({
             </>
           )}
           <Dialog.Root>
-            <Tooltip content="About this preview">
+            <Tooltip content={preview ? "About this preview" : "About Core"}>
               <Dialog.Trigger asChild>
                 <button
                   className="icon-button help-control"
-                  aria-label="About this preview"
+                  aria-label={preview ? "About this preview" : "About Core"}
                 >
                   <CircleHelp size={25} aria-hidden="true" />
                 </button>
@@ -126,24 +132,34 @@ export function ChatHeader({
             <Dialog.Portal>
               <Dialog.Overlay className="dialog-overlay" />
               <Dialog.Content className="standard-dialog preview-help">
-                <Dialog.Title>Core Gaming preview</Dialog.Title>
+                <Dialog.Title>
+                  {preview ? "Core Gaming preview" : "Core Gaming"}
+                </Dialog.Title>
                 <Dialog.Description>
-                  Communities, conversations, members, and game activity are
-                  sample data. Your profile comes from your Better Auth session.
+                  {preview
+                    ? "Communities, conversations, members, and game activity are sample data. Your profile comes from your Better Auth session."
+                    : "Your communities, channels, profile, and messages come from the Core application service."}
                 </Dialog.Description>
                 <p>
-                  Messages and reactions stay in this page and aren’t sent or
-                  saved. Voice, uploads, GIFs, pinned messages, and
-                  notifications are unavailable.
+                  {preview
+                    ? "Messages and reactions stay in this page and aren’t sent or saved."
+                    : "Refresh history for new messages. Search covers loaded history. Member profiles, presence, reactions, and live updates are unavailable."}{" "}
+                  Voice, uploads, GIFs, pinned messages, and notifications are
+                  unavailable.
                 </p>
                 <p>
-                  Press Enter to add a local message, or Shift+Enter for a new
-                  line. Account settings include sign out.
+                  Press Enter to{" "}
+                  {preview ? "add a local message" : "send a message"}, or
+                  Shift+Enter for a new line. Account settings include sign out.
                 </p>
                 <Dialog.Close asChild>
                   <button
                     className="icon-button dialog-close"
-                    aria-label="Close preview information"
+                    aria-label={
+                      preview
+                        ? "Close preview information"
+                        : "Close information"
+                    }
                   >
                     <X size={20} aria-hidden="true" />
                   </button>

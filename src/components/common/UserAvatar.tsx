@@ -5,7 +5,7 @@ export function UserAvatar({
   user,
   className,
 }: {
-  user: AuthUser;
+  user: Pick<AuthUser, "name" | "email" | "image">;
   className?: string;
 }) {
   const initials = (user.name.trim() || user.email)

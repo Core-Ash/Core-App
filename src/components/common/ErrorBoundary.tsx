@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 import { ErrorScreen } from "./ErrorScreen";
 
 export class ErrorBoundary extends Component<
@@ -9,11 +9,6 @@ export class ErrorBoundary extends Component<
 
   static getDerivedStateFromError() {
     return { failed: true };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    if (import.meta.env.DEV)
-      console.error("Core render error", error, info.componentStack);
   }
 
   render() {

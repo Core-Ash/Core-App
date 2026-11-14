@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StatusIndicator } from "@/components/ui/status-indicator";
 import { cn } from "@/lib/utils";
-import type { PreviewMember } from "@/features/community/preview/types";
+import type { CommunityMember } from "@/features/community/types";
 
 export function MemberAvatar({
   member,
@@ -9,7 +9,7 @@ export function MemberAvatar({
   presence = false,
   sample = true,
 }: {
-  member: PreviewMember;
+  member: CommunityMember;
   small?: boolean;
   presence?: boolean;
   sample?: boolean;

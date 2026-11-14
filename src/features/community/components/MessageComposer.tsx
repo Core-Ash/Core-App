@@ -3,28 +3,59 @@ import { Image, LoaderCircle, Plus, SendHorizontal, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmojiPicker } from "@/components/ui/emoji-picker";
 import { Tooltip } from "@/components/ui/tooltip";
+import { apiErrorMessage } from "@/lib/api/errors";
 
 interface MessageComposerProps {
   channelName: string;
-  onSend: (body: string) => void;
+  onSend: (body: string) => void | Promise<void>;
   sending?: boolean;
+  preview?: boolean;
 }
 
 export function MessageComposer({
   channelName,
   onSend,
   sending = false,
+  preview = true,
 }: MessageComposerProps) {
   const [draft, setDraft] = useState("");
   const [announcement, setAnnouncement] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const locked = useRef(false);
   const input = useRef<HTMLTextAreaElement>(null);
-  const ready = draft.trim().length > 0 && !sending;
-  function send() {
-    if (!ready) return;
-    onSend(draft.trim());
-    setDraft("");
-    setAnnouncement("Message added to the local preview. Only you can see it.");
-    input.current?.focus();
+  const busy = sending || submitting;
+  const maximum = preview ? 2000 : 4000;
+  const ready = draft.trim().length > 0 && !busy;
+  async function send() {
+    if (!ready || locked.current) return;
+    if (Array.from(draft.trim()).length > maximum || draft.includes("\0")) {
+      setError(
+        `Enter a message with 1–${maximum} characters and no unsupported control characters.`,
+      );
+      return;
+    }
+    locked.current = true;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = onSend(draft.trim());
+      if (result) await result;
+      setDraft("");
+      setAnnouncement(
+        preview
+          ? "Message added to the local preview. Only you can see it."
+          : "Message sent.",
+      );
+    } catch (failure) {
+      setError(apiErrorMessage(failure));
+    } finally {
+      locked.current = false;
+      setSubmitting(false);
+      // Focus after React re-enables the input following an async send.
+      if (preview) input.current?.focus();
+      else requestAnimationFrame(() => input.current?.focus());
+    }
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (
@@ -34,43 +65,49 @@ export function MessageComposer({
       event.nativeEvent.keyCode !== 229
     ) {
       event.preventDefault();
-      send();
+      void send();
     }
   }
   return (
     <div className="composer-area">
       <form
         className="message-composer"
-        aria-label="Local preview message composer"
-        aria-busy={sending}
+        aria-label={
+          preview ? "Local preview message composer" : "Message composer"
+        }
+        aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
-          send();
+          void send();
         }}
       >
-        <Tooltip content="Attachments are unavailable in preview">
+        <Tooltip content="Attachments are unavailable">
           <button
             type="button"
             className="icon-button attachment-button"
             disabled
-            aria-label="Attachments unavailable in preview"
+            aria-label="Attachments unavailable"
           >
             <Plus size={27} strokeWidth={1.6} aria-hidden="true" />
           </button>
         </Tooltip>
         <span className="composer-divider" />
         <label className="sr-only" htmlFor="message-draft">
-          Message #{channelName} (local preview)
+          Message #{channelName}
+          {preview ? " (local preview)" : ""}
         </label>
         <textarea
           ref={input}
           id="message-draft"
           rows={1}
-          maxLength={2000}
+          maxLength={maximum * 2}
           placeholder={`Message #${channelName}`}
           value={draft}
-          disabled={sending}
-          aria-describedby="composer-help"
+          disabled={busy}
+          aria-invalid={Boolean(error)}
+          aria-describedby={
+            error ? "composer-help composer-error" : "composer-help"
+          }
           onChange={(event) => {
             setDraft(event.target.value);
             setAnnouncement("");
@@ -78,32 +115,34 @@ export function MessageComposer({
           onKeyDown={onKeyDown}
         />
         <div className="composer-tools">
-          <Tooltip content="Image uploads are unavailable in preview">
+          <Tooltip content="Image uploads are unavailable">
             <button
               type="button"
               className="icon-button image-button"
               disabled
-              aria-label="Image uploads unavailable in preview"
+              aria-label="Image uploads unavailable"
             >
               <Image size={25} aria-hidden="true" />
             </button>
           </Tooltip>
-          <Tooltip content="GIFs are unavailable in preview">
+          <Tooltip content="GIFs are unavailable">
             <button
               type="button"
               className="icon-button gif-button"
               disabled
-              aria-label="GIFs unavailable in preview"
+              aria-label="GIFs unavailable"
             >
               <span aria-hidden="true">GIF</span>
             </button>
           </Tooltip>
           <EmojiPicker
             label="Choose an emoji"
-            disabled={sending}
+            disabled={busy}
             onSelect={(emoji) => {
               setDraft((previous) =>
-                `${previous}${emoji.value}`.slice(0, 2000),
+                Array.from(`${previous}${emoji.value}`)
+                  .slice(0, maximum)
+                  .join(""),
               );
               input.current?.focus();
             }}
@@ -116,10 +155,14 @@ export function MessageComposer({
             className="send-button"
             disabled={!ready}
             aria-label={
-              sending ? "Sending message" : "Send local preview message"
+              busy
+                ? "Sending message"
+                : preview
+                  ? "Send local preview message"
+                  : "Send message"
             }
           >
-            {sending ? (
+            {busy ? (
               <LoaderCircle className="animate-spin" aria-hidden="true" />
             ) : (
               <SendHorizontal
@@ -133,11 +176,25 @@ export function MessageComposer({
       </form>
       <div className="composer-help" id="composer-help">
         <span>
-          Design preview · sample conversations and activity. Messages aren’t
-          sent or saved.
+          {preview
+            ? "Design preview · sample conversations and activity. Messages aren’t sent or saved."
+            : "Enter to send · Shift+Enter for a new line. Refresh history to check for new messages."}
         </span>
-        {draft.length > 1800 && <span>{draft.length}/2000</span>}
+        {Array.from(draft).length > maximum - 200 && (
+          <span>
+            {Array.from(draft).length}/{maximum}
+          </span>
+        )}
       </div>
+      {error && (
+        <p
+          id="composer-error"
+          role="alert"
+          className="mt-2 text-sm text-destructive"
+        >
+          {error} Your draft has been kept.
+        </p>
+      )}
       <p role="status" className="sr-only">
         {announcement}
       </p>

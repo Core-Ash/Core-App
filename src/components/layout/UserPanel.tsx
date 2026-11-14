@@ -4,20 +4,62 @@ import { UserAvatar } from "@/components/common/UserAvatar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { StatusIndicator } from "@/components/ui/status-indicator";
 import { useAuth } from "@/features/auth/auth-context";
+import { useOptionalAppData } from "@/app/app-data-context";
+import { useCurrentUser } from "@/features/community/api/hooks";
+import type { AuthUser } from "@/lib/auth-client";
 
 export function UserPanel({ onNavigate }: { onNavigate?: () => void }) {
   const { session } = useAuth();
+  const data = useOptionalAppData();
   if (!session) return null;
+  if (data?.configured) return <BackendUserPanel onNavigate={onNavigate} />;
+  return (
+    <UserPanelView
+      user={session.user}
+      subtitle="Online"
+      onNavigate={onNavigate}
+    />
+  );
+}
+
+function BackendUserPanel({ onNavigate }: { onNavigate?: () => void }) {
+  const { session } = useAuth();
+  const profile = useCurrentUser();
+  const user = profile.isSuccess ? profile.data : undefined;
+  return (
+    <UserPanelView
+      user={{
+        name: user?.display_name || user?.username || "Core member",
+        email: "",
+        image: session?.user.image,
+      }}
+      subtitle={user?.username ? `@${user.username}` : "Profile unavailable"}
+      onNavigate={onNavigate}
+    />
+  );
+}
+
+function UserPanelView({
+  user,
+  subtitle,
+  onNavigate,
+}: {
+  user: Pick<AuthUser, "name" | "email" | "image">;
+  subtitle: string;
+  onNavigate?: () => void;
+}) {
   return (
     <section className="user-panel" aria-label="Signed-in account">
       <div className="user-panel-profile">
         <span className="member-avatar">
-          <UserAvatar user={session.user} className="profile-avatar" />
+          <UserAvatar user={user} className="profile-avatar" />
           <StatusIndicator status="online" label="Signed in to Core" />
         </span>
         <div className="user-panel-name">
-          <p title={session.user.name}>{session.user.name || "Core member"}</p>
-          <span title="Signed in; live presence is unavailable">Online</span>
+          <p title={user.name}>{user.name || "Core member"}</p>
+          <span title="Signed in; live presence is unavailable">
+            {subtitle}
+          </span>
         </div>
         <div className="user-controls">
           <Tooltip content="Microphone unavailable · voice is not connected">

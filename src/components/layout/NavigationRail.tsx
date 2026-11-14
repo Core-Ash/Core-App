@@ -12,8 +12,15 @@ import {
   usePreviewSelection,
 } from "@/features/community/preview/use-preview-selection";
 import { cn } from "@/lib/utils";
+import { useOptionalAppData } from "@/app/app-data-context";
+import { LiveNavigationRail } from "@/features/community/components/LiveNavigationRail";
 
 export function NavigationRail() {
+  const data = useOptionalAppData();
+  return data?.configured ? <LiveNavigationRail /> : <PreviewNavigationRail />;
+}
+
+function PreviewNavigationRail() {
   const { community } = usePreviewSelection();
   return (
     <nav className="navigation-rail" aria-label="Communities">

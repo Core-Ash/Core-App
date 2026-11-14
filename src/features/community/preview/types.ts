@@ -1,19 +1,11 @@
-import type { PresenceStatus } from "@/components/ui/status-indicator";
-
-export type AvatarTone = "rose" | "teal" | "amber" | "violet" | "slate";
-
-export interface PreviewMember {
-  id: string;
-  name: string;
-  initials: string;
-  avatar?: string;
-  activityAvatar?: string;
-  mobile?: boolean;
-  tone: AvatarTone;
-  status: PresenceStatus;
-  game?: string;
-  role?: string;
-}
+import type {
+  AvatarTone,
+  CommunityMember,
+  ChatMessageData,
+  MessageReaction,
+} from "@/features/community/types";
+export type { AvatarTone, CommunityView } from "@/features/community/types";
+export type PreviewMember = CommunityMember;
 
 export interface PreviewChannel {
   id: string;
@@ -38,21 +30,5 @@ export interface PreviewCommunity {
   }[];
 }
 
-export interface PreviewReaction {
-  emoji: string;
-  label: string;
-  count: number;
-}
-
-export interface PreviewMessage {
-  id: string;
-  author: PreviewMember;
-  body: string;
-  createdAt: string;
-  timestampLabel?: string;
-  attachment?: { src: string; alt: string };
-  reactions?: readonly PreviewReaction[];
-  local?: boolean;
-}
-
-export type CommunityView = "channel" | "overview" | "events" | "members";
+export type PreviewReaction = MessageReaction;
+export type PreviewMessage = ChatMessageData;
