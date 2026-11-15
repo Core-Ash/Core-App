@@ -1,4 +1,4 @@
-import { proxyServiceRequest } from "../server/service-proxy";
+import { proxyServiceRequest } from "../server/service-proxy.js";
 
 export default {
   fetch(request: Request) {

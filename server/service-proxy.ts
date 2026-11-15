@@ -1,4 +1,4 @@
-import { isPrivateHost } from "../src/lib/public-host";
+import { isPrivateHost } from "../src/lib/public-host.js";
 
 // Transport only: Core-auth owns sessions; Rust owns identity checks and authorization.
 interface ProxyEnvironment {
