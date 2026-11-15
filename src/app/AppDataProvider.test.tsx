@@ -86,7 +86,7 @@ describe("session-scoped application data", () => {
   it("deduplicates profile observers and works with StrictMode effect replay", async () => {
     const request = vi
       .fn()
-      .mockImplementation(async () => Response.json(profileFixture));
+      .mockImplementation(async () => Response.json({ profile: profileFixture, communities: { items: [] } }));
     vi.stubGlobal("fetch", request);
     render(
       <StrictMode>
@@ -119,7 +119,7 @@ describe("session-scoped application data", () => {
         }),
       )
       .mockResolvedValueOnce(
-        Response.json({ ...profileFixture, display_name: "Second account" }),
+        Response.json({ profile: { ...profileFixture, display_name: "Second account" }, communities: { items: [] } }),
       );
     vi.stubGlobal("fetch", request);
     const view = render(wrapper(authenticated()));
@@ -142,7 +142,7 @@ describe("session-scoped application data", () => {
     expect(oldQueries.getQueryCache().getAll()).toHaveLength(0);
     expect(await screen.findByText("Second account")).toBeInTheDocument();
     await act(async () => {
-      finishFirst(Response.json(profileFixture));
+      finishFirst(Response.json({ profile: profileFixture, communities: { items: [] } }));
     });
     expect(
       screen.queryByText(profileFixture.display_name),
@@ -153,7 +153,7 @@ describe("session-scoped application data", () => {
   it("clears the previous cache when a session expires", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(Response.json(profileFixture)),
+      vi.fn().mockResolvedValue(Response.json({ profile: profileFixture, communities: { items: [] } })),
     );
     const view = render(wrapper(authenticated()));
     await screen.findByText(profileFixture.display_name);
@@ -167,7 +167,7 @@ describe("session-scoped application data", () => {
   it("clears private memory immediately after successful official sign-out", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(Response.json(profileFixture)),
+      vi.fn().mockResolvedValue(Response.json({ profile: profileFixture, communities: { items: [] } })),
     );
     const refresh = vi.fn().mockResolvedValue(undefined);
     const signOut = vi

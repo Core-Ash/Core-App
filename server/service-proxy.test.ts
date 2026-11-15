@@ -53,6 +53,7 @@ describe("same-origin service proxy", () => {
           {
             headers: {
               "Retry-After": "9",
+              "Server-Timing": "auth;dur=5.12, handler;dur=2.34",
               "Set-Cookie": "must-not-be-issued-by-rust=x",
             },
           },
@@ -81,6 +82,7 @@ describe("same-origin service proxy", () => {
     expect(new TextDecoder().decode(options.body)).toBe('{"name":"Squad"}');
     expect(response.headers.get("Retry-After")).toBe("9");
     expect(response.headers.has("Set-Cookie")).toBe(false);
+    expect(response.headers.get("Server-Timing")).toBe("auth;dur=5.12, handler;dur=2.34");
   });
   it.each([
     undefined,

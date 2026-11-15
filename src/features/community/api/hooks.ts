@@ -7,6 +7,7 @@ import {
 import { useAppData } from "@/app/app-data-context";
 import { ApiError } from "@/lib/api/errors";
 import { endpoints } from "@/lib/api/endpoints";
+import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
 import type { MessageCursor } from "@/lib/api/types";
 
 export const queryKeys = {
@@ -19,9 +20,14 @@ export const queryKeys = {
 
 export function useCurrentUser() {
   const { api, ready } = useAppData();
+  const queries = useQueryClient();
   return useQuery({
     queryKey: queryKeys.profile,
-    queryFn: ({ signal }) => endpoints.currentUser(api, signal),
+    queryFn: async ({ signal }) => {
+      const result = await endpoints.bootstrap(api, signal);
+      queries.setQueryData(queryKeys.communities, result.communities);
+      return result.profile;
+    },
     enabled: ready,
   });
 }
@@ -98,10 +104,16 @@ export function useSendMessage(channelId: string) {
       if (!ready) throw new ApiError("unauthorized");
       return endpoints.sendMessage(api, channelId, input);
     },
-    onSuccess: () => {
-      void queries.invalidateQueries({
-        queryKey: queryKeys.messages(channelId),
-      });
+    onMutate: () =>
+      queries.cancelQueries({ queryKey: queryKeys.messages(channelId) }),
+    onSuccess: async (message) => {
+      // A manual refresh started during the send must not overwrite confirmation.
+      await queries.cancelQueries({ queryKey: queryKeys.messages(channelId) });
+      queries.setQueryData(
+        queryKeys.messages(channelId),
+        (previous: Parameters<typeof mergeConfirmedMessage>[0]) =>
+          mergeConfirmedMessage(previous, message),
+      );
     },
   });
 }

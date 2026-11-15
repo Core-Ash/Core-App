@@ -208,6 +208,18 @@ function LiveConversation({
                     </div>
                   }
                 />
+                {send.isPending && (
+                  <div
+                    role="status"
+                    aria-label="Pending message"
+                    className="px-5 py-2 text-sm text-muted-foreground"
+                  >
+                    <p className="whitespace-pre-wrap break-words">
+                      {send.variables?.body}
+                    </p>
+                    <span>Sending…</span>
+                  </div>
+                )}
                 <MessageComposer
                   channelName={channel.name}
                   preview={false}

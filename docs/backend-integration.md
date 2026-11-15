@@ -1,15 +1,15 @@
 # Rust backend integration
 
-The frontend uses the actual routes and shapes inspected in the adjacent Core repository's `API.md`, `docs/openapi.json`, `src/lib.rs`, `src/api.rs`, `src/auth.rs`, and `docs/configuration.md`. Core-auth's session and cookie settings were inspected in its `src/lib/auth.ts`. These sources were read only; neither repository was modified. Recheck deployed versions and configuration before release.
+The frontend uses the actual routes and shapes inspected in the adjacent Core repository's `API.md`, `docs/openapi.json`, `src/lib.rs`, `src/api.rs`, `src/auth.rs`, and `docs/configuration.md`. Core-auth's session and cookie settings were inspected in its `src/lib/auth.ts`. The bootstrap contract and request-latency changes are implemented in both repositories. Recheck deployed versions and configuration before release.
 
 ## Data and authentication flow
 
 1. The official Better Auth React client signs in, confirms the cookie-backed session, and maintains session state. It retains responsibility for refresh and sign-out.
 2. When that session is ready, `AppDataProvider` creates a session-specific query cache and cancellation scope. It never uses the session token as an API parameter or cache key.
-3. `GET /api/v1/me` reads the linked application profile. A 409 offers explicit profile setup through `POST /api/v1/me` with an empty JSON object. Reads never create records.
-4. Communities load after the profile succeeds. Channels load only for a community returned by that list; messages load only for a returned, visible channel. Invalid URL selections fall back to resources the backend actually returned.
+3. `GET /api/v1/bootstrap` reads the linked application profile and active communities together. A 409 offers explicit profile setup through `POST /api/v1/me` with an empty JSON object. Reads never create records.
+4. Bootstrap seeds the community cache before the profile query succeeds. Channels load only for a community returned by that list; messages load only for a returned, visible channel. Invalid URL selections fall back to resources the backend actually returned.
 5. All writes send JSON, browser-managed cookies, and `X-Core-CSRF: 1`. Rust derives the acting identity and permissions independently; the frontend supplies no acting user, author, or owner ID.
-6. Mutations invalidate the affected lists/history. Message submission generates one UUID nonce and reuses it when retrying an unchanged failed draft. A lost response therefore does not create duplicate messages when retried on the same page. The composer keeps failed drafts.
+6. Creation mutations invalidate their affected lists. Confirmed message sends merge into the channel history cache without refetching. Message submission generates one UUID nonce and reuses it when retrying an unchanged failed draft. A lost response therefore does not create duplicate messages when retried on the same page. The composer keeps failed drafts.
 
 API failures use safe, fixed messages. 400/413/415/422 indicate input problems; 403 denies access without signing out; 404 indicates an unavailable resource; 409 indicates conflict; 429 displays the documented Retry-After seconds; network and 5xx failures offer retry. HTML, malformed JSON, and invalid response shapes fail closed. Raw errors, stack traces, credentials, and private responses are not logged.
 
@@ -76,11 +76,12 @@ The inspected Core-auth source uses host-only cookies, production Secure/HttpOnl
 
 | Operation          | Existing Rust contract                                                                      | Frontend behavior                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Workspace bootstrap | GET `/api/v1/bootstrap`; `{profile,communities:{items:[...]}}` | Shared profile query seeds the community cache. |
 | Profile read/setup | GET/POST `/api/v1/me`; `{id,username,email,display_name}`                                   | Shared current-user query, explicit onboarding, settings, account panel.                                |
 | Communities        | GET/POST `/api/v1/communities`; list `{items:[{id,name,owner_id}]}`, creation `{name}`      | Dynamic rail/picker, selection, empty/error states, create dialog.                                      |
 | Channels           | GET/POST `/api/v1/communities/{id}/channels`; `{id,name,topic,position}`, creation `{name}` | Dynamic text channel list/selection and permission-checked creation.                                    |
 | Message history    | GET `/api/v1/channels/{id}/messages?limit=50`; `{items,next_cursor}`                        | Cursor-based older pages, chronological display, de-duplication, loaded-history search, manual refresh. |
-| Send message       | POST `/api/v1/channels/{id}/messages`; `{body,client_nonce}`                                | 1–4000 Unicode characters, retry-safe nonce, preserved failed drafts, history invalidation.             |
+| Send message       | POST `/api/v1/channels/{id}/messages`; `{body,client_nonce}`                                | 1–4000 Unicode characters, retry-safe nonce, preserved failed drafts, confirmed-response cache update.             |
 
 Lists contain at most 100 communities/channels; those endpoints expose no pagination. Names contain 1–100 characters. Body/field validation and authorization remain authoritative in Rust. The owner and members with the relevant grant can create channels; no permissions-discovery API exists, so the action explains the requirement and handles 403. No unsupported update/delete routes are called even though the reusable transport supports PUT/PATCH/DELETE.
 
@@ -99,3 +100,11 @@ Anonymous checks against the configured local services observed Better Auth `get
 Before release, use an authorized account to check sign-in/registration, actual Set-Cookie scope and flags, reload restoration, explicit new-profile setup, existing-email collisions, community/channel creation and selection, message pagination/sending, permission denial, revoked sessions, account switching, and logout. Verify that Rust receives and independently validates the real session through the deployed proxy. Confirm that reads/writes fail without a session and that auth/service failures hide private data. Email delivery still requires the owning Core-auth service configuration.
 
 Successful authenticated browser flows, runtime Vercel variables, function packaging/routing, deployed CORS/CSRF, and production cookie delivery remain unverified. Nothing in this task deploys or changes service configuration.
+
+## Request latency
+
+The signed-in workspace starts with `GET /api/v1/bootstrap`: `{profile, communities: {items: [...]}}`. This protected endpoint validates the session once, returns only the current user's profile and active communities, and has the same 409 onboarding behavior as GET /me. Deploy the matching backend before this frontend. An explicit onboarding POST is still required for new accounts.
+
+Profile observers share the bootstrap request; the validated community list seeds the session-scoped query cache. Channels and message history still require backend authorization. A confirmed message response updates only that channel's existing cache; cursor boundaries and older pages remain intact, retries deduplicate by server ID or author/nonce, and cleared caches stay empty. A pending send is visibly marked until confirmation. Failed sends retain their draft and nonce. This does not add realtime synchronization: use Refresh history to load other users' messages until WebSockets are implemented.
+
+`vercel.json` places API functions in `fra1` near the Railway Europe services; static assets still use Vercel's edge network. Preserve same-origin API URLs and server-only upstream variables. The proxy forwards numeric `Server-Timing` stages so the browser Network panel can distinguish backend authentication, rate-limit, and handler costs. It does not cache credentials or sessions.

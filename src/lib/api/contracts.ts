@@ -41,6 +41,13 @@ export function parseProfile(value: unknown): Profile {
     display_name: string(data.display_name),
   };
 }
+export function parseBootstrap(value: unknown) {
+  const data = record(value);
+  return {
+    profile: parseProfile(data.profile),
+    communities: parseList(data.communities, parseCommunity),
+  };
+}
 export function parseCommunity(value: unknown): Community {
   const data = record(value);
   return {

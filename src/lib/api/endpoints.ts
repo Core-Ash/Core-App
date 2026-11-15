@@ -1,5 +1,6 @@
 import type { ApiClient } from "@/lib/api/client";
 import {
+  parseBootstrap,
   parseChannel,
   parseCommunity,
   parseList,
@@ -10,6 +11,8 @@ import {
 import type { MessageCursor } from "@/lib/api/types";
 
 export const endpoints = {
+  bootstrap: async (api: ApiClient, signal?: AbortSignal) =>
+    parseBootstrap(await api.get("/bootstrap", { signal })),
   currentUser: async (api: ApiClient, signal?: AbortSignal) =>
     parseProfile(await api.get("/me", { signal })),
   createProfile: async (api: ApiClient) =>

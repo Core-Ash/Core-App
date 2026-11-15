@@ -35,6 +35,10 @@ function setup({ noCommunities = false, noProfile = false } = {}) {
   const request = vi.fn(async (input: string, options: RequestInit = {}) => {
     const url = new URL(input, "https://core.example.com");
     const write = options.method === "POST";
+    if (url.pathname === "/api/v1/bootstrap")
+      return profileCreated
+        ? Response.json({ profile: profileFixture, communities: { items: [...communities] } })
+        : new Response(null, { status: 409 });
     if (url.pathname === "/api/v1/me") {
       if (write) profileCreated = true;
       return profileCreated
@@ -102,8 +106,9 @@ describe("Rust-backed community workspace", () => {
       screen.queryByText(/Design preview · sample/),
     ).not.toBeInTheDocument();
     expect(
-      request.mock.calls.filter(([url]) => url === "/api/v1/me"),
+      request.mock.calls.filter(([url]) => url === "/api/v1/bootstrap"),
     ).toHaveLength(1);
+    expect(request.mock.calls.some(([url]) => url === "/api/v1/communities")).toBe(false);
     expect(
       screen.getByRole("button", { name: "Voice unavailable" }),
     ).toBeDisabled();
@@ -148,6 +153,64 @@ describe("Rust-backed community workspace", () => {
       calls.findIndex(([url]) => url === "/api/v1/communities"),
     ).toBeGreaterThan(calls.indexOf(writes[0]!));
   });
+  it("shows a pending send immediately and replaces it with the confirmed message without a history GET", async () => {
+    const { request } = setup();
+    const original = request.getMockImplementation()!;
+    let finish!: (response: Response) => void;
+    let payload!: { body: string; client_nonce: string };
+    request.mockImplementation((input, options) => {
+      if (input.includes("/messages") && options?.method === "POST") {
+        payload = JSON.parse(String(options.body)) as typeof payload;
+        return new Promise<Response>((resolve) => { finish = resolve; });
+      }
+      return original(input, options);
+    });
+    const draft = await screen.findByRole("textbox", { name: "Message #general" });
+    fireEvent.change(draft, { target: { value: "Fast feedback" } });
+    fireEvent.keyDown(draft, { key: "Enter" });
+    expect(await screen.findByRole("status", { name: "Pending message" })).toHaveTextContent("Fast feedback");
+    expect(draft).toHaveValue("Fast feedback");
+    await waitFor(() => expect(finish).toBeDefined());
+    await act(async () => {
+      finish(Response.json({ ...messageFixture, id: "77777777-7777-4777-8777-777777777777", ...payload }));
+    });
+    await waitFor(() => expect(draft).toHaveValue(""));
+    expect(screen.queryByRole("status", { name: "Pending message" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Fast feedback")).toHaveLength(1);
+    expect(request.mock.calls.filter(([url, options]) => url.includes("/messages") && options?.method !== "POST")).toHaveLength(1);
+  });
+  it("keeps confirmation when an older manual refresh completes after the send", async () => {
+    const { request } = setup();
+    const original = request.getMockImplementation()!;
+    const draft = await screen.findByRole("textbox", { name: "Message #general" });
+    let finishSend!: (response: Response) => void;
+    let finishRead!: (response: Response) => void;
+    let payload!: { body: string; client_nonce: string };
+    let readSignal!: AbortSignal;
+    request.mockImplementation((input, options) => {
+      if (!input.includes("/messages")) return original(input, options);
+      if (options?.method === "POST") {
+        payload = JSON.parse(String(options.body)) as typeof payload;
+        return new Promise<Response>((resolve) => { finishSend = resolve; });
+      }
+      readSignal = options?.signal as AbortSignal;
+      return new Promise<Response>((resolve) => { finishRead = resolve; });
+    });
+    fireEvent.change(draft, { target: { value: "Keep confirmation" } });
+    fireEvent.keyDown(draft, { key: "Enter" });
+    await waitFor(() => expect(finishSend).toBeDefined());
+    fireEvent.click(screen.getByRole("button", { name: "Refresh history" }));
+    await waitFor(() => expect(finishRead).toBeDefined());
+    await act(async () => {
+      finishSend(Response.json({ ...messageFixture, id: "77777777-7777-4777-8777-777777777777", ...payload }));
+    });
+    await waitFor(() => expect(draft).toHaveValue(""));
+    expect(readSignal.aborted).toBe(true);
+    await act(async () => {
+      finishRead(Response.json({ items: [messageFixture], next_cursor: null }));
+    });
+    expect(screen.getAllByText("Keep confirmation")).toHaveLength(1);
+  });
   it("keeps a failed draft and reuses its nonce after a lost send response", async () => {
     const { request, messages } = setup();
     const original = request.getMockImplementation()!;
@@ -187,6 +250,8 @@ describe("Rust-backed community workspace", () => {
     expect(sent[0]).toEqual(sent[1]);
     expect(Object.keys(sent[0]!).sort()).toEqual(["body", "client_nonce"]);
     expect(screen.getAllByText("Saved exactly once")).toHaveLength(1);
+    expect(request.mock.calls.filter(([url, options]) =>
+      url.includes("/messages") && options?.method !== "POST")).toHaveLength(1);
   });
   it("loads older history using both encoded cursor fields and keeps chronological order", async () => {
     const { request } = setup();
