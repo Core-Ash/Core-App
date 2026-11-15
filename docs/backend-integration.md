@@ -44,6 +44,8 @@ Vite verifies upstream HTTPS certificates and preserves Origin and cookie attrib
 
 ## Vercel and cookie routing
 
+The `/api/:path*` rewrite adds a reserved `path` query parameter. The proxy removes all copies before forwarding to Rust or Core-auth, while preserving search, pagination, auth flags, and other query fields. Forwarding this routing metadata causes Rust's strict query extractors to return HTTP 400 for message history, member lists, and access inspection. Other unknown fields still reach the backend for validation.
+
 Set public build-time variables:
 
 ```dotenv

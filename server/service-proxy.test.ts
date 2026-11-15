@@ -9,6 +9,58 @@ const env = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("same-origin service proxy", () => {
+  it.each([
+    [
+      "/api/v1/channels/33333333-3333-4333-8333-333333333333/messages",
+      "limit=50",
+      "https://api.example.com",
+    ],
+    [
+      "/api/v1/channels/33333333-3333-4333-8333-333333333333/messages",
+      "limit=50&before_time=2026-11-16T10%3A00%3A00%2B00%3A00&before_id=44444444-4444-4444-8444-444444444444",
+      "https://api.example.com",
+    ],
+    [
+      "/api/v1/communities/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/members",
+      "search=Core+%26+friends&limit=50&after_id=44444444-4444-4444-8444-444444444444",
+      "https://api.example.com",
+    ],
+    [
+      "/api/v1/communities/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/access",
+      "limit=50&search=&role_id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&access=denied",
+      "https://api.example.com",
+    ],
+    [
+      "/api/auth/get-session",
+      "disableCookieCache=true&disableRefresh=true",
+      "https://auth.example.com",
+    ],
+  ])("strips Vercel's rewrite capture while preserving API queries for %s", async (path, query, target) => {
+    const upstream = vi.fn(async (input: string) => {
+      // Rust's strict query extractors reject the extra routing parameter.
+      return new URL(input).searchParams.has("path")
+        ? Response.json({ code: "invalid_request" }, { status: 400 })
+        : Response.json({ ok: true });
+    });
+    vi.stubGlobal("fetch", upstream);
+    const url = new URL(`https://core.example.com${path}?${query}`);
+    url.searchParams.append("path", path.slice("/api/".length));
+    // Routing metadata must never be allowed to choose the upstream URL.
+    url.searchParams.append("path", "https://hostile.example.com");
+    const response = await proxyServiceRequest(new Request(url), env);
+    expect(response.status).toBe(200);
+    expect(upstream).toHaveBeenCalledOnce();
+    expect(upstream.mock.calls[0]![0]).toBe(`${target}${path}?${query}`);
+  });
+  it("preserves unrelated unknown query fields for backend validation", async () => {
+    const upstream = vi.fn().mockResolvedValue(Response.json({ code: "invalid_request" }, { status: 400 }));
+    vi.stubGlobal("fetch", upstream);
+    const response = await proxyServiceRequest(
+      new Request("https://core.example.com/api/v1/communities?path=v1%2Fcommunities&unexpected=1"), env,
+    );
+    expect(upstream.mock.calls[0]![0]).toBe("https://api.example.com/api/v1/communities?unexpected=1");
+    expect(response.status).toBe(400);
+  });
   it("preserves cookie scope and all auth cookies without caching", async () => {
     const headers = new Headers({ "Content-Type": "application/json" });
     headers.append(

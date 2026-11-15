@@ -74,6 +74,9 @@ export async function proxyServiceRequest(
   const api = url.pathname.startsWith("/api/v1/");
   if ((!auth && !api) || /%2f|%5c|%2e|\\/i.test(url.pathname))
     return failure(404);
+  // Vercel's /api/:path* rewrite adds a reserved routing query parameter.
+  // Keep it out of upstream API queries; Rust rejects unknown query fields.
+  if (url.searchParams.has("path")) url.searchParams.delete("path");
   if (
     !["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].includes(request.method)
   )
