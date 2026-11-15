@@ -4,7 +4,7 @@ import {
   useCommunities,
   useCurrentUser,
 } from "@/features/community/api/hooks";
-import type { CommunityView } from "@/features/community/preview/types";
+import type { CommunityView } from "@/features/community/types";
 
 export function communityHref(
   communityId: string,

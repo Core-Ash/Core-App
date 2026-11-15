@@ -2,7 +2,6 @@ import { Headphones, Mic, Settings } from "lucide-react";
 import { Link } from "react-router";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { Tooltip } from "@/components/ui/tooltip";
-import { StatusIndicator } from "@/components/ui/status-indicator";
 import { useAuth } from "@/features/auth/auth-context";
 import { useOptionalAppData } from "@/app/app-data-context";
 import { useCurrentUser } from "@/features/community/api/hooks";
@@ -16,14 +15,13 @@ export function UserPanel({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <UserPanelView
       user={session.user}
-      subtitle="Online"
+      subtitle="Signed in"
       onNavigate={onNavigate}
     />
   );
 }
 
 function BackendUserPanel({ onNavigate }: { onNavigate?: () => void }) {
-  const { session } = useAuth();
   const profile = useCurrentUser();
   const user = profile.isSuccess ? profile.data : undefined;
   return (
@@ -31,7 +29,7 @@ function BackendUserPanel({ onNavigate }: { onNavigate?: () => void }) {
       user={{
         name: user?.display_name || user?.username || "Core member",
         email: "",
-        image: session?.user.image,
+        image: user?.avatar_url,
       }}
       subtitle={user?.username ? `@${user.username}` : "Profile unavailable"}
       onNavigate={onNavigate}
@@ -53,7 +51,6 @@ function UserPanelView({
       <div className="user-panel-profile">
         <span className="member-avatar">
           <UserAvatar user={user} className="profile-avatar" />
-          <StatusIndicator status="online" label="Signed in to Core" />
         </span>
         <div className="user-panel-name">
           <p title={user.name}>{user.name || "Core member"}</p>

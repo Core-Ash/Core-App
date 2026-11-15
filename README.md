@@ -2,7 +2,7 @@
 
 React + TypeScript frontend for Core. Better Auth owns authentication and sessions; the Rust REST API owns application profiles, communities, channels, messages, and authorization. The frontend never connects to PostgreSQL.
 
-The existing Core layout is preserved. With `VITE_API_URL` configured, the workspace loads real communities, text channels, and paginated messages, supports their creation and message sending, and shows the Rust application profile. With that variable empty, the existing, explicitly labelled design preview remains available. A configured but unavailable backend shows an error; it never falls back to sample data.
+The existing Core layout is preserved. The workspace loads communities, text channels, paginated messages, and the Rust application profile. It supports community/channel creation, message sending, and owner-managed member admission. A missing API URL shows a configuration notice; an unavailable backend shows an error. There are no sample communities, simulated message sends, or local-only reactions in the application.
 
 ## Run locally
 
@@ -32,7 +32,7 @@ Open Vite's printed URL. Existing process environment and mode-specific Vite fil
 | Variable                 | Purpose                                                                                                                                                                        |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `VITE_AUTH_URL`          | Required for authentication. Public HTTPS Better Auth origin/full base URL, or explicit `/api/auth` for the same-origin proxy. HTTP localhost is permitted in development.     |
-| `VITE_API_URL`           | Rust origin or origin with `/api/v1`; explicit `/api/v1` selects the same-origin proxy. Empty retains the labelled design preview. HTTP localhost is permitted in development. |
+| `VITE_API_URL`           | Required Rust origin or origin with `/api/v1`; explicit `/api/v1` selects the same-origin proxy. Missing configuration blocks application data. HTTP localhost is permitted in development. |
 | `CORE_AUTH_PROXY_TARGET` | Vercel server-only environment variable: public HTTPS Core-auth origin, without `/api/auth`.                                                                                   |
 | `CORE_API_PROXY_TARGET`  | Vercel server-only environment variable: public HTTPS Rust origin, without `/api/v1`.                                                                                          |
 | `DEV_AUTH_PROXY_TARGET`  | Optional Vite development proxy: HTTPS Core-auth origin.                                                                                                                       |
@@ -74,14 +74,18 @@ New identities explicitly set up their application profile with the existing ide
 - `src/features/auth/`: Better Auth session provider, guards, login, registration, logout.
 - `src/lib/api/`: credentialed fetch client, safe errors, runtime response validation, actual Rust endpoint adapters.
 - `src/features/community/api/`: query keys, typed hooks, selection, and mutations.
-- `src/features/community/`: the live workspace and isolated, labelled visual preview.
+- `src/features/community/`: the backend-connected workspace and membership management.
 - `src/components/`: shared UI and existing responsive layout; `src/styles/` owns theme tokens and styling.
 - `api/`, `server/`: Vercel transport proxy; no auth implementation or database access.
 - `src/test/`: unit-test fixtures, never an application authentication mode.
 
 Routes `/app` and `/app/communities` show the workspace; `/app/settings` shows the profile and sign-out. `/login` and `/register` remain guest routes. Direct messages and friends remain unavailable.
 
-The current Rust contract has no member/profile directory or avatars, permissions-discovery endpoint, update endpoints, reactions, voice, uploads, events, or live message events. Other message authors are identified by their actual member UUID; only your own avatar can come from your Better Auth identity. Search filters loaded message history. Use **Refresh history** to see new messages; there is no polling or WebSocket implementation. See [supported contracts and gaps](docs/backend-integration.md#supported-contracts-and-gaps).
+The right sidebar lists actual members who can view the selected channel. The **Members** page lists the community's active members and lets owners admit another application member UUID. Names and avatars resolve from linked Better Auth records through a narrow Rust public-profile projection; messages resolve all authors in a batch, including departed members. Clicking a member or message-author name opens the same public profile card. Member lists support search, role grouping, pagination, and refresh without inventing presence. See [member profiles and rollout](docs/member-profiles.md) for migration 0005 and runtime grants. A newly admitted user can use **Refresh communities** in an empty workspace without signing in again.
+
+Open the channel-header gear, then **Permissions → View Channel Access**, for manager-authorized effective member access, role states/counts, searchable and filtered member pages, and access explanations. Rust's shared permission evaluator is authoritative. Access refreshes on focus, manually, and every 30 seconds while open. This requires backend migration 0004 and runtime grants; see [channel access](docs/channel-access.md).
+
+The current Rust contract has no update/delete routes, friends or friend requests, permission-editing endpoints, reactions, voice, uploads, events, or live message events. These features remain unavailable. Member directories are scoped to authorized communities/channels rather than exposing a global user directory. Search filters loaded message history. Use **Refresh history** to see new messages or updated historical author profiles; message history has no polling or WebSocket implementation. See [supported contracts and gaps](docs/backend-integration.md#supported-contracts-and-gaps).
 
 ## Verification
 
@@ -92,6 +96,6 @@ pnpm test
 pnpm run build
 ```
 
-Tests mock network responses while exercising production auth/data code, including account isolation, cancellation, 401/403 handling, nonce retries, cursor pagination, onboarding, creation, and proxy cookie/header behavior. They preserve the existing login, registration, routing, and preview tests.
+Tests mock network responses while exercising production auth/data code, including account isolation, cancellation, 401/403 handling, nonce retries, cursor pagination, onboarding, creation, owner-only membership controls, duplicate-submit protection, missing configuration, and proxy cookie/header behavior. Login, registration, session restoration, and protected routing remain covered. No new dependencies or lockfile changes are required.
 
 Anonymous local service checks confirmed a responding Better Auth session endpoint and a Rust `/api/v1/me` response of **401** without a cookie. Successful live registration/sign-in, cookie persistence and renewal through both services, authenticated Rust reads/writes, and authenticated logout remain **unverified**. No account was created and no deployment was performed. Follow the [live verification steps](docs/backend-integration.md#verification-status) with an authorized account before release.

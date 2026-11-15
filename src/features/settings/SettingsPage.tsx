@@ -10,7 +10,6 @@ import { ApiError } from "@/lib/api/errors";
 
 export function SettingsPage() {
   const { session } = useAuth();
-  const data = useOptionalAppData();
   if (!session) return null;
   return (
     <div className="page-scroll">
@@ -22,47 +21,9 @@ export function SettingsPage() {
         <div className="page-intro">
           <p className="eyebrow">Make yourself at home</p>
           <h1>Your account</h1>
-          <p>
-            {data?.configured
-              ? "Your application profile."
-              : "Your profile from your current sign-in session."}
-          </p>
+          <p>Your application profile.</p>
         </div>
-        {data?.configured ? (
-          <BackendAccountProfile />
-        ) : (
-          <section className="settings-panel" aria-label="Account profile">
-            <div className="settings-profile">
-              <UserAvatar user={session.user} className="size-14" />
-              <div>
-                <h2>{session.user.name || "Core member"}</h2>
-                <p>{session.user.email}</p>
-              </div>
-              <ShieldCheck
-                className="text-online ml-auto shrink-0"
-                size={22}
-                aria-label="Session-backed profile"
-              />
-            </div>
-            <dl>
-              <div>
-                <dt>Display name</dt>
-                <dd>{session.user.name || "Core member"}</dd>
-              </div>
-              <div>
-                <dt>Email address</dt>
-                <dd>{session.user.email}</dd>
-              </div>
-              <div>
-                <dt>Appearance</dt>
-                <dd>Core dark · Red accent</dd>
-              </div>
-            </dl>
-            <p className="settings-note">
-              Profile editing and password recovery aren’t available here yet.
-            </p>
-          </section>
-        )}
+        <BackendAccountProfile />
         <section className="settings-panel voice-settings">
           <Headphones size={21} aria-hidden="true" />
           <div>
@@ -83,7 +44,6 @@ export function SettingsPage() {
 
 function BackendAccountProfile() {
   const profile = useCurrentUser();
-  const { session } = useAuth();
   const data = useOptionalAppData();
   if (data?.configurationError)
     return <ApiNotice error={new ApiError("configuration")} />;
@@ -96,7 +56,7 @@ function BackendAccountProfile() {
           user={{
             name: user.display_name || user.username,
             email: user.email,
-            image: session?.user.image,
+            image: user.avatar_url,
           }}
           className="size-14"
         />
@@ -129,7 +89,7 @@ function BackendAccountProfile() {
         </div>
       </dl>
       <p className="settings-note">
-        Profile editing isn't available yet. Your sign-in avatar is shown here.
+        Profile editing isn't available here yet. Your public profile comes from Core-auth.
       </p>
     </section>
   );

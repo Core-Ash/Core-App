@@ -18,6 +18,7 @@ import {
   channelFixture,
   profileFixture,
   messageFixture,
+  memberPageFixture,
 } from "@/test/api-fixtures";
 import { sessionFixture, signedOutState } from "@/test/auth-fixture";
 import type { Message } from "@/lib/api/types";
@@ -27,9 +28,10 @@ vi.mock("@/lib/env", () => ({
 }));
 afterEach(() => vi.unstubAllGlobals());
 
-function setup({ noCommunities = false, noProfile = false } = {}) {
+function setup({ noCommunities = false, noProfile = false, noChannels = false, owner = true } = {}) {
   const communities = noCommunities ? [] : [communityFixture];
-  const channels = [channelFixture];
+  const channels = noChannels ? [] : [channelFixture];
+  if (!owner) communities[0] = { ...communityFixture, owner_id: "99999999-9999-4999-8999-999999999999" };
   const messages: Message[] = [messageFixture];
   let profileCreated = !noProfile;
   const request = vi.fn(async (input: string, options: RequestInit = {}) => {
@@ -52,6 +54,10 @@ function setup({ noCommunities = false, noProfile = false } = {}) {
       }
       return Response.json({ items: [...communities] });
     }
+    if (url.pathname === `/api/v1/communities/${communityFixture.id}/members` && write)
+      return new Response(null, { status: 201 });
+    if (url.pathname.endsWith("/members"))
+      return Response.json({ ...memberPageFixture, channel_id: url.pathname.includes("/channels/") ? channelFixture.id : null });
     if (
       url.pathname === `/api/v1/communities/${communityFixture.id}/channels`
     ) {
@@ -92,6 +98,80 @@ function setup({ noCommunities = false, noProfile = false } = {}) {
 }
 
 describe("Rust-backed community workspace", () => {
+  it("automatically loads and toggles the channel member sidebar on wide layouts", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+    const { request } = setup();
+    const sidebar = await screen.findByRole("complementary", { name: "Community members" });
+    expect(await within(sidebar).findByRole("button", { name: `View profile for ${profileFixture.display_name}` })).toBeInTheDocument();
+    expect(request.mock.calls.some(([url]) => url.includes(`/channels/${channelFixture.id}/members?`))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Hide members" }));
+    expect(screen.queryByRole("complementary", { name: "Community members" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show members" }));
+    expect(await screen.findByRole("complementary", { name: "Community members" })).toBeInTheDocument();
+  });
+  it("renders another author's resolved public profile without fetching individual users", async () => {
+    const { request, messages } = setup();
+    const id = "99999999-9999-4999-8999-999999999999";
+    messages[0] = { ...messageFixture, author_id: id, author: { id, display_name: "Visiting Gamer", username: "visiting_gamer", avatar_url: null } };
+    fireEvent.click(await screen.findByRole("button", { name: "View profile for Visiting Gamer" }));
+    const card = screen.getByRole("dialog", { name: "Visiting Gamer" });
+    expect(within(card).getByText("@visiting_gamer")).toBeInTheDocument();
+    expect(within(card).getByText(id)).toBeInTheDocument();
+    expect(request.mock.calls.some(([url]) => url.includes("/users/"))).toBe(false);
+  });
+  it("lets an admitted user refresh an empty community list without signing in again", async () => {
+    const { communities, request } = setup({ noCommunities: true });
+    const refresh = await screen.findByRole("button", { name: "Refresh communities" });
+    communities.push(communityFixture);
+    fireEvent.click(refresh);
+    expect(await screen.findByText(messageFixture.body!)).toBeInTheDocument();
+    expect(request.mock.calls.filter(([url]) => url === "/api/v1/communities")).toHaveLength(1);
+    expect(request.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  });
+  it("adds a member to a community without channels, preserving input on denial and blocking duplicate submits", async () => {
+    const { request } = setup({ noChannels: true });
+    fireEvent.click(await screen.findByRole("link", { name: "Members" }));
+    const form = screen.getByRole("form", { name: "Add community member" });
+    const input = within(form).getByRole("textbox", { name: "Application member ID" });
+    fireEvent.change(input, { target: { value: "not a uuid" } });
+    fireEvent.submit(form);
+    expect(within(form).getByRole("alert")).toHaveTextContent("valid application member ID");
+    expect(request.mock.calls.filter(([url]) => url.endsWith("/members"))).toHaveLength(0);
+
+    const original = request.getMockImplementation()!;
+    let finish!: (response: Response) => void;
+    request.mockImplementation((url, options) => url.endsWith("/members")
+      ? new Promise<Response>((resolve) => { finish = resolve; })
+      : original(url, options));
+    const target = "88888888-8888-4888-8888-888888888888";
+    fireEvent.change(input, { target: { value: target } });
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await waitFor(() => expect(finish).toBeDefined());
+    expect(within(form).getByRole("button", { name: "Adding member…" })).toBeDisabled();
+    expect(request.mock.calls.filter(([url]) => url.endsWith("/members"))).toHaveLength(1);
+    await act(async () => { finish(new Response(null, { status: 403 })); });
+    expect(await within(form).findByRole("alert")).toHaveTextContent("don't have permission");
+    expect(input).toHaveValue(target);
+    expect(within(form).getByRole("status")).not.toHaveTextContent("Member added");
+    fireEvent.submit(form);
+    await waitFor(() => expect(request.mock.calls.filter(([url]) => url.endsWith("/members"))).toHaveLength(2));
+    await act(async () => { finish(new Response(null, { status: 201 })); });
+    await waitFor(() => expect(within(form).getByRole("status")).toHaveTextContent("Member added"));
+    expect(input).toHaveValue("");
+    const membershipWrites = request.mock.calls.filter(([url]) => url.endsWith("/members"));
+    expect(membershipWrites[1]![1]).toMatchObject({
+      method: "POST", credentials: "include", body: JSON.stringify({ user_id: target }),
+      headers: expect.objectContaining({ "X-Core-CSRF": "1" }),
+    });
+    expect(request.mock.calls.some(([url]) => url.includes("/messages"))).toBe(false);
+  });
+  it("shows the member directory limitation without owner controls for other members", async () => {
+    setup({ owner: false });
+    fireEvent.click(await screen.findByRole("link", { name: "Members" }));
+    expect(screen.getByRole("heading", { name: "Community members" })).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Add community member" })).not.toBeInTheDocument();
+  });
   it("renders the Rust profile and real history without mixing in sample identities", async () => {
     const { request } = setup();
     expect(await screen.findByText(messageFixture.body!)).toBeInTheDocument();
@@ -351,11 +431,12 @@ describe("Rust-backed community workspace", () => {
       screen.getByRole("region", { name: "Signed-in account" }),
     ).toBeInTheDocument();
   });
-  it("renders untrusted HTML as text and identifies authors with no profile endpoint", async () => {
+  it("renders untrusted HTML as text, handles missing author profiles, and loads visible members", async () => {
     const { messages } = setup();
     messages[0] = {
       ...messageFixture,
       author_id: "99999999-9999-4999-8999-999999999999",
+      author: null,
       body: '<img src="x" onerror="alert(1)" />',
     };
     const body = await screen.findByText('<img src="x" onerror="alert(1)" />');
@@ -366,7 +447,7 @@ describe("Rust-backed community workspace", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Show members" }));
     expect(
-      screen.getByRole("heading", { name: "Member profiles unavailable" }),
+      await screen.findByRole("button", { name: `View profile for ${profileFixture.display_name}` }),
     ).toBeInTheDocument();
   });
 });

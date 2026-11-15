@@ -26,13 +26,13 @@ export function UnavailablePage({
         }
         description={
           friends
-            ? "No friends to show yet. Friend requests and online presence aren’t available in this preview."
-            : "No conversations yet. Direct messages aren’t available in this preview."
+            ? "Friend requests and online presence aren't available yet."
+            : "Direct messages aren't available yet."
         }
       >
         <Button variant="outline" asChild>
           <Link to="/app/communities">
-            Explore a sample community
+            Explore your communities
             <ArrowRight aria-hidden="true" />
           </Link>
         </Button>

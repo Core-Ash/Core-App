@@ -1,4 +1,4 @@
-import { useRef, useState, type Ref } from "react";
+import { useRef, useState, type Ref, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Bell,
@@ -26,7 +26,7 @@ interface ChatHeaderProps {
   membersOpen: boolean;
   onToggleMembers: () => void;
   membersButtonRef: Ref<HTMLButtonElement>;
-  preview?: boolean;
+  settings?: ReactNode;
 }
 
 export function ChatHeader({
@@ -38,7 +38,7 @@ export function ChatHeader({
   membersOpen,
   onToggleMembers,
   membersButtonRef,
-  preview = true,
+  settings,
 }: ChatHeaderProps) {
   const [mobileSearch, setMobileSearch] = useState(false);
   const searchToggle = useRef<HTMLButtonElement>(null);
@@ -60,6 +60,7 @@ export function ChatHeader({
           <h1>{name}</h1>
         </div>
         <div className="chat-header-tools">
+          {settings}
           <Tooltip content="Notifications unavailable">
             <button
               className="icon-button notification-control"
@@ -96,9 +97,7 @@ export function ChatHeader({
               <label className="header-search">
                 <Search size={21} aria-hidden="true" />
                 <span className="sr-only">
-                  {preview
-                    ? "Search messages in this channel"
-                    : "Search loaded messages in this channel"}
+                  Search loaded messages in this channel
                 </span>
                 <input
                   type="search"
@@ -119,11 +118,11 @@ export function ChatHeader({
             </>
           )}
           <Dialog.Root>
-            <Tooltip content={preview ? "About this preview" : "About Core"}>
+            <Tooltip content="About Core">
               <Dialog.Trigger asChild>
                 <button
                   className="icon-button help-control"
-                  aria-label={preview ? "About this preview" : "About Core"}
+                  aria-label="About Core"
                 >
                   <CircleHelp size={25} aria-hidden="true" />
                 </button>
@@ -133,33 +132,25 @@ export function ChatHeader({
               <Dialog.Overlay className="dialog-overlay" />
               <Dialog.Content className="standard-dialog preview-help">
                 <Dialog.Title>
-                  {preview ? "Core Gaming preview" : "Core Gaming"}
+                  Core Gaming
                 </Dialog.Title>
                 <Dialog.Description>
-                  {preview
-                    ? "Communities, conversations, members, and game activity are sample data. Your profile comes from your Better Auth session."
-                    : "Your communities, channels, profile, and messages come from the Core application service."}
+                  Your communities, channels, profile, and messages come from the Core application service.
                 </Dialog.Description>
                 <p>
-                  {preview
-                    ? "Messages and reactions stay in this page and aren’t sent or saved."
-                    : "Refresh history for new messages. Search covers loaded history. Member profiles, presence, reactions, and live updates are unavailable."}{" "}
+                  Refresh history for new messages. Search covers loaded history.
+                  Member profiles are available from the member list. Presence, reactions, and live updates are unavailable.{" "}
                   Voice, uploads, GIFs, pinned messages, and notifications are
                   unavailable.
                 </p>
                 <p>
-                  Press Enter to{" "}
-                  {preview ? "add a local message" : "send a message"}, or
+                  Press Enter to send a message, or
                   Shift+Enter for a new line. Account settings include sign out.
                 </p>
                 <Dialog.Close asChild>
                   <button
                     className="icon-button dialog-close"
-                    aria-label={
-                      preview
-                        ? "Close preview information"
-                        : "Close information"
-                    }
+                    aria-label="Close information"
                   >
                     <X size={20} aria-hidden="true" />
                   </button>

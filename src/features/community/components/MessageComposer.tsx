@@ -9,14 +9,12 @@ interface MessageComposerProps {
   channelName: string;
   onSend: (body: string) => void | Promise<void>;
   sending?: boolean;
-  preview?: boolean;
 }
 
 export function MessageComposer({
   channelName,
   onSend,
   sending = false,
-  preview = true,
 }: MessageComposerProps) {
   const [draft, setDraft] = useState("");
   const [announcement, setAnnouncement] = useState("");
@@ -25,7 +23,7 @@ export function MessageComposer({
   const locked = useRef(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const busy = sending || submitting;
-  const maximum = preview ? 2000 : 4000;
+  const maximum = 4000;
   const ready = draft.trim().length > 0 && !busy;
   async function send() {
     if (!ready || locked.current) return;
@@ -42,19 +40,14 @@ export function MessageComposer({
       const result = onSend(draft.trim());
       if (result) await result;
       setDraft("");
-      setAnnouncement(
-        preview
-          ? "Message added to the local preview. Only you can see it."
-          : "Message sent.",
-      );
+      setAnnouncement("Message sent.");
     } catch (failure) {
       setError(apiErrorMessage(failure));
     } finally {
       locked.current = false;
       setSubmitting(false);
       // Focus after React re-enables the input following an async send.
-      if (preview) input.current?.focus();
-      else requestAnimationFrame(() => input.current?.focus());
+      requestAnimationFrame(() => input.current?.focus());
     }
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -72,9 +65,7 @@ export function MessageComposer({
     <div className="composer-area">
       <form
         className="message-composer"
-        aria-label={
-          preview ? "Local preview message composer" : "Message composer"
-        }
+        aria-label="Message composer"
         aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
@@ -94,7 +85,6 @@ export function MessageComposer({
         <span className="composer-divider" />
         <label className="sr-only" htmlFor="message-draft">
           Message #{channelName}
-          {preview ? " (local preview)" : ""}
         </label>
         <textarea
           ref={input}
@@ -155,11 +145,7 @@ export function MessageComposer({
             className="send-button"
             disabled={!ready}
             aria-label={
-              busy
-                ? "Sending message"
-                : preview
-                  ? "Send local preview message"
-                  : "Send message"
+              busy ? "Sending message" : "Send message"
             }
           >
             {busy ? (
@@ -176,9 +162,7 @@ export function MessageComposer({
       </form>
       <div className="composer-help" id="composer-help">
         <span>
-          {preview
-            ? "Design preview · sample conversations and activity. Messages aren’t sent or saved."
-            : "Enter to send · Shift+Enter for a new line. Refresh history to check for new messages."}
+          Enter to send · Shift+Enter for a new line. Refresh history to check for new messages.
         </span>
         {Array.from(draft).length > maximum - 200 && (
           <span>

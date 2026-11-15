@@ -5,6 +5,13 @@ import type {
   Message,
   MessagePage,
   Profile,
+  AccessMember,
+  AccessRole,
+  AccessSource,
+  ChannelAccessPage,
+  PublicProfile,
+  MemberPage,
+  ServerMember,
 } from "@/lib/api/types";
 
 function record(value: unknown): Record<string, unknown> {
@@ -35,11 +42,22 @@ function timestamp(value: unknown): string {
 export function parseProfile(value: unknown): Profile {
   const data = record(value);
   return {
-    id: uuid(data.id),
-    username: string(data.username),
+    ...parsePublicProfile(value),
     email: string(data.email),
-    display_name: string(data.display_name),
   };
+}
+function avatarUrl(value: unknown): string | null {
+  if (value === null) return null;
+  const text = string(value);
+  try {
+    const url = new URL(text);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) throw new Error();
+    return url.href;
+  } catch { throw new ApiError("invalid_response"); }
+}
+export function parsePublicProfile(value: unknown): PublicProfile {
+  const data = record(value);
+  return { id: uuid(data.id), username: string(data.username), display_name: string(data.display_name), avatar_url: avatarUrl(data.avatar_url) };
 }
 export function parseBootstrap(value: unknown) {
   const data = record(value);
@@ -73,6 +91,8 @@ export function parseChannel(value: unknown): Channel {
 }
 export function parseMessage(value: unknown): Message {
   const data = record(value);
+  const author = data.author === null ? null : parsePublicProfile(data.author);
+  if (author && author.id !== data.author_id) throw new ApiError("invalid_response");
   return {
     id: uuid(data.id),
     author_id: uuid(data.author_id),
@@ -81,6 +101,7 @@ export function parseMessage(value: unknown): Message {
     edited_at: data.edited_at === null ? null : timestamp(data.edited_at),
     deleted_at: data.deleted_at === null ? null : timestamp(data.deleted_at),
     client_nonce: uuid(data.client_nonce),
+    author,
   };
 }
 export function parseList<T>(value: unknown, parse: (item: unknown) => T): T[] {
@@ -100,5 +121,77 @@ export function parseMessagePage(value: unknown): MessagePage {
           before_id: uuid(cursor.before_id),
         }
       : null,
+  };
+}
+
+function count(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
+    throw new ApiError("invalid_response");
+  return value;
+}
+function color(value: unknown): string | null {
+  if (value === null) return null;
+  const result = string(value);
+  if (!/^#[0-9a-f]{6}$/i.test(result)) throw new ApiError("invalid_response");
+  return result;
+}
+function accessRole(value: unknown): AccessRole {
+  const data = record(value);
+  const access = string(data.access);
+  if (!["allowed", "denied", "inherited", "none"].includes(access))
+    throw new ApiError("invalid_response");
+  return {
+    id: uuid(data.id), name: string(data.name), color: color(data.color),
+    position: count(data.position), member_count: count(data.member_count),
+    access: access as AccessRole["access"],
+  };
+}
+function accessSource(value: unknown): AccessSource {
+  const data = record(value);
+  const kind = string(data.kind);
+  if (!["owner", "member_allow", "member_deny", "role_allow", "role_deny", "inherited", "no_grant"].includes(kind))
+    throw new ApiError("invalid_response");
+  if (["role_allow", "role_deny", "inherited"].includes(kind))
+    return { kind: kind as AccessSource["kind"], role_id: uuid(data.role_id), role_name: string(data.role_name) };
+  return { kind: kind as AccessSource["kind"] };
+}
+function accessMember(value: unknown): AccessMember {
+  const data = record(value);
+  if (typeof data.allowed !== "boolean" || !Array.isArray(data.sources) || !data.sources.length)
+    throw new ApiError("invalid_response");
+  const highest = data.highest_role === null ? null : record(data.highest_role);
+  return {
+    ...parsePublicProfile(value), allowed: data.allowed, sources: data.sources.map(accessSource),
+    highest_role: highest ? { id: uuid(highest.id), name: string(highest.name), color: color(highest.color) } : null,
+  };
+}
+export function parseChannelAccess(value: unknown): ChannelAccessPage {
+  const data = record(value);
+  const channel = record(data.channel);
+  if (!Array.isArray(data.roles) || !Array.isArray(data.items) || data.items.length > 100)
+    throw new ApiError("invalid_response");
+  return {
+    channel: { id: uuid(channel.id), community_id: uuid(channel.community_id), name: string(channel.name) },
+    total_allowed: count(data.total_allowed), total_denied: count(data.total_denied), filtered_total: count(data.filtered_total),
+    roles: data.roles.map(accessRole), items: data.items.map(accessMember),
+    next_cursor: data.next_cursor === null ? null : uuid(data.next_cursor),
+  };
+}
+function parseMember(value: unknown): ServerMember {
+  const data = record(value);
+  if (!Array.isArray(data.roles)) throw new ApiError("invalid_response");
+  return {
+    ...parsePublicProfile(value), community_id: uuid(data.community_id), joined_at: timestamp(data.joined_at),
+    roles: data.roles.map((value) => {
+      const role = record(value);
+      return { id: uuid(role.id), name: string(role.name), color: color(role.color), position: count(role.position) };
+    }),
+  };
+}
+export function parseMemberPage(value: unknown): MemberPage {
+  const data = record(value);
+  return {
+    community_id: uuid(data.community_id), channel_id: data.channel_id === null ? null : uuid(data.channel_id),
+    total: count(data.total), items: parseList(value, parseMember), next_cursor: data.next_cursor === null ? null : uuid(data.next_cursor),
   };
 }

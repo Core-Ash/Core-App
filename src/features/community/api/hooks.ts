@@ -8,7 +8,7 @@ import { useAppData } from "@/app/app-data-context";
 import { ApiError } from "@/lib/api/errors";
 import { endpoints } from "@/lib/api/endpoints";
 import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
-import type { MessageCursor } from "@/lib/api/types";
+import type { ChannelAccessFilters, MessageCursor } from "@/lib/api/types";
 
 export const queryKeys = {
   profile: ["profile"] as const,
@@ -16,6 +16,8 @@ export const queryKeys = {
   channels: (communityId: string | undefined) =>
     ["channels", communityId] as const,
   messages: (channelId: string | undefined) => ["messages", channelId] as const,
+  channelAccess: (communityId: string) => ["channel-access", communityId] as const,
+  members: (communityId: string) => ["members", communityId] as const,
 };
 
 export function useCurrentUser() {
@@ -94,6 +96,46 @@ export function useCreateChannel(communityId?: string) {
     },
     onSuccess: () =>
       queries.invalidateQueries({ queryKey: queryKeys.channels(communityId) }),
+  });
+}
+export function useAddMember(communityId: string) {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => {
+      if (!ready) throw new ApiError("unauthorized");
+      return endpoints.addMember(api, communityId, userId);
+    },
+    onSuccess: () => Promise.all([
+      queries.invalidateQueries({ queryKey: queryKeys.channelAccess(communityId) }),
+      queries.invalidateQueries({ queryKey: queryKeys.members(communityId) }),
+    ]),
+  });
+}
+export function useChannelAccess(communityId: string, channelId: string, filters: ChannelAccessFilters, settled = true) {
+  const { api, ready } = useAppData();
+  return useInfiniteQuery({
+    queryKey: [...queryKeys.channelAccess(communityId), channelId, filters],
+    queryFn: ({ pageParam, signal }) => endpoints.channelAccess(api, communityId, channelId, filters, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: ready && settled,
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+    // Active dialogs recheck external membership/permission changes without a
+    // permission-event or WebSocket API. Polling stops when the dialog closes.
+    refetchInterval: 30_000,
+  });
+}
+export function useMembers(communityId: string, channelId: string | undefined, search: string, settled = true) {
+  const { api, ready } = useAppData();
+  return useInfiniteQuery({
+    queryKey: [...queryKeys.members(communityId), channelId ?? null, search],
+    queryFn: ({ pageParam, signal }) => endpoints.members(api, communityId, channelId, search, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: ready && settled,
+    staleTime: 10_000, refetchOnWindowFocus: true, refetchInterval: 30_000,
   });
 }
 export function useSendMessage(channelId: string) {

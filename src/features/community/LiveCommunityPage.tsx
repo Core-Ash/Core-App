@@ -1,13 +1,12 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { CalendarDays, Compass, Hash, Menu, Users, X } from "lucide-react";
+import { CalendarDays, Compass, Hash, Menu, X } from "lucide-react";
 import { useOutletContext } from "react-router";
 import { useAppData } from "@/app/app-data-context";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/features/auth/auth-context";
 import {
   useCurrentUser,
   useMessages,
@@ -16,17 +15,17 @@ import {
 import { useCommunitySelection } from "@/features/community/api/use-community-selection";
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
 import { ChatHeader } from "@/features/community/components/ChatHeader";
+import { ChannelSettings } from "@/features/community/access/ChannelSettings";
+import { CommunityMembers } from "@/features/community/components/CommunityMembers";
+import { MemberDirectory } from "@/features/community/members/MemberDirectory";
 import {
   CreateChannelDialog,
   CreateCommunityDialog,
 } from "@/features/community/components/CreateResourceDialog";
 import { MessageComposer } from "@/features/community/components/MessageComposer";
 import { MessageList } from "@/features/community/components/MessageList";
-import type {
-  ChatMessageData,
-  CommunityView,
-} from "@/features/community/types";
-import type { Channel, Community, Profile } from "@/lib/api/types";
+import type { ChatMessageData } from "@/features/community/types";
+import type { Channel, Community } from "@/lib/api/types";
 import { ApiError } from "@/lib/api/errors";
 import { useMediaQuery } from "@/lib/use-media-query";
 
@@ -48,32 +47,15 @@ function WorkspaceState({ children }: { children: ReactNode }) {
     </div>
   );
 }
-function UnavailableMembers() {
-  return (
-    <div id="community-members">
-      <EmptyState
-        icon={Users}
-        title="Member profiles unavailable"
-        description="Member names, avatars, and live activity aren't available from the application service yet. Messages identify other authors by their member ID."
-      />
-    </div>
-  );
-}
-
 function LiveConversation({
   community,
   channel,
-  profile,
-  view,
 }: {
   community: Community;
   channel: Channel;
-  profile: Profile;
-  view: CommunityView;
 }) {
-  const history = useMessages(view === "channel" ? channel.id : undefined);
+  const history = useMessages(channel.id);
   const send = useSendMessage(channel.id);
-  const { session } = useAuth();
   const wide = useMediaQuery("(min-width: 1200px)");
   const [membersVisible, setMembersVisible] = useState(true);
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
@@ -90,10 +72,7 @@ function LiveConversation({
     const items: ChatMessageData[] = [...unique.values()]
       .reverse()
       .map((item) => {
-        const own = item.author_id === profile.id;
-        const name = own
-          ? profile.display_name || profile.username || "You"
-          : `Member ${item.author_id.slice(0, 8)}`;
+        const name = item.author?.display_name || item.author?.username || `Member ${item.author_id.slice(0, 8)}`;
         return {
           id: item.id,
           body: item.body ?? "",
@@ -103,10 +82,10 @@ function LiveConversation({
           author: {
             id: item.author_id,
             name,
-            initials: own ? (Array.from(name)[0]?.toUpperCase() ?? "?") : "?",
+            initials: Array.from(name)[0]?.toUpperCase() ?? "?",
             tone: "slate",
-            status: "offline",
-            avatar: own ? (session?.user.image ?? undefined) : undefined,
+            avatar: item.author?.avatar_url ?? undefined,
+            profile: item.author,
           },
         };
       });
@@ -120,7 +99,7 @@ function LiveConversation({
               .includes(term),
         )
       : items;
-  }, [history.data, profile, search, session?.user]);
+  }, [history.data, search]);
   const membersOpen = wide ? membersVisible : membersDialogOpen;
   return (
     <section
@@ -129,15 +108,9 @@ function LiveConversation({
       aria-label={`${community.name} community`}
     >
       <ChatHeader
-        name={
-          view === "channel"
-            ? channel.name
-            : view === "events"
-              ? "Events"
-              : "Members"
-        }
+        name={channel.name}
         communityName={community.name}
-        view={view}
+        view="channel"
         search={search}
         onSearch={setSearch}
         membersOpen={membersOpen}
@@ -146,23 +119,9 @@ function LiveConversation({
           else setMembersDialogOpen((value) => !value);
         }}
         membersButtonRef={membersButton}
-        preview={false}
+        settings={<ChannelSettings key={channel.id} community={community} channel={channel} />}
       />
       <div className="chat-column">
-        {view !== "channel" ? (
-          <div className="page-scroll">
-            <EmptyState
-              icon={view === "events" ? CalendarDays : Users}
-              title={
-                view === "events"
-                  ? "Events unavailable"
-                  : "Member profiles unavailable"
-              }
-              description="This feature isn't available from the application service yet."
-            />
-          </div>
-        ) : (
-          <>
             {history.isPending ? (
               <ApiNotice loading="Loading message history…" />
             ) : history.error ? (
@@ -178,7 +137,6 @@ function LiveConversation({
                   channel={channel}
                   messages={messages}
                   searching={Boolean(search.trim())}
-                  preview={false}
                   historyControls={
                     <div className="flex flex-wrap gap-2 p-3">
                       {history.hasNextPage && (
@@ -222,7 +180,6 @@ function LiveConversation({
                 )}
                 <MessageComposer
                   channelName={channel.name}
-                  preview={false}
                   sending={send.isPending}
                   onSend={async (body) => {
                     // A retry of an unchanged draft reuses its nonce, including after a lost response.
@@ -237,12 +194,10 @@ function LiveConversation({
                 />
               </>
             )}
-          </>
-        )}
       </div>
       {wide && membersVisible && (
         <aside className="member-sidebar" aria-label="Community members">
-          <UnavailableMembers />
+          <div id="community-members" className="member-sidebar-content"><MemberDirectory communityId={community.id} channelId={channel.id} /></div>
         </aside>
       )}
       <Dialog.Root
@@ -260,9 +215,9 @@ function LiveConversation({
           >
             <Dialog.Title className="sr-only">Community members</Dialog.Title>
             <Dialog.Description className="sr-only">
-              Member profiles and activity are unavailable.
+              Members who can view this channel.
             </Dialog.Description>
-            <UnavailableMembers />
+            <div id="community-members" className="member-sidebar-content"><MemberDirectory communityId={community.id} channelId={channel.id} /></div>
             <Dialog.Close asChild>
               <button
                 className="icon-button dialog-close"
@@ -323,7 +278,29 @@ export function LiveCommunityPage() {
           <CreateCommunityDialog>
             <Button>Create community</Button>
           </CreateCommunityDialog>
+          <Button
+            variant="outline"
+            disabled={communities.isFetching}
+            onClick={() => { void communities.refetch(); }}
+          >
+            {communities.isFetching ? "Refreshing…" : "Refresh communities"}
+          </Button>
         </EmptyState>
+      </WorkspaceState>
+    );
+  // Membership admission and unavailable-feature notices do not depend on a
+  // visible channel. Owners must be able to add members to an empty community.
+  if (view === "members")
+    return (
+      <WorkspaceState>
+        <CommunityMembers community={community} profile={profile.data} />
+      </WorkspaceState>
+    );
+  if (view === "events")
+    return (
+      <WorkspaceState>
+        <EmptyState icon={CalendarDays} title="Events unavailable"
+          description="Events aren't available from the application service yet." />
       </WorkspaceState>
     );
   if (channels.isPending)
@@ -362,8 +339,6 @@ export function LiveCommunityPage() {
       key={JSON.stringify([community.id, channel.id, view])}
       community={community}
       channel={channel}
-      profile={profile.data}
-      view={view}
     />
   );
 }

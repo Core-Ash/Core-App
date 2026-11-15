@@ -7,6 +7,12 @@ import {
 } from "@/features/auth/auth-context";
 import { sessionFixture, signedOutState } from "@/test/auth-fixture";
 import { AppRoutes } from "./router";
+import { AppDataProvider } from "@/app/AppDataProvider";
+
+vi.mock("@/lib/env", async (original) => ({
+  ...await original<typeof import("@/lib/env")>(),
+  apiConfiguration: { url: null, configured: false, error: "API URL missing" },
+}));
 
 function LocationObserver() {
   const { pathname, search, hash, state } = useLocation();
@@ -21,7 +27,7 @@ function renderRoutes(path: string, auth: AuthContextValue) {
   return render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[path]}>
-        <AppRoutes />
+        <AppDataProvider><AppRoutes /></AppDataProvider>
         <LocationObserver />
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -50,7 +56,7 @@ describe("authentication routing", () => {
       "Restoring your session",
     );
     expect(
-      screen.queryByRole("heading", { name: "general" }),
+      screen.queryByRole("heading", { name: "Welcome to Core" }),
     ).not.toBeInTheDocument();
     view.unmount();
   });
@@ -64,11 +70,11 @@ describe("authentication routing", () => {
     );
   });
   it.each(["/login", "/register"])(
-    "redirects signed-in users from %s to their default channel",
+    "redirects signed-in users from %s to their workspace",
     async (path) => {
       renderRoutes(path, { ...signedOutState, session: sessionFixture });
       expect(
-        await screen.findByRole("heading", { name: "general" }),
+        await screen.findByRole("heading", { name: "Welcome to Core" }),
       ).toBeInTheDocument();
       expect(screen.getByTestId("location")).toHaveTextContent('"path":"/app"');
     },
@@ -122,7 +128,7 @@ describe("authentication routing", () => {
       "couldn't check your session",
     );
     expect(
-      screen.queryByRole("heading", { name: "general" }),
+      screen.queryByRole("heading", { name: "Welcome to Core" }),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
@@ -133,12 +139,12 @@ describe("authentication routing", () => {
       session: sessionFixture,
     });
     expect(
-      screen.getByRole("heading", { name: "general" }),
+      screen.getByRole("heading", { name: "Welcome to Core" }),
     ).toBeInTheDocument();
     view.rerender(
       <AuthContext.Provider value={signedOutState}>
         <MemoryRouter initialEntries={["/app"]}>
-          <AppRoutes />
+          <AppDataProvider><AppRoutes /></AppDataProvider>
           <LocationObserver />
         </MemoryRouter>
       </AuthContext.Provider>,
@@ -147,7 +153,7 @@ describe("authentication routing", () => {
       await screen.findByRole("heading", { name: "Welcome back." }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("heading", { name: "general" }),
+      screen.queryByRole("heading", { name: "Welcome to Core" }),
     ).not.toBeInTheDocument();
   });
   it("keeps the not-found page public", () => {

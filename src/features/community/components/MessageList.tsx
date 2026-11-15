@@ -8,13 +8,11 @@ export function MessageList({
   messages,
   channel,
   searching,
-  preview = true,
   historyControls,
 }: {
   messages: readonly ChatMessageData[];
   channel: { name: string };
   searching: boolean;
-  preview?: boolean;
   historyControls?: ReactNode;
 }) {
   const scrollArea = useRef<HTMLDivElement>(null);
@@ -36,7 +34,7 @@ export function MessageList({
         last === previous.current.last
       ) {
         element.scrollTop += element.scrollHeight - previous.current.height;
-      } else if (followLatest.current || messages.at(-1)?.local)
+      } else if (followLatest.current)
         element.scrollTop = element.scrollHeight;
       previous.current = { first, last, height: element.scrollHeight };
     }
@@ -75,9 +73,7 @@ export function MessageList({
             description={
               searching
                 ? "Try another name or a different search term."
-                : preview
-                  ? "No sample messages yet. Try the composer to leave a message in this local preview."
-                  : "Be the first to send a message in this channel."
+                : "Be the first to send a message in this channel."
             }
           />
         ) : (
@@ -95,14 +91,12 @@ export function MessageList({
                   gap >= 0 &&
                   gap < 300_000 &&
                   new Date(previous.createdAt).toDateString() ===
-                    new Date(message.createdAt).toDateString() &&
-                  previous.local === message.local;
+                    new Date(message.createdAt).toDateString();
                 return (
                   <ChatMessage
                     key={message.id}
                     message={message}
                     grouped={grouped}
-                    preview={preview}
                   />
                 );
               })}

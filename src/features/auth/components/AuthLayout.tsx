@@ -85,7 +85,7 @@ export function AuthLayout({
         </div>
         <footer className="auth-page-footer">
           <span>Made for the way you play.</span>
-          <span>Core · Web preview</span>
+          <span>Core · Your gaming community</span>
         </footer>
       </main>
     </div>

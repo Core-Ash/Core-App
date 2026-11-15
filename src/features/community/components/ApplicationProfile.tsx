@@ -1,4 +1,5 @@
 import { ApiNotice } from "@/components/common/ApiNotice";
+import { useAppData } from "@/app/app-data-context";
 import { Button } from "@/components/ui/button";
 import {
   useCreateProfile,
@@ -7,8 +8,10 @@ import {
 import { ApiError, apiErrorMessage } from "@/lib/api/errors";
 
 export function ApplicationProfileState() {
+  const { configurationError } = useAppData();
   const profile = useCurrentUser();
   const onboarding = useCreateProfile();
+  if (configurationError) return <ApiNotice error={new ApiError("configuration")} />;
   if (profile.isPending)
     return <ApiNotice loading="Loading your application profile…" />;
   if (profile.error instanceof ApiError && profile.error.status === 409)

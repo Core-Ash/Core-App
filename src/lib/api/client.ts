@@ -73,11 +73,13 @@ export function createApiClient({
           response.headers.get("Retry-After"),
         );
       }
-      if (
-        response.status === 204 ||
-        response.headers.get("Content-Length") === "0"
-      )
+      if (response.status === 204)
         return undefined as T;
+      // Axum membership admission returns an empty 201, which may be chunked
+      // by a proxy and therefore have no Content-Length header.
+      const payload = await response.text();
+      signal.throwIfAborted();
+      if (!payload && method !== "GET") return undefined as T;
       if (
         !response.headers
           .get("Content-Type")
@@ -88,7 +90,7 @@ export function createApiClient({
       }
       let data: unknown;
       try {
-        data = await response.json();
+        data = JSON.parse(payload);
       } catch {
         throw new ApiError("invalid_response", response.status);
       }

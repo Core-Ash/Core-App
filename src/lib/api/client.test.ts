@@ -161,6 +161,28 @@ describe("Rust API transport", () => {
       });
     expect(request).not.toHaveBeenCalled();
   });
+  it("accepts the bodyless membership 201 with or without Content-Length", async () => {
+    const { api, request } = setup();
+    for (const headers of [new Headers(), new Headers({ "Content-Length": "0" })]) {
+      request.mockResolvedValueOnce(new Response(null, { status: 201, headers }));
+      await expect(endpoints.addMember(api,
+        "22222222-2222-4222-8222-222222222222",
+        "11111111-1111-4111-8111-111111111111",
+      )).resolves.toBeUndefined();
+      expect(request).toHaveBeenLastCalledWith(
+        "https://api.example.com/api/v1/communities/22222222-2222-4222-8222-222222222222/members",
+        expect.objectContaining({ method: "POST", credentials: "include",
+          body: '{"user_id":"11111111-1111-4111-8111-111111111111"}',
+          headers: expect.objectContaining({ "X-Core-CSRF": "1" }),
+        }),
+      );
+    }
+  });
+  it("rejects an empty read response even if Content-Length says zero", async () => {
+    const { api, request } = setup();
+    request.mockResolvedValue(new Response(null, { headers: { "Content-Length": "0" } }));
+    await expect(endpoints.currentUser(api)).rejects.toMatchObject({ kind: "invalid_response" });
+  });
   it("discards a late response after caller cancellation", async () => {
     const { api, request } = setup();
     const controller = new AbortController();

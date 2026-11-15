@@ -1,5 +1,3 @@
-import type { PresenceStatus } from "@/components/ui/status-indicator";
-
 export type AvatarTone = "rose" | "teal" | "amber" | "violet" | "slate";
 export type CommunityView = "channel" | "overview" | "events" | "members";
 export interface CommunityMember {
@@ -7,27 +5,15 @@ export interface CommunityMember {
   name: string;
   initials: string;
   avatar?: string;
-  activityAvatar?: string;
-  mobile?: boolean;
   tone: AvatarTone;
-  status: PresenceStatus;
-  game?: string;
-  role?: string;
-}
-export interface MessageReaction {
-  emoji: string;
-  label: string;
-  count: number;
+  profile?: PublicProfile | null;
 }
 export interface ChatMessageData {
   id: string;
   author: CommunityMember;
   body: string;
   createdAt: string;
-  timestampLabel?: string;
-  attachment?: { src: string; alt: string };
-  reactions?: readonly MessageReaction[];
-  local?: boolean;
   edited?: boolean;
   deleted?: boolean;
 }
+import type { PublicProfile } from "@/lib/api/types";
