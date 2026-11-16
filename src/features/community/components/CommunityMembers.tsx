@@ -16,9 +16,9 @@ export function CommunityMembers({
   return (
     <section aria-label={`${community.name} membership`}>
       <h2 className="px-6 pt-6 text-xl font-semibold">Community members</h2>
-      <MemberDirectory key={community.id} communityId={community.id} />
+      <MemberDirectory key={`members-${community.id}`} communityId={community.id} />
       {community.owner_id === profile.id && (
-        <AddMemberForm key={community.id} communityId={community.id} />
+        <AddMemberForm key={`admission-${community.id}`} communityId={community.id} />
       )}
     </section>
   );
@@ -43,7 +43,7 @@ function AddMemberForm({ communityId }: { communityId: string }) {
         setSuccess(false);
         const targetId = userId.trim();
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)) {
-          setValidation("Enter a valid application member ID (UUID).");
+          setValidation("Enter a valid member reference.");
           return;
         }
         setValidation("");
@@ -60,11 +60,13 @@ function AddMemberForm({ communityId }: { communityId: string }) {
       <h2 className="text-lg font-semibold">Add a member</h2>
       <p id={`${id}-help`} className="text-sm text-muted-foreground">
         As the owner, you can give an existing Core member access to this community.
-        Ask them for the application member ID shown in their account settings.
+        Enter an existing member reference supplied by your administrator.
+        Member lookup and invitation links are unavailable.
       </p>
-      <label htmlFor={id} className="block text-sm">Application member ID</label>
+      <label htmlFor={id} className="block text-sm">Member reference</label>
       <Input
         id={id}
+        type="password"
         value={userId}
         disabled={add.isPending}
         required

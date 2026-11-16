@@ -1,41 +1,104 @@
+import { useLayoutEffect, useRef, type RefObject } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import type { MemberRole, PublicProfile } from "@/lib/api/types";
+import { displayName, publicUsername } from "@/lib/display-name";
 
 export function MemberIdentity({ profile, roles, joinedAt, avatar = true, username = true }: {
   profile: PublicProfile; roles?: MemberRole[]; joinedAt?: string; avatar?: boolean; username?: boolean;
 }) {
-  const user = { name: profile.display_name, email: profile.username, image: profile.avatar_url };
+  const name = displayName(profile);
+  const handle = publicUsername(profile);
+  const user = { name, email: "", image: profile.avatar_url };
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
-    <Dialog.Root>
+    <Dialog.Root modal={false}>
       <Dialog.Trigger asChild>
-        <button className="member-identity" title={profile.id} aria-label={`View profile for ${profile.display_name || profile.username}`}>
+        <button ref={trigger} className="member-identity" title={name} aria-label={`View profile for ${name}`}>
           {avatar && <UserAvatar user={user} className="size-9 shrink-0" />}
           <span className="min-w-0 text-left">
-            <span className="block truncate font-medium">{profile.display_name || profile.username}</span>
-            {username && <span className="block truncate text-xs text-muted-foreground">@{profile.username}</span>}
+            <span className="block truncate font-medium">{name}</span>
+            {username && handle && <span className="block truncate text-xs text-muted-foreground">@{handle}</span>}
           </span>
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="standard-dialog member-profile-dialog">
-          <UserAvatar user={user} className="mb-3 size-16" />
-          <Dialog.Title className="break-words text-xl font-semibold">{profile.display_name || profile.username}</Dialog.Title>
-          <Dialog.Description className="break-all text-sm text-muted-foreground">@{profile.username}</Dialog.Description>
-          <dl className="mt-4 space-y-3 text-sm">
-            <div><dt className="text-muted-foreground">Member ID</dt><dd className="break-all">{profile.id}</dd></div>
-            {joinedAt && <div><dt className="text-muted-foreground">Joined community</dt><dd><time dateTime={joinedAt}>{new Date(joinedAt).toLocaleDateString()}</time></dd></div>}
-          </dl>
-          {roles && <div className="mt-4"><h3 className="mb-2 text-sm font-semibold">Roles</h3>
-            {roles.length ? <ul className="flex flex-wrap gap-2">{roles.map((role) => <li key={role.id} className="access-badge flex items-center gap-1">
-              <span className="access-role-color" style={{ backgroundColor: role.color ?? "var(--muted-foreground)" }} aria-hidden="true" />{role.name}
-            </li>)}</ul> : <p className="text-sm text-muted-foreground">No assigned roles.</p>}
-          </div>}
-          <Dialog.Close asChild><button className="icon-button dialog-close" aria-label="Close member profile"><X size={20} aria-hidden="true" /></button></Dialog.Close>
-        </Dialog.Content>
+        <MemberProfileCard anchor={trigger} profile={profile} roles={roles} joinedAt={joinedAt} />
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+function MemberProfileCard({ anchor, profile, roles, joinedAt }: {
+  anchor: RefObject<HTMLButtonElement | null>; profile: PublicProfile; roles?: MemberRole[]; joinedAt?: string;
+}) {
+  const content = useRef<HTMLDivElement>(null);
+  const name = displayName(profile);
+  const handle = publicUsername(profile);
+
+  useLayoutEffect(() => {
+    const card = content.current;
+    const trigger = anchor.current;
+    if (!card || !trigger) return;
+    function position() {
+      if (!card || !trigger) return;
+      const viewport = window.visualViewport;
+      const minLeft = (viewport?.offsetLeft ?? 0) + 12;
+      const minTop = (viewport?.offsetTop ?? 0) + 12;
+      const right = minLeft + (viewport?.width ?? window.innerWidth) - 24;
+      const bottom = minTop + (viewport?.height ?? window.innerHeight) - 24;
+      card.style.maxHeight = `${bottom - minTop}px`;
+      card.style.maxWidth = `${right - minLeft}px`;
+      const target = trigger.getBoundingClientRect();
+      const { width, height } = card.getBoundingClientRect();
+      // Prefer the left of the member list; flip when the trigger is near the left edge.
+      const preferredLeft = target.left - width - 12;
+      const left = preferredLeft >= minLeft ? preferredLeft : target.right + 12;
+      card.style.left = `${Math.max(minLeft, Math.min(left, right - width))}px`;
+      card.style.top = `${Math.max(minTop, Math.min(target.top, bottom - height))}px`;
+      card.style.visibility = "visible";
+    }
+    position();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(position);
+    observer?.observe(card);
+    observer?.observe(trigger);
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    window.visualViewport?.addEventListener("resize", position);
+    window.visualViewport?.addEventListener("scroll", position);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", position, true);
+      window.visualViewport?.removeEventListener("resize", position);
+      window.visualViewport?.removeEventListener("scroll", position);
+    };
+  }, [anchor]);
+
+  return (
+    <Dialog.Content ref={content} className="member-profile-dialog">
+      <div className="member-profile-banner" aria-hidden="true" />
+      <UserAvatar user={{ name, email: "", image: profile.avatar_url }} className="member-profile-avatar" />
+      <div className="member-profile-body">
+        <Dialog.Title className="member-profile-name">{name}</Dialog.Title>
+        <Dialog.Description className={handle ? "member-profile-handle" : "sr-only"}>
+          {handle ? `@${handle}` : "Core member profile"}
+        </Dialog.Description>
+        {roles && <section className="member-profile-section" aria-label="Member roles">
+          <h3>Roles</h3>
+          {roles.length ? <ul className="member-profile-roles">{roles.map((role) => <li key={role.id} className="member-profile-role">
+            <span className="access-role-color" style={{ backgroundColor: role.color ?? "var(--muted-foreground)" }} aria-hidden="true" />
+            <span>{role.name}</span>
+          </li>)}</ul> : <p className="member-profile-empty">No assigned roles</p>}
+        </section>}
+        {joinedAt && <dl className="member-profile-joined">
+          <div><dt>Joined community</dt><dd><time dateTime={joinedAt}>{new Date(joinedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</time></dd></div>
+        </dl>}
+      </div>
+      <Dialog.Close asChild>
+        <button className="icon-button dialog-close member-profile-close" aria-label="Close member profile"><X size={16} aria-hidden="true" /></button>
+      </Dialog.Close>
+    </Dialog.Content>
   );
 }

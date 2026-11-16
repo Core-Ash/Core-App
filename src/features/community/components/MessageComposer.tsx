@@ -162,7 +162,7 @@ export function MessageComposer({
       </form>
       <div className="composer-help" id="composer-help">
         <span>
-          Enter to send · Shift+Enter for a new line. Refresh history to check for new messages.
+          Enter to send · Shift+Enter for a new line
         </span>
         {Array.from(draft).length > maximum - 200 && (
           <span>

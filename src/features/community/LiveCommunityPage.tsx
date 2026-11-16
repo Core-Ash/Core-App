@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { CalendarDays, Compass, Hash, Menu, X } from "lucide-react";
+import { Compass, Hash, Menu, X } from "lucide-react";
 import { useOutletContext } from "react-router";
 import { useAppData } from "@/app/app-data-context";
 import { ApiNotice } from "@/components/common/ApiNotice";
@@ -16,7 +16,7 @@ import { useCommunitySelection } from "@/features/community/api/use-community-se
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
 import { ChatHeader } from "@/features/community/components/ChatHeader";
 import { ChannelSettings } from "@/features/community/access/ChannelSettings";
-import { CommunityMembers } from "@/features/community/components/CommunityMembers";
+import { ServerSettings } from "@/features/community/components/ServerSettings";
 import { MemberDirectory } from "@/features/community/members/MemberDirectory";
 import {
   CreateChannelDialog,
@@ -28,8 +28,9 @@ import type { ChatMessageData } from "@/features/community/types";
 import type { Channel, Community } from "@/lib/api/types";
 import { ApiError } from "@/lib/api/errors";
 import { useMediaQuery } from "@/lib/use-media-query";
+import { displayName } from "@/lib/display-name";
 
-function WorkspaceState({ children }: { children: ReactNode }) {
+function WorkspaceState({ children, title = "Welcome to Core" }: { children: ReactNode; title?: string }) {
   const navigation = useOutletContext<WorkspaceNavigation | null>();
   return (
     <div className="page-scroll">
@@ -41,7 +42,7 @@ function WorkspaceState({ children }: { children: ReactNode }) {
         >
           <Menu size={22} aria-hidden="true" />
         </button>
-        <h1>Welcome to Core</h1>
+        <h1>{title}</h1>
       </header>
       {children}
     </div>
@@ -72,7 +73,7 @@ function LiveConversation({
     const items: ChatMessageData[] = [...unique.values()]
       .reverse()
       .map((item) => {
-        const name = item.author?.display_name || item.author?.username || `Member ${item.author_id.slice(0, 8)}`;
+        const name = displayName(item.author);
         return {
           id: item.id,
           body: item.body ?? "",
@@ -138,8 +139,7 @@ function LiveConversation({
                   messages={messages}
                   searching={Boolean(search.trim())}
                   historyControls={
-                    <div className="flex flex-wrap gap-2 p-3">
-                      {history.hasNextPage && (
+                    history.hasNextPage && <div className="history-controls">
                         <Button
                           variant="outline"
                           disabled={history.isFetching}
@@ -151,18 +151,6 @@ function LiveConversation({
                             ? "Loading…"
                             : "Load older messages"}
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        disabled={history.isFetching}
-                        onClick={() => {
-                          void history.refetch();
-                        }}
-                      >
-                        {history.isRefetching
-                          ? "Refreshing…"
-                          : "Refresh history"}
-                      </Button>
                     </div>
                   }
                 />
@@ -290,17 +278,10 @@ export function LiveCommunityPage() {
     );
   // Membership admission and unavailable-feature notices do not depend on a
   // visible channel. Owners must be able to add members to an empty community.
-  if (view === "members")
+  if (view !== "channel")
     return (
-      <WorkspaceState>
-        <CommunityMembers community={community} profile={profile.data} />
-      </WorkspaceState>
-    );
-  if (view === "events")
-    return (
-      <WorkspaceState>
-        <EmptyState icon={CalendarDays} title="Events unavailable"
-          description="Events aren't available from the application service yet." />
+      <WorkspaceState title={community.name}>
+        <ServerSettings community={community} profile={profile.data} channelId={channel?.id} view={view} />
       </WorkspaceState>
     );
   if (channels.isPending)
@@ -328,9 +309,9 @@ export function LiveCommunityPage() {
           title="No visible channels"
           description="Create a channel if you have permission, or ask the community owner for access."
         >
-          <CreateChannelDialog communityId={community.id}>
+          {community.owner_id === profile.data.id && <CreateChannelDialog communityId={community.id}>
             <Button>Create channel</Button>
-          </CreateChannelDialog>
+          </CreateChannelDialog>}
         </EmptyState>
       </WorkspaceState>
     );

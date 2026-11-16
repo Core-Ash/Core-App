@@ -128,7 +128,7 @@ describe("channel access settings", () => {
     request.mockImplementation(async (url, options) => options?.method === "POST" ? new Response(null, { status: 201 })
       : Response.json(url.includes("/access?") ? { ...channelAccessFixture, total_allowed: 3 } : { ...memberPageFixture, channel_id: null }));
     const form = screen.getByRole("form", { name: "Add community member" });
-    fireEvent.change(within(form).getByRole("textbox"), { target: { value: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" } });
+    fireEvent.change(within(form).getByLabelText("Member reference"), { target: { value: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" } });
     fireEvent.submit(form);
     expect(await screen.findByText("3 members can view this channel")).toBeInTheDocument();
     expect(request.mock.calls.filter(([url]) => url.includes("/access?"))).toHaveLength(2);

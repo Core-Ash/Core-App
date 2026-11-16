@@ -7,6 +7,8 @@ import {
   within,
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppDataProvider } from "@/app/AppDataProvider";
 import { AuthContext } from "@/features/auth/auth-context";
@@ -22,13 +24,27 @@ import {
 } from "@/test/api-fixtures";
 import { sessionFixture, signedOutState } from "@/test/auth-fixture";
 import type { Message } from "@/lib/api/types";
+import { queryKeys } from "@/features/community/api/hooks";
 
 vi.mock("@/lib/env", () => ({
   apiConfiguration: { url: "/api/v1", configured: true, error: null },
 }));
 afterEach(() => vi.unstubAllGlobals());
 
+function QueryCapture({ capture }: { capture: (client: QueryClient) => void }) {
+  const client = useQueryClient();
+  useEffect(() => capture(client), [capture, client]);
+  return null;
+}
+
+async function openServerSettings() {
+  const menu = await screen.findByLabelText(`Server menu, ${communityFixture.name}`);
+  fireEvent.click(menu);
+  fireEvent.click(screen.getByRole("link", { name: "Server Settings" }));
+}
+
 function setup({ noCommunities = false, noProfile = false, noChannels = false, owner = true } = {}) {
+  let queries!: QueryClient;
   const communities = noCommunities ? [] : [communityFixture];
   const channels = noChannels ? [] : [channelFixture];
   if (!owner) communities[0] = { ...communityFixture, owner_id: "99999999-9999-4999-8999-999999999999" };
@@ -84,6 +100,7 @@ function setup({ noCommunities = false, noProfile = false, noChannels = false, o
       value={{ ...signedOutState, session: sessionFixture }}
     >
       <AppDataProvider>
+        <QueryCapture capture={(client) => { queries = client; }} />
         <MemoryRouter initialEntries={["/app"]}>
           <NavigationRail />
           <AppSidebar />
@@ -94,10 +111,40 @@ function setup({ noCommunities = false, noProfile = false, noChannels = false, o
       </AppDataProvider>
     </AuthContext.Provider>,
   );
-  return { request, messages, communities, channels };
+  return { request, messages, communities, channels, get queries() { return queries; } };
 }
 
 describe("Rust-backed community workspace", () => {
+  it("collapses categories independently and opens creation without changing expansion", async () => {
+    setup();
+    const category = await screen.findByRole("region", { name: "Text Channels" });
+    const toggle = within(category).getByRole("button", { name: "Text Channels" });
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("link", { name: "general" })).not.toBeInTheDocument();
+    const create = within(category).getByRole("button", { name: "Create Channel" });
+    fireEvent.click(create);
+    expect(screen.getByRole("dialog", { name: "Create a channel" })).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(create).toHaveFocus());
+    fireEvent.click(toggle);
+    expect(screen.getByRole("link", { name: "general" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Voice Channels" })).toHaveAttribute("aria-expanded", "true");
+  });
+  it("keeps privileged creation and admission controls hidden from regular members", async () => {
+    setup({ owner: false });
+    await screen.findByText(messageFixture.body!);
+    expect(screen.queryByRole("button", { name: /Create Channel/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Members" })).not.toBeInTheDocument();
+    await openServerSettings();
+    expect(screen.getByText("Server name, icon, and banner editing are unavailable.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Members" }));
+    expect(screen.queryByRole("form", { name: "Add community member" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Back to channels" }));
+    expect(await screen.findByRole("heading", { name: "general" })).toBeInTheDocument();
+  });
   it("automatically loads and toggles the channel member sidebar on wide layouts", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
     const { request } = setup();
@@ -116,7 +163,7 @@ describe("Rust-backed community workspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: "View profile for Visiting Gamer" }));
     const card = screen.getByRole("dialog", { name: "Visiting Gamer" });
     expect(within(card).getByText("@visiting_gamer")).toBeInTheDocument();
-    expect(within(card).getByText(id)).toBeInTheDocument();
+    expect(within(card).queryByText(id)).not.toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url.includes("/users/"))).toBe(false);
   });
   it("lets an admitted user refresh an empty community list without signing in again", async () => {
@@ -130,17 +177,19 @@ describe("Rust-backed community workspace", () => {
   });
   it("adds a member to a community without channels, preserving input on denial and blocking duplicate submits", async () => {
     const { request } = setup({ noChannels: true });
-    fireEvent.click(await screen.findByRole("link", { name: "Members" }));
+    await openServerSettings();
+    fireEvent.click(screen.getByRole("link", { name: "Members" }));
     const form = screen.getByRole("form", { name: "Add community member" });
-    const input = within(form).getByRole("textbox", { name: "Application member ID" });
+    const input = within(form).getByLabelText("Member reference");
+    expect(input).toHaveAttribute("type", "password");
     fireEvent.change(input, { target: { value: "not a uuid" } });
     fireEvent.submit(form);
-    expect(within(form).getByRole("alert")).toHaveTextContent("valid application member ID");
-    expect(request.mock.calls.filter(([url]) => url.endsWith("/members"))).toHaveLength(0);
+    expect(within(form).getByRole("alert")).toHaveTextContent("valid member reference");
+    expect(request.mock.calls.filter(([url, options]) => url.endsWith("/members") && options?.method === "POST")).toHaveLength(0);
 
     const original = request.getMockImplementation()!;
     let finish!: (response: Response) => void;
-    request.mockImplementation((url, options) => url.endsWith("/members")
+    request.mockImplementation((url, options) => url.endsWith("/members") && options?.method === "POST"
       ? new Promise<Response>((resolve) => { finish = resolve; })
       : original(url, options));
     const target = "88888888-8888-4888-8888-888888888888";
@@ -149,17 +198,17 @@ describe("Rust-backed community workspace", () => {
     fireEvent.submit(form);
     await waitFor(() => expect(finish).toBeDefined());
     expect(within(form).getByRole("button", { name: "Adding member…" })).toBeDisabled();
-    expect(request.mock.calls.filter(([url]) => url.endsWith("/members"))).toHaveLength(1);
+    expect(request.mock.calls.filter(([url, options]) => url.endsWith("/members") && options?.method === "POST")).toHaveLength(1);
     await act(async () => { finish(new Response(null, { status: 403 })); });
     expect(await within(form).findByRole("alert")).toHaveTextContent("don't have permission");
     expect(input).toHaveValue(target);
     expect(within(form).getByRole("status")).not.toHaveTextContent("Member added");
     fireEvent.submit(form);
-    await waitFor(() => expect(request.mock.calls.filter(([url]) => url.endsWith("/members"))).toHaveLength(2));
+    await waitFor(() => expect(request.mock.calls.filter(([url, options]) => url.endsWith("/members") && options?.method === "POST")).toHaveLength(2));
     await act(async () => { finish(new Response(null, { status: 201 })); });
     await waitFor(() => expect(within(form).getByRole("status")).toHaveTextContent("Member added"));
     expect(input).toHaveValue("");
-    const membershipWrites = request.mock.calls.filter(([url]) => url.endsWith("/members"));
+    const membershipWrites = request.mock.calls.filter(([url, options]) => url.endsWith("/members") && options?.method === "POST");
     expect(membershipWrites[1]![1]).toMatchObject({
       method: "POST", credentials: "include", body: JSON.stringify({ user_id: target }),
       headers: expect.objectContaining({ "X-Core-CSRF": "1" }),
@@ -168,7 +217,8 @@ describe("Rust-backed community workspace", () => {
   });
   it("shows the member directory limitation without owner controls for other members", async () => {
     setup({ owner: false });
-    fireEvent.click(await screen.findByRole("link", { name: "Members" }));
+    await openServerSettings();
+    fireEvent.click(screen.getByRole("link", { name: "Members" }));
     expect(screen.getByRole("heading", { name: "Community members" })).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Add community member" })).not.toBeInTheDocument();
   });
@@ -259,8 +309,8 @@ describe("Rust-backed community workspace", () => {
     expect(screen.getAllByText("Fast feedback")).toHaveLength(1);
     expect(request.mock.calls.filter(([url, options]) => url.includes("/messages") && options?.method !== "POST")).toHaveLength(1);
   });
-  it("keeps confirmation when an older manual refresh completes after the send", async () => {
-    const { request } = setup();
+  it("keeps confirmation when an older background refresh completes after the send", async () => {
+    const { request, queries } = setup();
     const original = request.getMockImplementation()!;
     const draft = await screen.findByRole("textbox", { name: "Message #general" });
     let finishSend!: (response: Response) => void;
@@ -279,7 +329,7 @@ describe("Rust-backed community workspace", () => {
     fireEvent.change(draft, { target: { value: "Keep confirmation" } });
     fireEvent.keyDown(draft, { key: "Enter" });
     await waitFor(() => expect(finishSend).toBeDefined());
-    fireEvent.click(screen.getByRole("button", { name: "Refresh history" }));
+    await act(async () => { void queries.invalidateQueries({ queryKey: queryKeys.messages(channelFixture.id) }); });
     await waitFor(() => expect(finishRead).toBeDefined());
     await act(async () => {
       finishSend(Response.json({ ...messageFixture, id: "77777777-7777-4777-8777-777777777777", ...payload }));
@@ -391,7 +441,7 @@ describe("Rust-backed community workspace", () => {
       within(dialog).getByRole("button", { name: "Create community" }),
     );
     await screen.findByText(messageFixture.body!);
-    fireEvent.click(screen.getByRole("button", { name: "Create channel" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "Text Channels" })).getByRole("button", { name: "Create Channel" }));
     dialog = screen.getByRole("dialog", { name: "Create a channel" });
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "tactics" },
@@ -441,10 +491,9 @@ describe("Rust-backed community workspace", () => {
     };
     const body = await screen.findByText('<img src="x" onerror="alert(1)" />');
     expect(body.querySelector("img")).toBeNull();
-    expect(screen.getByText("Member 99999999")).toHaveAttribute(
-      "title",
-      "99999999-9999-4999-8999-999999999999",
-    );
+    expect(screen.getByText("Unknown User")).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent("99999999");
+    expect(document.querySelector('[title="99999999-9999-4999-8999-999999999999"]')).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show members" }));
     expect(
       await screen.findByRole("button", { name: `View profile for ${profileFixture.display_name}` }),

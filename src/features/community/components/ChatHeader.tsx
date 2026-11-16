@@ -135,11 +135,11 @@ export function ChatHeader({
                   Core Gaming
                 </Dialog.Title>
                 <Dialog.Description>
-                  Your communities, channels, profile, and messages come from the Core application service.
+                  A place for your communities and conversations.
                 </Dialog.Description>
                 <p>
-                  Refresh history for new messages. Search covers loaded history.
-                  Member profiles are available from the member list. Presence, reactions, and live updates are unavailable.{" "}
+                  Messages update periodically. Search covers loaded history.
+                  Member profiles are available from the member list. Presence, reactions, and instant updates are unavailable.{" "}
                   Voice, uploads, GIFs, pinned messages, and notifications are
                   unavailable.
                 </p>

@@ -28,7 +28,7 @@ export function ChatMessage({
     >
       <div className="message-avatar-column">
         {grouped ? (
-          <time dateTime={message.createdAt} className="grouped-timestamp">
+          <time dateTime={message.createdAt} title={timestamp} aria-label={timestamp} className="grouped-timestamp">
             {messageTime.format(new Date(message.createdAt))}
           </time>
         ) : (
@@ -40,7 +40,6 @@ export function ChatMessage({
           <div className="message-meta">
             {message.author.profile ? <MemberIdentity profile={message.author.profile} avatar={false} username={false} /> : <span
               className="message-author"
-              title={message.author.id}
             >
               {message.author.name}
             </span>}

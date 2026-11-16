@@ -7,6 +7,7 @@ import { useCurrentUser } from "@/features/community/api/hooks";
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { ApiError } from "@/lib/api/errors";
+import { displayName, publicIdentityLabel, publicUsername } from "@/lib/display-name";
 
 export function SettingsPage() {
   const { session } = useAuth();
@@ -54,14 +55,14 @@ function BackendAccountProfile() {
       <div className="settings-profile">
         <UserAvatar
           user={{
-            name: user.display_name || user.username,
+            name: displayName(user),
             email: user.email,
             image: user.avatar_url,
           }}
           className="size-14"
         />
         <div>
-          <h2>{user.display_name || user.username || "Core member"}</h2>
+          <h2>{displayName(user)}</h2>
           <p>{user.email || "No email available"}</p>
         </div>
         <ShieldCheck
@@ -73,19 +74,15 @@ function BackendAccountProfile() {
       <dl>
         <div>
           <dt>Display name</dt>
-          <dd>{user.display_name || "Not set"}</dd>
+          <dd>{publicIdentityLabel(user.display_name, user.id) || "Not set"}</dd>
         </div>
         <div>
           <dt>Username</dt>
-          <dd>{user.username || "Not set"}</dd>
+          <dd>{publicUsername(user) || "Not set"}</dd>
         </div>
         <div>
           <dt>Email address</dt>
           <dd>{user.email || "Not available"}</dd>
-        </div>
-        <div>
-          <dt>Application member ID</dt>
-          <dd className="break-all">{user.id}</dd>
         </div>
       </dl>
       <p className="settings-note">

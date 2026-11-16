@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { useOptionalAppData } from "@/app/app-data-context";
 import { useCurrentUser } from "@/features/community/api/hooks";
 import type { AuthUser } from "@/lib/auth-client";
+import { displayName, publicIdentityLabel } from "@/lib/display-name";
 
 export function UserPanel({ onNavigate }: { onNavigate?: () => void }) {
   const { session } = useAuth();
@@ -14,8 +15,7 @@ export function UserPanel({ onNavigate }: { onNavigate?: () => void }) {
   if (data?.configured) return <BackendUserPanel onNavigate={onNavigate} />;
   return (
     <UserPanelView
-      user={session.user}
-      subtitle="Signed in"
+      user={{ ...session.user, name: publicIdentityLabel(session.user.name, session.user.id) || "Unknown User" }}
       onNavigate={onNavigate}
     />
   );
@@ -27,11 +27,10 @@ function BackendUserPanel({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <UserPanelView
       user={{
-        name: user?.display_name || user?.username || "Core member",
+        name: displayName(user),
         email: "",
         image: user?.avatar_url,
       }}
-      subtitle={user?.username ? `@${user.username}` : "Profile unavailable"}
       onNavigate={onNavigate}
     />
   );
@@ -39,11 +38,9 @@ function BackendUserPanel({ onNavigate }: { onNavigate?: () => void }) {
 
 function UserPanelView({
   user,
-  subtitle,
   onNavigate,
 }: {
   user: Pick<AuthUser, "name" | "email" | "image">;
-  subtitle: string;
   onNavigate?: () => void;
 }) {
   return (
@@ -54,9 +51,6 @@ function UserPanelView({
         </span>
         <div className="user-panel-name">
           <p title={user.name}>{user.name || "Core member"}</p>
-          <span title="Signed in; live presence is unavailable">
-            {subtitle}
-          </span>
         </div>
         <div className="user-controls">
           <Tooltip content="Microphone unavailable · voice is not connected">

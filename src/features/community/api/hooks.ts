@@ -72,6 +72,11 @@ export function useMessages(channelId?: string) {
     initialPageParam: null as MessageCursor | null,
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     enabled: ready && Boolean(channelId),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    // Match member refresh cadence until a live-message transport is available.
+    // React Query pauses background polling while the window is hidden.
+    refetchInterval: 30_000,
   });
 }
 export function useCreateCommunity() {
