@@ -1,36 +1,32 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MessageComposer } from "@/features/community/components/MessageComposer";
 import { ApiError } from "@/lib/api/errors";
 
 describe("persisted message composer", () => {
-  it("blocks duplicate sends and announces success only after confirmation", async () => {
-    let finish!: () => void;
-    const send = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+  it("clears immediately and allows the next message without awaiting delivery", () => {
+    const send = vi.fn();
     render(<MessageComposer channelName="general" onSend={send} />);
     const input = screen.getByRole("textbox");
-    fireEvent.change(input, { target: { value: "  Ready for the next round.  " } });
+    fireEvent.change(input, { target: { value: "  First message  " } });
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.submit(screen.getByRole("form"));
-    expect(send).toHaveBeenCalledExactlyOnceWith("Ready for the next round.");
-    expect(input).toBeDisabled();
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
-    await act(async () => { finish(); });
+    expect(send).toHaveBeenCalledExactlyOnceWith("First message");
     expect(input).toHaveValue("");
-    expect(screen.getByRole("status")).toHaveTextContent("Message sent.");
+    expect(input).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Message queued.");
+    fireEvent.change(input, { target: { value: "Second message" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(send).toHaveBeenCalledTimes(2);
   });
-  it("keeps a failed draft without reporting success and allows explicit retry", async () => {
-    const send = vi.fn().mockRejectedValueOnce(new ApiError("unavailable")).mockResolvedValue(undefined);
+  it("keeps input if it cannot be queued", () => {
+    const send = vi.fn(() => { throw new ApiError("unauthorized"); });
     render(<MessageComposer channelName="general" onSend={send} />);
     const input = screen.getByRole("textbox");
     fireEvent.change(input, { target: { value: "Keep this draft" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Your draft has been kept");
+    expect(screen.getByRole("alert")).toHaveTextContent("Your draft has been kept");
     expect(input).toHaveValue("Keep this draft");
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
-    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
-    await waitFor(() => expect(input).toHaveValue(""));
-    expect(send).toHaveBeenCalledTimes(2);
   });
   it("preserves multiline and IME input and rejects blank or oversized messages", async () => {
     const send = vi.fn().mockResolvedValue(undefined);

@@ -10,6 +10,10 @@ export interface CommunityMember {
 }
 export interface ChatMessageData {
   id: string;
+  renderKey?: string;
+  delivery?: "pending" | "failed";
+  deliveryError?: string;
+  onRetry?: () => void;
   author: CommunityMember;
   body: string;
   createdAt: string;

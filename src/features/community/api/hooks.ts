@@ -5,10 +5,10 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useAppData } from "@/app/app-data-context";
-import { ApiError } from "@/lib/api/errors";
+import { ApiError, apiErrorMessage } from "@/lib/api/errors";
 import { endpoints } from "@/lib/api/endpoints";
 import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
-import type { ChannelAccessFilters, MessageCursor } from "@/lib/api/types";
+import type { ChannelAccessFilters, MessageCursor, Message } from "@/lib/api/types";
 
 export const queryKeys = {
   profile: ["profile"] as const,
@@ -143,24 +143,69 @@ export function useMembers(communityId: string, channelId: string | undefined, s
     staleTime: 10_000, refetchOnWindowFocus: true, refetchInterval: 30_000,
   });
 }
+export interface LocalMessage {
+  message: Message;
+  status: "pending" | "failed";
+  error?: string;
+  retryable?: boolean;
+}
+
 export function useSendMessage(channelId: string) {
   const { api, ready } = useAppData();
   const queries = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { body: string; client_nonce: string }) => {
+  const profile = useCurrentUser();
+  const key = ["message-outbox", channelId] as const;
+  const outbox = useQuery<LocalMessage[]>({
+    queryKey: key, queryFn: () => [], initialData: [], enabled: false,
+    // Pending and failed sends survive navigation, but SessionScope clears them on logout.
+    gcTime: Infinity,
+  });
+  function update(nonce: string, change: (entry: LocalMessage) => LocalMessage | null) {
+    queries.setQueryData<LocalMessage[]>(key, (previous) => previous?.flatMap((entry) => {
+      if (entry.message.client_nonce !== nonce) return [entry];
+      const next = change(entry);
+      return next ? [next] : [];
+    }));
+  }
+  const mutation = useMutation({
+    mutationFn: async (input: { body: string; client_nonce: string }) => {
       if (!ready) throw new ApiError("unauthorized");
-      return endpoints.sendMessage(api, channelId, input);
+      const message = await endpoints.sendMessage(api, channelId, input);
+      if (message.client_nonce !== input.client_nonce || message.author_id !== profile.data?.id) throw new ApiError("invalid_response");
+      return message;
     },
-    onMutate: () =>
-      queries.cancelQueries({ queryKey: queryKeys.messages(channelId) }),
-    onSuccess: async (message) => {
+    onSuccess: async (message, input) => {
       // A manual refresh started during the send must not overwrite confirmation.
       await queries.cancelQueries({ queryKey: queryKeys.messages(channelId) });
+      if (!queries.getQueryData<LocalMessage[]>(key)?.some((entry) => entry.message.client_nonce === input.client_nonce)) return;
       queries.setQueryData(
         queryKeys.messages(channelId),
         (previous: Parameters<typeof mergeConfirmedMessage>[0]) =>
           mergeConfirmedMessage(previous, message),
       );
+      update(input.client_nonce, () => null);
+    },
+    onError: (error, input) => {
+      update(input.client_nonce, (entry) => ({ ...entry, status: "failed", error: apiErrorMessage(error),
+        retryable: !(error instanceof ApiError && ["unauthorized", "session_transport", "auth_unavailable", "forbidden", "validation", "not_found", "conflict", "configuration"].includes(error.kind)),
+      }));
     },
   });
+  return {
+    entries: outbox.data,
+    send: (body: string) => {
+      if (!ready || !profile.isSuccess) throw new ApiError("unauthorized");
+      const nonce = crypto.randomUUID();
+      const message: Message = { id: nonce, client_nonce: nonce, author_id: profile.data.id,
+        author: profile.data, body, created_at: new Date().toISOString(), edited_at: null, deleted_at: null };
+      queries.setQueryData<LocalMessage[]>(key, (previous = []) => [...previous, { message, status: "pending" }]);
+      mutation.mutate({ body, client_nonce: nonce });
+    },
+    retry: (nonce: string) => {
+      const entry = queries.getQueryData<LocalMessage[]>(key)?.find((entry) => entry.message.client_nonce === nonce);
+      if (!ready || entry?.status !== "failed" || !entry.retryable) return;
+      update(nonce, (entry) => ({ ...entry, status: "pending", error: undefined }));
+      mutation.mutate({ body: entry.message.body!, client_nonce: nonce });
+    },
+  };
 }

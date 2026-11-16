@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from "react";
-import { Image, LoaderCircle, Plus, SendHorizontal, Smile } from "lucide-react";
+import { Image, Plus, SendHorizontal, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmojiPicker } from "@/components/ui/emoji-picker";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -7,25 +7,21 @@ import { apiErrorMessage } from "@/lib/api/errors";
 
 interface MessageComposerProps {
   channelName: string;
-  onSend: (body: string) => void | Promise<void>;
-  sending?: boolean;
+  onSend: (body: string) => void;
 }
 
 export function MessageComposer({
   channelName,
   onSend,
-  sending = false,
 }: MessageComposerProps) {
   const [draft, setDraft] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const locked = useRef(false);
   const input = useRef<HTMLTextAreaElement>(null);
-  const busy = sending || submitting;
   const maximum = 4000;
-  const ready = draft.trim().length > 0 && !busy;
-  async function send() {
+  const ready = draft.trim().length > 0;
+  function send() {
     if (!ready || locked.current) return;
     if (Array.from(draft.trim()).length > maximum || draft.includes("\0")) {
       setError(
@@ -34,19 +30,16 @@ export function MessageComposer({
       return;
     }
     locked.current = true;
-    setSubmitting(true);
     setError(null);
     try {
-      const result = onSend(draft.trim());
-      if (result) await result;
+      onSend(draft.trim());
       setDraft("");
-      setAnnouncement("Message sent.");
+      setAnnouncement("Message queued.");
     } catch (failure) {
       setError(apiErrorMessage(failure));
     } finally {
       locked.current = false;
-      setSubmitting(false);
-      // Focus after React re-enables the input following an async send.
+      // Keep keyboard entry ready for the next message.
       requestAnimationFrame(() => input.current?.focus());
     }
   }
@@ -66,7 +59,6 @@ export function MessageComposer({
       <form
         className="message-composer"
         aria-label="Message composer"
-        aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
           void send();
@@ -93,7 +85,6 @@ export function MessageComposer({
           maxLength={maximum * 2}
           placeholder={`Message #${channelName}`}
           value={draft}
-          disabled={busy}
           aria-invalid={Boolean(error)}
           aria-describedby={
             error ? "composer-help composer-error" : "composer-help"
@@ -127,7 +118,6 @@ export function MessageComposer({
           </Tooltip>
           <EmojiPicker
             label="Choose an emoji"
-            disabled={busy}
             onSelect={(emoji) => {
               setDraft((previous) =>
                 Array.from(`${previous}${emoji.value}`)
@@ -144,19 +134,13 @@ export function MessageComposer({
             size="icon"
             className="send-button"
             disabled={!ready}
-            aria-label={
-              busy ? "Sending message" : "Send message"
-            }
+            aria-label="Send message"
           >
-            {busy ? (
-              <LoaderCircle className="animate-spin" aria-hidden="true" />
-            ) : (
-              <SendHorizontal
+            <SendHorizontal
                 fill="currentColor"
                 size={28}
                 aria-hidden="true"
               />
-            )}
           </Button>
         </div>
       </form>

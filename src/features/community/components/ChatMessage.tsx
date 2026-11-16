@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/features/community/types";
 import { MemberAvatar } from "@/features/community/components/MemberAvatar";
 import { MemberIdentity } from "@/features/community/members/MemberIdentity";
+import { CircleAlert } from "lucide-react";
 
 const messageTime = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
@@ -24,7 +25,9 @@ export function ChatMessage({
       className={cn(
         "chat-message",
         grouped && "message-grouped",
+        message.delivery && `message-${message.delivery}`,
       )}
+      data-delivery={message.delivery ?? "sent"}
     >
       <div className="message-avatar-column">
         {grouped ? (
@@ -49,6 +52,12 @@ export function ChatMessage({
         <p className="message-body">
           {message.deleted ? "Message deleted" : message.body}
         </p>
+        {message.delivery === "pending" && <span className="sr-only">Sending message</span>}
+        {message.delivery === "failed" && <div className="message-delivery-error" role="status">
+          <CircleAlert size={12} aria-hidden="true" />
+          <span>Message failed to send. {message.deliveryError}</span>
+          {message.onRetry && <button type="button" onClick={message.onRetry} aria-label="Retry message">Retry</button>}
+        </div>}
         {message.edited && !message.deleted && (
           <span className="text-xs text-muted-foreground">Edited</span>
         )}

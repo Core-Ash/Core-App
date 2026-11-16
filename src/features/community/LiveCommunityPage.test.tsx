@@ -115,6 +115,84 @@ function setup({ noCommunities = false, noProfile = false, noChannels = false, o
 }
 
 describe("Rust-backed community workspace", () => {
+  it("handles rapid sends, out-of-order confirmations and refreshes without remounting rows", async () => {
+    const { request, queries } = setup();
+    const draft = await screen.findByRole("textbox", { name: "Message #general" });
+    const original = request.getMockImplementation()!;
+    const pending: { finish: (response: Response) => void; input: { body: string; client_nonce: string } }[] = [];
+    request.mockImplementation((url, options) => options?.method === "POST" && url.endsWith("/messages")
+      ? new Promise<Response>((finish) => { pending.push({ finish, input: JSON.parse(String(options.body)) }); })
+      : original(url, options));
+    for (const body of ["First concurrent", "Second concurrent"]) {
+      fireEvent.change(draft, { target: { value: body } });
+      fireEvent.keyDown(draft, { key: "Enter" });
+      expect(draft).toHaveValue("");
+      expect(draft).toBeEnabled();
+    }
+    const first = (await screen.findByText("First concurrent")).closest("li");
+    const second = (await screen.findByText("Second concurrent")).closest("li");
+    await waitFor(() => expect(pending).toHaveLength(2));
+    await act(async () => { await queries.invalidateQueries({ queryKey: queryKeys.messages(channelFixture.id) }); });
+    expect(first).toBeInTheDocument();
+    expect(second).toBeInTheDocument();
+    await act(async () => pending[1]!.finish(Response.json({ ...messageFixture, ...pending[1]!.input,
+      id: "77777777-7777-4777-8777-777777777777", created_at: new Date().toISOString() })));
+    await waitFor(() => expect(second).toHaveAttribute("data-delivery", "sent"));
+    expect(first).toHaveAttribute("data-delivery", "pending");
+    await act(async () => pending[0]!.finish(Response.json({ ...messageFixture, ...pending[0]!.input,
+      id: "88888888-8888-4888-8888-888888888888", created_at: new Date().toISOString() })));
+    await waitFor(() => expect(first).toHaveAttribute("data-delivery", "sent"));
+    expect(screen.getAllByText("First concurrent")).toHaveLength(1);
+    expect(screen.getAllByText("Second concurrent")).toHaveLength(1);
+  });
+  it("keeps failed sends in their channel after navigation and blocks retry on permission failures", async () => {
+    const { request, queries } = setup();
+    const draft = await screen.findByRole("textbox", { name: "Message #general" });
+    const original = request.getMockImplementation()!;
+    request.mockImplementation((url, options) => options?.method === "POST" && url.endsWith("/messages")
+      ? Promise.resolve(new Response(null, { status: 403 })) : original(url, options));
+    fireEvent.change(draft, { target: { value: "Permission denied message" } });
+    fireEvent.keyDown(draft, { key: "Enter" });
+    await screen.findByText(/Message failed to send/);
+    expect(screen.queryByRole("button", { name: "Retry message" })).not.toBeInTheDocument();
+    expect(screen.getByText(/don't have permission/)).toBeInTheDocument();
+    await act(async () => { queries.setQueryData(queryKeys.channels(communityFixture.id), [channelFixture,
+      { ...channelFixture, id: "66666666-6666-4666-8666-666666666666", name: "second" }]); });
+    fireEvent.click(await screen.findByRole("link", { name: "second" }));
+    await screen.findByRole("textbox", { name: "Message #second" });
+    expect(screen.queryByText("Permission denied message")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "general" }));
+    expect(await screen.findByText("Permission denied message")).toBeInTheDocument();
+    expect(request.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(1);
+  });
+  it("retains pending sends across navigation and prevents simultaneous retries of a failed row", async () => {
+    const { request, channels } = setup();
+    channels.push({ ...channelFixture, id: "66666666-6666-4666-8666-666666666666", name: "second" });
+    const draft = await screen.findByRole("textbox", { name: "Message #general" });
+    const original = request.getMockImplementation()!;
+    let finish!: (response: Response) => void;
+    request.mockImplementation((url, options) => options?.method === "POST" && url.endsWith("/messages")
+      ? new Promise<Response>((resolve) => { finish = resolve; }) : original(url, options));
+    fireEvent.change(draft, { target: { value: "Stays in general" } });
+    fireEvent.keyDown(draft, { key: "Enter" });
+    await screen.findByText("Stays in general");
+    await waitFor(() => expect(finish).toBeDefined());
+    fireEvent.click(await screen.findByRole("link", { name: "second" }));
+    await screen.findByRole("textbox", { name: "Message #second" });
+    expect(screen.queryByText("Stays in general")).not.toBeInTheDocument();
+    await act(async () => finish(new Response(null, { status: 503 })));
+    fireEvent.click(screen.getByRole("link", { name: "general" }));
+    const retry = await screen.findByRole("button", { name: "Retry message" });
+    const row = screen.getByText("Stays in general").closest("li");
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(2));
+    await waitFor(() => expect(row).toHaveAttribute("data-delivery", "pending"));
+    await act(async () => finish(new Response(null, { status: 503 })));
+    expect(await screen.findByRole("button", { name: "Retry message" })).toBeInTheDocument();
+    expect(screen.getAllByText("Stays in general")).toHaveLength(1);
+    expect(screen.getByText("Stays in general").closest("li")).toBe(row);
+  });
   it("collapses categories independently and opens creation without changing expansion", async () => {
     setup();
     const category = await screen.findByRole("region", { name: "Text Channels" });
@@ -298,14 +376,17 @@ describe("Rust-backed community workspace", () => {
     const draft = await screen.findByRole("textbox", { name: "Message #general" });
     fireEvent.change(draft, { target: { value: "Fast feedback" } });
     fireEvent.keyDown(draft, { key: "Enter" });
-    expect(await screen.findByRole("status", { name: "Pending message" })).toHaveTextContent("Fast feedback");
-    expect(draft).toHaveValue("Fast feedback");
+    const row = (await screen.findByText("Fast feedback")).closest("li");
+    expect(row).toHaveAttribute("data-delivery", "pending");
+    expect(draft).toHaveValue("");
+    expect(draft).toBeEnabled();
     await waitFor(() => expect(finish).toBeDefined());
     await act(async () => {
       finish(Response.json({ ...messageFixture, id: "77777777-7777-4777-8777-777777777777", ...payload }));
     });
     await waitFor(() => expect(draft).toHaveValue(""));
-    expect(screen.queryByRole("status", { name: "Pending message" })).not.toBeInTheDocument();
+    await waitFor(() => expect(row).toHaveAttribute("data-delivery", "sent"));
+    expect(screen.getByText("Fast feedback").closest("li")).toBe(row);
     expect(screen.getAllByText("Fast feedback")).toHaveLength(1);
     expect(request.mock.calls.filter(([url, options]) => url.includes("/messages") && options?.method !== "POST")).toHaveLength(1);
   });
@@ -341,7 +422,7 @@ describe("Rust-backed community workspace", () => {
     });
     expect(screen.getAllByText("Keep confirmation")).toHaveLength(1);
   });
-  it("keeps a failed draft and reuses its nonce after a lost send response", async () => {
+  it("keeps a failed message and retries with the same nonce after a lost response", async () => {
     const { request, messages } = setup();
     const original = request.getMockImplementation()!;
     const sent: { body: string; client_nonce: string }[] = [];
@@ -370,11 +451,12 @@ describe("Rust-backed community workspace", () => {
     });
     fireEvent.change(draft, { target: { value: "Saved exactly once" } });
     fireEvent.keyDown(draft, { key: "Enter" });
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Your draft has been kept",
-    );
-    expect(draft).toHaveValue("Saved exactly once");
-    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    const retry = await screen.findByRole("button", { name: "Retry message" });
+    expect(screen.getByText("Saved exactly once").closest("li")).toHaveAttribute("data-delivery", "failed");
+    expect(draft).toHaveValue("");
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Retry message" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Saved exactly once").closest("li")).toHaveAttribute("data-delivery", "sent"));
     await waitFor(() => expect(draft).toHaveValue(""));
     expect(sent).toHaveLength(2);
     expect(sent[0]).toEqual(sent[1]);

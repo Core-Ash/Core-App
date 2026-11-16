@@ -729,6 +729,11 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.message-pending .message-body { opacity: .6; }
+.message-failed .message-body { color: var(--link); }
+.message-delivery-error { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 3px; color: var(--link); font-size: 11px; line-height: 18px; }
+.message-delivery-error > svg { flex-shrink: 0; }
+.message-delivery-error > button { border-radius: 3px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .message-grouped {
   min-height: 22px;
   margin-top: 0;

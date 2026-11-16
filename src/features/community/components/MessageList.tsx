@@ -94,7 +94,7 @@ export function MessageList({
                     new Date(message.createdAt).toDateString();
                 return (
                   <ChatMessage
-                    key={message.id}
+                    key={message.renderKey ?? message.id}
                     message={message}
                     grouped={grouped}
                   />

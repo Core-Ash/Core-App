@@ -62,20 +62,27 @@ function LiveConversation({
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const membersButton = useRef<HTMLButtonElement>(null);
-  const attempt = useRef<{ body: string; client_nonce: string } | null>(null);
   const messages = useMemo(() => {
-    // Preserve the backend's newest-first cursor ordering, including timestamp ties.
+    // Server history wins when a refresh confirms an in-flight or failed send.
     const unique = new Map(
       history.data?.pages
         .flatMap((page) => page.items)
         .map((item) => [item.id, item]),
     );
-    const items: ChatMessageData[] = [...unique.values()]
-      .reverse()
+    const local = new Map(send.entries.map((entry) => [entry.message.author_id + ":" + entry.message.client_nonce, entry]));
+    for (const item of unique.values()) local.delete(item.author_id + ":" + item.client_nonce);
+    const server = [...unique.values()].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id));
+    const items: ChatMessageData[] = [...server, ...[...local.values()].map((entry) => entry.message)]
+      // Stable sorting keeps rapid local sends in enqueue order when timestamps tie.
+      .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
       .map((item) => {
         const name = displayName(item.author);
         return {
           id: item.id,
+          renderKey: item.author_id + ':' + item.client_nonce,
+          delivery: local.get(item.author_id + ':' + item.client_nonce)?.status,
+          deliveryError: local.get(item.author_id + ':' + item.client_nonce)?.error,
+          onRetry: local.get(item.author_id + ':' + item.client_nonce)?.retryable ? () => send.retry(item.client_nonce) : undefined,
           body: item.body ?? "",
           createdAt: item.created_at,
           edited: Boolean(item.edited_at),
@@ -100,7 +107,7 @@ function LiveConversation({
               .includes(term),
         )
       : items;
-  }, [history.data, search]);
+  }, [history.data, search, send]);
   const membersOpen = wide ? membersVisible : membersDialogOpen;
   return (
     <section
@@ -123,9 +130,9 @@ function LiveConversation({
         settings={<ChannelSettings key={channel.id} community={community} channel={channel} />}
       />
       <div className="chat-column">
-            {history.isPending ? (
+            {history.isPending && !send.entries.length ? (
               <ApiNotice loading="Loading message history…" />
-            ) : history.error ? (
+            ) : history.error && ((!history.data && !send.entries.length) || (history.error instanceof ApiError && ["unauthorized", "forbidden", "session_transport", "auth_unavailable"].includes(history.error.kind))) ? (
               <ApiNotice
                 error={history.error}
                 onRetry={() => {
@@ -154,32 +161,7 @@ function LiveConversation({
                     </div>
                   }
                 />
-                {send.isPending && (
-                  <div
-                    role="status"
-                    aria-label="Pending message"
-                    className="px-5 py-2 text-sm text-muted-foreground"
-                  >
-                    <p className="whitespace-pre-wrap break-words">
-                      {send.variables?.body}
-                    </p>
-                    <span>Sending…</span>
-                  </div>
-                )}
-                <MessageComposer
-                  channelName={channel.name}
-                  sending={send.isPending}
-                  onSend={async (body) => {
-                    // A retry of an unchanged draft reuses its nonce, including after a lost response.
-                    if (attempt.current?.body !== body)
-                      attempt.current = {
-                        body,
-                        client_nonce: crypto.randomUUID(),
-                      };
-                    await send.mutateAsync(attempt.current);
-                    attempt.current = null;
-                  }}
-                />
+                <MessageComposer channelName={channel.name} onSend={send.send} />
               </>
             )}
       </div>
