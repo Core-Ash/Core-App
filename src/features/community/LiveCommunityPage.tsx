@@ -16,12 +16,13 @@ import { useCommunitySelection } from "@/features/community/api/use-community-se
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
 import { ChatHeader } from "@/features/community/components/ChatHeader";
 import { ChannelSettings } from "@/features/community/access/ChannelSettings";
+import { ServerEvents } from "@/features/events/ServerEvents";
 import { ServerSettings } from "@/features/community/components/ServerSettings";
 import { MemberDirectory } from "@/features/community/members/MemberDirectory";
 import {
   CreateChannelDialog,
-  CreateCommunityDialog,
 } from "@/features/community/components/CreateResourceDialog";
+import { AddServerDialog } from "@/features/community/components/AddServerDialog";
 import { MessageComposer } from "@/features/community/components/MessageComposer";
 import { MessageList } from "@/features/community/components/MessageList";
 import type { ChatMessageData } from "@/features/community/types";
@@ -131,7 +132,7 @@ function LiveConversation({
       />
       <div className="chat-column">
             {history.isPending && !send.entries.length ? (
-              <ApiNotice loading="Loading message history…" />
+              <ApiNotice loading="Loading message historyâ€¦" />
             ) : history.error && ((!history.data && !send.entries.length) || (history.error instanceof ApiError && ["unauthorized", "forbidden", "session_transport", "auth_unavailable"].includes(history.error.kind))) ? (
               <ApiNotice
                 error={history.error}
@@ -155,7 +156,7 @@ function LiveConversation({
                           }}
                         >
                           {history.isFetchingNextPage
-                            ? "Loading…"
+                            ? "Loadingâ€¦"
                             : "Load older messages"}
                         </Button>
                     </div>
@@ -223,7 +224,7 @@ export function LiveCommunityPage() {
   if (communities.isPending)
     return (
       <WorkspaceState>
-        <ApiNotice loading="Loading your communities…" />
+        <ApiNotice loading="Loading your communitiesâ€¦" />
       </WorkspaceState>
     );
   if (communities.error)
@@ -243,23 +244,23 @@ export function LiveCommunityPage() {
         <EmptyState
           icon={Compass}
           title="A place for your squad."
-          description="You don't belong to any communities yet. Create one to get started."
+          description="Create your own server or join one with an invite link."
         >
-          <CreateCommunityDialog>
-            <Button>Create community</Button>
-          </CreateCommunityDialog>
+          <AddServerDialog>
+            <Button>Add a server</Button>
+          </AddServerDialog>
           <Button
             variant="outline"
             disabled={communities.isFetching}
             onClick={() => { void communities.refetch(); }}
           >
-            {communities.isFetching ? "Refreshing…" : "Refresh communities"}
+            {communities.isFetching ? "Refreshingâ€¦" : "Refresh communities"}
           </Button>
         </EmptyState>
       </WorkspaceState>
     );
-  // Membership admission and unavailable-feature notices do not depend on a
-  // visible channel. Owners must be able to add members to an empty community.
+  if (view === "events") return <WorkspaceState title={community.name}><ServerEvents key={community.id} community={community} /></WorkspaceState>;
+  // Server settings remain available even without visible channels.
   if (view !== "channel")
     return (
       <WorkspaceState title={community.name}>
@@ -269,7 +270,7 @@ export function LiveCommunityPage() {
   if (channels.isPending)
     return (
       <WorkspaceState>
-        <ApiNotice loading="Loading channels…" />
+        <ApiNotice loading="Loading channelsâ€¦" />
       </WorkspaceState>
     );
   if (channels.error)

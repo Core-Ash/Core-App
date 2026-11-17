@@ -40,7 +40,7 @@ function QueryCapture({ capture }: { capture: (client: QueryClient) => void }) {
 async function openServerSettings() {
   const menu = await screen.findByLabelText(`Server menu, ${communityFixture.name}`);
   fireEvent.click(menu);
-  fireEvent.click(screen.getByRole("link", { name: "Server Settings" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Server Settings" }));
 }
 
 function setup({ noCommunities = false, noProfile = false, noChannels = false, owner = true } = {}) {
@@ -53,6 +53,8 @@ function setup({ noCommunities = false, noProfile = false, noChannels = false, o
   const request = vi.fn(async (input: string, options: RequestInit = {}) => {
     const url = new URL(input, "https://core.example.com");
     const write = options.method === "POST";
+    if (url.pathname.endsWith("/event-permissions")) return Response.json({ create: owner, manage: owner });
+    if (url.pathname.endsWith("/invite-permissions")) return Response.json({ create: owner, manage: owner, manage_channels: owner, owner });
     if (url.pathname === "/api/v1/bootstrap")
       return profileCreated
         ? Response.json({ profile: profileFixture, communities: { items: [...communities] } })
@@ -200,7 +202,7 @@ describe("Rust-backed community workspace", () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("link", { name: "general" })).not.toBeInTheDocument();
-    const create = within(category).getByRole("button", { name: "Create Channel" });
+    const create = await within(category).findByRole("button", { name: "Create Channel" });
     fireEvent.click(create);
     expect(screen.getByRole("dialog", { name: "Create a channel" })).toBeInTheDocument();
     expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -253,45 +255,13 @@ describe("Rust-backed community workspace", () => {
     expect(request.mock.calls.filter(([url]) => url === "/api/v1/communities")).toHaveLength(1);
     expect(request.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
   });
-  it("adds a member to a community without channels, preserving input on denial and blocking duplicate submits", async () => {
-    const { request } = setup({ noChannels: true });
+  it("replaces member-reference admission with link invitations, even without channels", async () => {
+    setup({ noChannels: true });
     await openServerSettings();
     fireEvent.click(screen.getByRole("link", { name: "Members" }));
-    const form = screen.getByRole("form", { name: "Add community member" });
-    const input = within(form).getByLabelText("Member reference");
-    expect(input).toHaveAttribute("type", "password");
-    fireEvent.change(input, { target: { value: "not a uuid" } });
-    fireEvent.submit(form);
-    expect(within(form).getByRole("alert")).toHaveTextContent("valid member reference");
-    expect(request.mock.calls.filter(([url, options]) => url.endsWith("/members") && options?.method === "POST")).toHaveLength(0);
-
-    const original = request.getMockImplementation()!;
-    let finish!: (response: Response) => void;
-    request.mockImplementation((url, options) => url.endsWith("/members") && options?.method === "POST"
-      ? new Promise<Response>((resolve) => { finish = resolve; })
-      : original(url, options));
-    const target = "88888888-8888-4888-8888-888888888888";
-    fireEvent.change(input, { target: { value: target } });
-    fireEvent.submit(form);
-    fireEvent.submit(form);
-    await waitFor(() => expect(finish).toBeDefined());
-    expect(within(form).getByRole("button", { name: "Adding member…" })).toBeDisabled();
-    expect(request.mock.calls.filter(([url, options]) => url.endsWith("/members") && options?.method === "POST")).toHaveLength(1);
-    await act(async () => { finish(new Response(null, { status: 403 })); });
-    expect(await within(form).findByRole("alert")).toHaveTextContent("don't have permission");
-    expect(input).toHaveValue(target);
-    expect(within(form).getByRole("status")).not.toHaveTextContent("Member added");
-    fireEvent.submit(form);
-    await waitFor(() => expect(request.mock.calls.filter(([url, options]) => url.endsWith("/members") && options?.method === "POST")).toHaveLength(2));
-    await act(async () => { finish(new Response(null, { status: 201 })); });
-    await waitFor(() => expect(within(form).getByRole("status")).toHaveTextContent("Member added"));
-    expect(input).toHaveValue("");
-    const membershipWrites = request.mock.calls.filter(([url, options]) => url.endsWith("/members") && options?.method === "POST");
-    expect(membershipWrites[1]![1]).toMatchObject({
-      method: "POST", credentials: "include", body: JSON.stringify({ user_id: target }),
-      headers: expect.objectContaining({ "X-Core-CSRF": "1" }),
-    });
-    expect(request.mock.calls.some(([url]) => url.includes("/messages"))).toBe(false);
+    expect(screen.getByRole("heading", { name: "Community members" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Member reference")).not.toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Invites" })).toBeInTheDocument();
   });
   it("shows the member directory limitation without owner controls for other members", async () => {
     setup({ owner: false });
@@ -311,7 +281,7 @@ describe("Rust-backed community workspace", () => {
     expect(screen.queryByText("Alex Morgan")).not.toBeInTheDocument();
     expect(screen.queryByText("Nex")).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/Design preview · sample/),
+      screen.queryByText(/Design preview Â· sample/),
     ).not.toBeInTheDocument();
     expect(
       request.mock.calls.filter(([url]) => url === "/api/v1/bootstrap"),
@@ -333,7 +303,7 @@ describe("Rust-backed community workspace", () => {
         : original(input, options),
     );
     expect(
-      await screen.findByText("Loading message history…"),
+      await screen.findByText("Loading message historyâ€¦"),
     ).toBeInTheDocument();
     await act(async () => {
       finish(Response.json({ items: [], next_cursor: null }));
@@ -513,14 +483,15 @@ describe("Rust-backed community workspace", () => {
   it("creates a community and channel using the supported contracts and selects the results", async () => {
     const { request } = setup({ noCommunities: true });
     fireEvent.click(
-      await screen.findByRole("button", { name: "Create community" }),
+      await screen.findByRole("button", { name: "Add a server" }),
     );
-    let dialog = screen.getByRole("dialog", { name: "Create a community" });
+    fireEvent.click(screen.getByRole("button", { name: "Create a server" }));
+    let dialog = screen.getByRole("dialog", { name: "Create a server" });
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "Test Squad" },
     });
     fireEvent.click(
-      within(dialog).getByRole("button", { name: "Create community" }),
+      within(dialog).getByRole("button", { name: "Create server" }),
     );
     await screen.findByText(messageFixture.body!);
     fireEvent.click(within(screen.getByRole("region", { name: "Text Channels" })).getByRole("button", { name: "Create Channel" }));

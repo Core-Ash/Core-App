@@ -105,19 +105,11 @@ describe("member directories", () => {
     await act(async () => { finish(Response.json(memberPageFixture)); });
     expect(screen.queryByText(profileFixture.display_name)).not.toBeInTheDocument();
   });
-  it("invalidates community members after confirmed admission while masking the required reference", async () => {
+  it("retains the member directory without user-reference admission", async () => {
     const { request } = setup(<CommunityMembers community={communityFixture} profile={profileFixture} />);
-    request.mockImplementation(async (_url, options) => options?.method === "POST" ? new Response(null, { status: 201 })
-      : Response.json({ ...memberPageFixture, channel_id: null, total: 2 }));
     await screen.findByText(profileFixture.display_name);
-    const form = screen.getByRole("form", { name: "Add community member" });
-    const input = within(form).getByLabelText("Member reference");
-    expect(input).toHaveAttribute("type", "password");
-    fireEvent.change(input, { target: { value: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" } });
-    const before = request.mock.calls.length;
-    fireEvent.submit(form);
-    await waitFor(() => expect(request.mock.calls.length).toBe(before + 2));
-    expect(await within(form).findByRole("status")).toHaveTextContent("Member added");
-    expect(request.mock.calls[0]![0]).not.toContain("/channels/");
+    expect(screen.queryByRole("form", { name: "Add community member" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Member reference")).not.toBeInTheDocument();
+    expect(request.mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
   });
 });

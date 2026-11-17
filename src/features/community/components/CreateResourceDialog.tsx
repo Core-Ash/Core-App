@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement } from "react";
+import { useRef, useState, type ReactElement, type RefObject } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -17,14 +17,22 @@ function CreateDialog({
   create,
   pending,
   error,
+  open: controlledOpen,
+  onOpenChange,
+  returnFocusRef,
 }: {
   kind: "community" | "channel";
-  children: ReactElement;
+  children?: ReactElement;
   create: (name: string) => Promise<void>;
   pending: boolean;
   error: unknown;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (value: boolean) => { setInternalOpen(value); onOpenChange?.(value); };
   const [name, setName] = useState("");
   const [validation, setValidation] = useState("");
   const submitting = useRef(false);
@@ -35,12 +43,14 @@ function CreateDialog({
         if (!pending) setOpen(value);
       }}
     >
-      <Dialog.Trigger asChild>{children}</Dialog.Trigger>
+      {children && <Dialog.Trigger asChild>{children}</Dialog.Trigger>}
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="standard-dialog">
+        <Dialog.Content className="standard-dialog create-resource-dialog" onCloseAutoFocus={(event) => {
+          if (returnFocusRef?.current) { event.preventDefault(); returnFocusRef.current.focus(); }
+        }}>
           <Dialog.Title className="text-xl font-semibold">
-            Create a {kind}
+            Create a {kind === "community" ? "server" : kind}
           </Dialog.Title>
           <Dialog.Description className="mt-2 text-sm text-muted-foreground">
             {kind === "community"
@@ -102,7 +112,7 @@ function CreateDialog({
               </p>
             )}
             <Button type="submit" disabled={pending}>
-              {pending ? "Creating…" : `Create ${kind}`}
+              {pending ? "Creating…" : `Create ${kind === "community" ? "server" : kind}`}
             </Button>
           </form>
           <Dialog.Close asChild>
@@ -122,14 +132,23 @@ function CreateDialog({
 
 export function CreateCommunityDialog({
   children,
+  open,
+  onOpenChange,
+  returnFocusRef,
 }: {
-  children: ReactElement;
+  children?: ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const mutation = useCreateCommunity();
   const navigate = useNavigate();
   return (
     <CreateDialog
       kind="community"
+      open={open}
+      onOpenChange={onOpenChange}
+      returnFocusRef={returnFocusRef}
       pending={mutation.isPending}
       error={mutation.error}
       create={async (name) => {
@@ -144,15 +163,24 @@ export function CreateCommunityDialog({
 export function CreateChannelDialog({
   communityId,
   children,
+  open,
+  onOpenChange,
+  returnFocusRef,
 }: {
   communityId: string;
-  children: ReactElement;
+  children?: ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const mutation = useCreateChannel(communityId);
   const navigate = useNavigate();
   return (
     <CreateDialog
       kind="channel"
+      open={open}
+      onOpenChange={onOpenChange}
+      returnFocusRef={returnFocusRef}
       pending={mutation.isPending}
       error={mutation.error}
       create={async (name) => {

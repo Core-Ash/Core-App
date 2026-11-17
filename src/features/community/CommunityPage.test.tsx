@@ -38,7 +38,7 @@ describe("workspace configuration", () => {
       expect(screen.queryByRole("list", { name: "Messages" })).not.toBeInTheDocument();
       expect(screen.queryByText("Nex")).not.toBeInTheDocument();
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Add community" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Add server" })).toBeDisabled();
       expect(request).not.toHaveBeenCalled();
     },
   );

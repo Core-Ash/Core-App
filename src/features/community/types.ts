@@ -1,5 +1,5 @@
 export type AvatarTone = "rose" | "teal" | "amber" | "violet" | "slate";
-export type CommunityView = "channel" | "overview" | "events" | "members";
+export type CommunityView = "channel" | "overview" | "events" | "members" | "invites";
 export interface CommunityMember {
   id: string;
   name: string;

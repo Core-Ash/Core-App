@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppDataProvider } from "@/app/AppDataProvider";
 import { AuthContext } from "@/features/auth/auth-context";
@@ -119,18 +119,12 @@ describe("channel access settings", () => {
     await act(async () => { finish(Response.json(channelAccessFixture)); });
     expect(screen.queryByText(profileFixture.display_name)).not.toBeInTheDocument();
   });
-  it("invalidates channel access after successful member admission", async () => {
-    const { request } = setup(<>
+  it("preserves channel access inspection alongside member administration without reference admission", async () => {
+    setup(<>
       <ChannelAccess communityId={communityFixture.id} channelId={channelFixture.id} />
       <CommunityMembers community={communityFixture} profile={profileFixture} />
     </>);
     await screen.findByText("2 members can view this channel");
-    request.mockImplementation(async (url, options) => options?.method === "POST" ? new Response(null, { status: 201 })
-      : Response.json(url.includes("/access?") ? { ...channelAccessFixture, total_allowed: 3 } : { ...memberPageFixture, channel_id: null }));
-    const form = screen.getByRole("form", { name: "Add community member" });
-    fireEvent.change(within(form).getByLabelText("Member reference"), { target: { value: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" } });
-    fireEvent.submit(form);
-    expect(await screen.findByText("3 members can view this channel")).toBeInTheDocument();
-    expect(request.mock.calls.filter(([url]) => url.includes("/access?"))).toHaveLength(2);
+    expect(screen.queryByRole("form", { name: "Add community member" })).not.toBeInTheDocument();
   });
 });

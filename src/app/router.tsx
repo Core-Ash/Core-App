@@ -9,11 +9,13 @@ import { SessionRedirect } from "@/features/auth/SessionRedirect";
 import { UnavailablePage } from "@/features/home/UnavailablePage";
 import { CommunityPage } from "@/features/community/CommunityPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
+import { InvitePage } from "@/features/invites/InvitePage";
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<SessionRedirect />} />
+      <Route path="/invite/:code" element={<InvitePage />} />
       <Route element={<GuestRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

@@ -273,7 +273,7 @@
   flex-shrink: 0;
   z-index: 16;
 }
-.community-picker > summary {
+.community-picker > :is(summary, .server-header-trigger) {
   position: relative;
   height: 144px;
   border-bottom: 1px solid var(--core-divider);
@@ -304,7 +304,7 @@
   line-height: 28px;
   letter-spacing: -0.025em;
 }
-.community-picker > summary > svg {
+.community-picker > :is(summary, .server-header-trigger) > svg {
   position: absolute;
   right: 16px;
   bottom: 21px;
@@ -1326,7 +1326,7 @@
   min-height: 0;
   flex: 1;
 }
-.navigation-dialog .community-picker > summary {
+.navigation-dialog .community-picker > :is(summary, .server-header-trigger) {
   height: 145px;
 }
 .navigation-dialog .community-banner-art {
@@ -1901,3 +1901,93 @@
     padding: 18px;
   }
 }
+/* Public invitation and invitation settings use the existing dark-red tokens. */
+.invite-page { min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem; background: radial-gradient(ellipse at top, color-mix(in srgb, var(--primary) 15%, var(--background)), var(--background) 65%); }
+.invite-card { width: min(100%, 29rem); padding: clamp(1.5rem, 5vw, 2.5rem); border: 1px solid var(--border); border-radius: 1rem; background: var(--card); box-shadow: 0 24px 80px #0006; text-align: center; display: grid; gap: 1.25rem; overflow: hidden; }
+.invite-brand { font-weight: 900; letter-spacing: .2em; color: var(--primary); }
+.invite-server-icon { width: 4.5rem; height: 4.5rem; border-radius: 1.25rem; background: var(--muted); color: var(--primary); display: grid; place-items: center; margin: 0 auto 1rem; overflow: hidden; }
+.invite-server-icon img { width: 100%; height: 100%; object-fit: cover; }
+.invite-banner { width: 100%; max-height: 9rem; object-fit: cover; border-radius: .5rem; }
+.invite-member-count { display: flex; gap: .5rem; justify-content: center; align-items: center; color: var(--muted-foreground); }
+.invite-dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 2rem); overflow-y: auto; padding: 0; border-radius: 10px; background: var(--card); }
+.invite-modal-heading { padding: 24px 52px 0 24px; }
+.invite-modal-title { font-size: 18px; line-height: 1.4; font-weight: 700; letter-spacing: -.025em; overflow-wrap: anywhere; outline: none; }
+.invite-modal-description { margin-top: 7px; color: var(--muted-foreground); font-size: 13px; line-height: 1.6; }
+.invite-modal-body { padding: 22px 24px 24px; }
+.invite-server-preview { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--surface-secondary) 65%, transparent); }
+.invite-server-thumbnail { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; overflow: hidden; border-radius: 14px; background: var(--primary-subtle); color: var(--link); }
+.invite-server-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.invite-server-details { display: grid; gap: 4px; min-width: 0; }
+.invite-server-details strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite-server-details span { font-size: 12px; color: var(--muted-foreground); }
+.invite-preview-link-icon { margin-left: auto; flex-shrink: 0; color: var(--text-muted); }
+.invite-sharing-note { margin-top: 16px; font-size: 13px; line-height: 1.7; color: var(--muted-foreground); }
+.invite-modal-footer { padding: 20px 24px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--surface-secondary) 65%, var(--card)); }
+.invite-field-label { display: block; margin-bottom: 9px; font-size: 13px; line-height: 1.5; font-weight: 600; color: var(--foreground); }
+.invite-link-row { display: flex; gap: 6px; align-items: center; padding: 5px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-secondary); }
+.invite-link-row:focus-within { border-color: var(--ring); }
+.invite-link-row input { height: 32px; flex: 1; padding: 0 6px; border: 0; border-radius: 3px; background: transparent; font-size: 13px; box-shadow: none; }
+.invite-link-row input:focus-visible { box-shadow: none; }
+.invite-copy-button { height: 32px; padding: 0 12px; border-radius: 4px; font-size: 12px; gap: 6px; }
+.invite-copy-button.is-copied { background: color-mix(in srgb, var(--online) 18%, var(--surface-secondary)); color: var(--online); }
+.invite-link-caption { margin-top: 10px; color: var(--muted-foreground); font-size: 11px; line-height: 1.7; }
+.invite-edit-link { color: var(--link); border-radius: 2px; font-weight: 500; }
+.invite-edit-link:hover { text-decoration: underline; }
+.invite-edit-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.invite-edit-link:disabled { opacity: .5; }
+.invite-modal-settings { padding: 24px; }
+.invite-modal-settings .invite-field-label:not(:first-child) { margin-top: 22px; }
+.invite-select-wrap { position: relative; }
+.invite-select-wrap .invite-select { appearance: none; height: 42px; padding: 0 40px 0 12px; border-radius: 6px; background: var(--surface-secondary); font-size: 14px; }
+.invite-select-wrap > svg { position: absolute; right: 12px; top: 11px; pointer-events: none; color: var(--muted-foreground); }
+.invite-modal-hint { margin-top: 14px; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+.invite-modal-actions { display: grid; grid-template-columns: 1fr 1.5fr; gap: 12px; }
+.invite-modal-actions button { height: 38px; border-radius: 5px; font-size: 13px; }
+.invite-modal-actions button:first-child { background: var(--surface-hover); color: var(--foreground); }
+.invite-copy-status { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
+@media (max-width: 380px) {
+  .invite-modal-heading { padding-left: 18px; }
+  .invite-modal-body, .invite-modal-settings, .invite-modal-footer { padding: 18px; }
+  .invite-modal-actions { grid-template-columns: 1fr; }
+  .invite-modal-actions button:first-child { order: 2; }
+  .invite-copy-button { padding-inline: 8px; }
+}
+.invite-settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 1rem; }
+.invite-select { width: 100%; padding: .6rem; color: var(--foreground); background: var(--background); border: 1px solid var(--border); border-radius: .375rem; }
+.invite-select:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.invite-table { width: 100%; text-align: left; font-size: .875rem; border-collapse: collapse; }
+.invite-table th, .invite-table td { padding: .8rem; border-bottom: 1px solid var(--border); }
+
+.server-header-trigger { display: block; width: 100%; text-align: left; }
+.server-header-trigger:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; }
+.server-header-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.server-header-trigger > svg { transition: transform 140ms ease; }
+.community-picker-menu { opacity: 1; transform: translateY(0); transition: opacity 140ms ease, transform 140ms ease, display 140ms allow-discrete; }
+.community-picker-menu[hidden] { display: none; opacity: 0; transform: translateY(-5px); }
+@starting-style { .community-picker-menu { opacity: 0; transform: translateY(-5px); } }
+.server-menu-action > svg { width: 18px; height: 18px; flex-shrink: 0; }
+.server-menu-action:focus-visible { outline: none; color: var(--foreground); background: var(--surface-hover); box-shadow: inset 0 0 0 1px var(--ring); }
+.server-menu-invite { color: var(--primary); }
+.server-menu-separator { height: 1px; margin: 6px 0; background: var(--border); }
+.server-menu-feedback { position: fixed; z-index: 100; bottom: 24px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 2rem); padding: 12px 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); box-shadow: 0 8px 24px #0005; font-size: 14px; }
+.event-dialog { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+.event-textarea { display: block; width: 100%; padding: .6rem; border: 1px solid var(--border); border-radius: .375rem; background: var(--background); }
+.event-textarea:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.event-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,18rem),1fr)); gap: 1rem; }
+.event-card { padding: 1.25rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--card); min-width: 0; }
+@media (prefers-reduced-motion: reduce) { .community-picker-menu, .server-header-trigger > svg { transition: none; } }
+.add-server-dialog { width: min(460px, calc(100vw - 32px)); padding: 0; background: var(--card); }
+.add-server-heading { padding: 24px 50px 0 24px; }
+.add-server-body { padding: 24px; }
+.add-server-choices { display: grid; gap: 12px; }
+.add-server-choice { display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0; padding: 16px; text-align: left; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-secondary); transition: background 140ms ease, border-color 140ms ease; }
+.add-server-choice:hover { background: var(--surface-hover); border-color: var(--text-muted); }
+.add-server-choice:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.add-server-choice > span:nth-child(2) { min-width: 0; display: grid; gap: 4px; }
+.add-server-choice strong { font-size: 14px; font-weight: 600; }
+.add-server-choice > span:nth-child(2) > span { font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
+.add-server-choice > svg { margin-left: auto; flex-shrink: 0; color: var(--muted-foreground); }
+.add-server-choice-icon { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; background: var(--primary-subtle); color: var(--link); }
+.add-server-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface-secondary); }
+.create-resource-dialog { padding: 24px; }
+@media (max-width: 380px) { .add-server-body { padding: 20px; } .add-server-choice { padding: 12px; gap: 10px; } .add-server-choice-icon { width: 36px; height: 36px; } .add-server-footer { padding: 16px; } }

@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 import { Link } from "react-router";
 import { Brand } from "@/components/common/Brand";
 import { Tooltip } from "@/components/ui/tooltip";
-import { CreateCommunityDialog } from "@/features/community/components/CreateResourceDialog";
+import { AddServerDialog } from "@/features/community/components/AddServerDialog";
 import { useCurrentUser } from "@/features/community/api/hooks";
 import {
   communityHref,
@@ -36,15 +36,15 @@ export function LiveNavigationRail() {
             </Link>
           </Tooltip>
         ))}
-        <CreateCommunityDialog>
+        <AddServerDialog>
           <button
             className="rail-link rail-add"
-            aria-label="Add community"
+            aria-label="Add server"
             disabled={!profile.isSuccess}
           >
             <Plus size={29} strokeWidth={1.5} aria-hidden="true" />
           </button>
-        </CreateCommunityDialog>
+        </AddServerDialog>
       </div>
     </nav>
   );

@@ -34,7 +34,7 @@ export function useCommunitySelection() {
     channelItems[0];
   const requestedView = params.get("view");
   const view: CommunityView =
-    requestedView === "overview" || requestedView === "events" || requestedView === "members"
+    requestedView === "overview" || requestedView === "events" || requestedView === "members" || requestedView === "invites"
       ? requestedView
       : "channel";
   return {

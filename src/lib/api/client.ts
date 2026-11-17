@@ -12,11 +12,13 @@ export function createApiClient({
   sessionSignal,
   isActive = () => true,
   onUnauthorized,
+  credentials = "include",
 }: {
   baseUrl: string | null;
   sessionSignal: () => AbortSignal;
   isActive?: () => boolean;
   onUnauthorized: () => Promise<"active" | "expired" | "unavailable">;
+  credentials?: RequestCredentials;
 }) {
   async function request<T>(
     method: Method,
@@ -47,7 +49,8 @@ export function createApiClient({
       const response = await fetch(`${baseUrl}${path}${query}`, {
         method,
         headers,
-        credentials: "include",
+        credentials,
+        referrerPolicy: "no-referrer",
         cache: "no-store",
         redirect: "error",
         signal,
