@@ -1,19 +1,53 @@
-import { Menu, MessageSquare, Plus } from "lucide-react";
-import { Link, useOutletContext } from "react-router";
-import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
+import { useState } from "react";
+import { MessageSquare, Plus, Users } from "lucide-react";
+import { Link, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
+import { CreateGroupDmDialog } from "@/features/conversations/components/CreateGroupDmDialog";
+import { ConversationView } from "@/features/conversations/components/ConversationView";
 
 export function MessagesPage() {
-  const navigation = useOutletContext<WorkspaceNavigation | undefined>();
-  return <div className="friends-page messages-page">
-    <header className="friends-header">
-      {navigation && <button className="icon-button community-menu-toggle" aria-label="Open navigation" onClick={navigation.openNavigation}><Menu size={20} aria-hidden="true" /></button>}
-      <h1><MessageSquare size={20} aria-hidden="true" />Direct messages</h1>
-      <span className="personal-soon">Coming soon</span>
-    </header>
-    <div className="messages-workspace">
-      <div className="messages-empty"><MessageSquare size={48} aria-hidden="true" /><h2>A place for your conversations</h2><p>Direct messages aren’t available yet. You can already find your people and manage friend requests.</p><Button asChild variant="outline"><Link to="/app/friends">Go to Friends</Link></Button></div>
-      <div className="messages-composer" aria-label="Direct messaging unavailable"><Plus size={20} aria-hidden="true" /><span>Direct messages are not available yet</span></div>
+  const { conversationId } = useParams<{ conversationId?: string }>();
+  const [createDmOpen, setCreateDmOpen] = useState(false);
+
+  if (conversationId) {
+    return <ConversationView conversationId={conversationId} />;
+  }
+
+  return (
+    <div className="friends-page messages-page">
+      <header className="friends-header">
+        <h1>
+          <MessageSquare size={20} aria-hidden="true" />
+          Direct messages
+        </h1>
+      </header>
+      <div className="messages-workspace">
+        <div className="messages-empty">
+          <MessageSquare size={48} aria-hidden="true" />
+          <h2>A place for your conversations</h2>
+          <p>
+            Direct Messages and Group DMs give you private spaces to talk with
+            your friends outside of servers.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={() => setCreateDmOpen(true)}>
+              <Plus size={16} className="mr-1.5" />
+              Start Conversation
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/app/friends">
+                <Users size={16} className="mr-1.5" />
+                Go to Friends
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <CreateGroupDmDialog
+        open={createDmOpen}
+        onOpenChange={setCreateDmOpen}
+      />
     </div>
-  </div>;
+  );
 }

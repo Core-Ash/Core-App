@@ -29,6 +29,10 @@ export function AppRoutes() {
             element={<MessagesPage />}
           />
           <Route
+            path="/app/messages/:conversationId"
+            element={<MessagesPage />}
+          />
+          <Route
             path="/app/friends"
             element={<FriendsPage />}
           />

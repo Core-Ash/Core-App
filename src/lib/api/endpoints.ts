@@ -10,6 +10,9 @@ import {
   parseProfile,
   parseChannelAccess,
   parseMemberPage,
+  parseConversationSummary,
+  parseConversationDetail,
+  parseConversationParticipant,
 } from "@/lib/api/contracts";
 import type { ChannelAccessFilters, MessageCursor } from "@/lib/api/types";
 
@@ -79,4 +82,55 @@ export const endpoints = {
     channelId: string,
     input: { body: string; client_nonce: string },
   ) => parseMessage(await api.post(`/channels/${channelId}/messages`, input)),
+  conversations: async (api: ApiClient, signal?: AbortSignal) =>
+    parseList(await api.get("/conversations", { signal }), parseConversationSummary),
+  conversation: async (api: ApiClient, id: string, signal?: AbortSignal) =>
+    parseConversationDetail(await api.get(`/conversations/${id}`, { signal })),
+  createDirectConversation: async (
+    api: ApiClient,
+    input: { recipient_id?: string; username?: string },
+  ) => parseConversationDetail(await api.post("/conversations/direct", input)),
+  createGroupConversation: async (
+    api: ApiClient,
+    input: { recipient_ids: string[]; name?: string },
+  ) => parseConversationDetail(await api.post("/conversations/group", input)),
+  updateConversation: async (
+    api: ApiClient,
+    id: string,
+    input: { name?: string },
+  ) => parseConversationDetail(await api.patch(`/conversations/${id}`, input)),
+  hideConversation: async (api: ApiClient, id: string) => {
+    await api.post(`/conversations/${id}/hide`, {});
+  },
+  leaveConversation: async (api: ApiClient, id: string) => {
+    await api.post(`/conversations/${id}/leave`, {});
+  },
+  conversationMembers: async (api: ApiClient, id: string, signal?: AbortSignal) =>
+    parseList(await api.get(`/conversations/${id}/members`, { signal }), parseConversationParticipant),
+  addConversationMembers: async (api: ApiClient, id: string, userIds: string[]) =>
+    parseList(await api.post(`/conversations/${id}/members`, { user_ids: userIds }), parseConversationParticipant),
+  removeConversationMember: async (api: ApiClient, id: string, userId: string) => {
+    await api.delete(`/conversations/${id}/members/${userId}`);
+  },
+  conversationMessages: async (
+    api: ApiClient,
+    id: string,
+    cursor: MessageCursor | null,
+    signal?: AbortSignal,
+  ) =>
+    parseMessagePage(
+      await api.get(`/conversations/${id}/messages`, {
+        signal,
+        query: {
+          limit: 50,
+          before_time: cursor?.before_time,
+          before_id: cursor?.before_id,
+        },
+      }),
+    ),
+  sendConversationMessage: async (
+    api: ApiClient,
+    id: string,
+    input: { body: string; client_nonce: string },
+  ) => parseMessage(await api.post(`/conversations/${id}/messages`, input)),
 };

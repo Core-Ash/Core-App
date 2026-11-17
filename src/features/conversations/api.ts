@@ -1,0 +1,310 @@
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAppData } from "@/app/app-data-context";
+import { useCurrentUser } from "@/features/community/api/hooks";
+import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
+import { endpoints } from "@/lib/api/endpoints";
+import { ApiError, apiErrorMessage } from "@/lib/api/errors";
+import type { Message, MessageCursor } from "@/lib/api/types";
+
+export const conversationQueryKeys = {
+  conversations: ["conversations"] as const,
+  conversation: (id?: string) => ["conversations", id] as const,
+  members: (id?: string) => ["conversation-members", id] as const,
+  messages: (id?: string) => ["conversation-messages", id] as const,
+};
+
+export interface LocalConversationMessage {
+  message: Message;
+  status: "pending" | "failed";
+  error?: string;
+  retryable?: boolean;
+}
+
+export function useConversations() {
+  const { api, ready } = useAppData();
+  const profile = useCurrentUser();
+  return useQuery({
+    queryKey: conversationQueryKeys.conversations,
+    queryFn: ({ signal }) => endpoints.conversations(api, signal),
+    enabled: ready && profile.isSuccess,
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useConversation(conversationId?: string) {
+  const { api, ready } = useAppData();
+  return useQuery({
+    queryKey: conversationQueryKeys.conversation(conversationId),
+    queryFn: ({ signal }) => endpoints.conversation(api, conversationId!, signal),
+    enabled: ready && Boolean(conversationId),
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useConversationMembers(conversationId?: string) {
+  const { api, ready } = useAppData();
+  return useQuery({
+    queryKey: conversationQueryKeys.members(conversationId),
+    queryFn: ({ signal }) => endpoints.conversationMembers(api, conversationId!, signal),
+    enabled: ready && Boolean(conversationId),
+    staleTime: 10_000,
+  });
+}
+
+export function useConversationMessages(conversationId?: string) {
+  const { api, ready } = useAppData();
+  return useInfiniteQuery({
+    queryKey: conversationQueryKeys.messages(conversationId),
+    queryFn: ({ pageParam, signal }) =>
+      endpoints.conversationMessages(api, conversationId!, pageParam, signal),
+    initialPageParam: null as MessageCursor | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: ready && Boolean(conversationId),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useSendConversationMessage(conversationId: string) {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  const profile = useCurrentUser();
+  const key = ["conversation-message-outbox", conversationId] as const;
+  const outbox = useQuery<LocalConversationMessage[]>({
+    queryKey: key,
+    queryFn: () => [],
+    initialData: [],
+    enabled: false,
+    gcTime: Infinity,
+  });
+
+  function update(
+    nonce: string,
+    change: (entry: LocalConversationMessage) => LocalConversationMessage | null,
+  ) {
+    queries.setQueryData<LocalConversationMessage[]>(key, (previous) =>
+      previous?.flatMap((entry) => {
+        if (entry.message.client_nonce !== nonce) return [entry];
+        const next = change(entry);
+        return next ? [next] : [];
+      }),
+    );
+  }
+
+  const mutation = useMutation({
+    mutationFn: async (input: { body: string; client_nonce: string }) => {
+      if (!ready) throw new ApiError("unauthorized");
+      const message = await endpoints.sendConversationMessage(api, conversationId, input);
+      if (
+        message.client_nonce !== input.client_nonce ||
+        message.author_id !== profile.data?.id
+      )
+        throw new ApiError("invalid_response");
+      return message;
+    },
+    onSuccess: async (message, input) => {
+      await queries.cancelQueries({
+        queryKey: conversationQueryKeys.messages(conversationId),
+      });
+      if (
+        !queries
+          .getQueryData<LocalConversationMessage[]>(key)
+          ?.some((entry) => entry.message.client_nonce === input.client_nonce)
+      )
+        return;
+      queries.setQueryData(
+        conversationQueryKeys.messages(conversationId),
+        (previous: Parameters<typeof mergeConfirmedMessage>[0]) =>
+          mergeConfirmedMessage(previous, message),
+      );
+      update(input.client_nonce, () => null);
+      // Invalidate conversation list so last message updates
+      void queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversations,
+      });
+    },
+    onError: (error, input) => {
+      update(input.client_nonce, (entry) => ({
+        ...entry,
+        status: "failed",
+        error: apiErrorMessage(error),
+        retryable: !(
+          error instanceof ApiError &&
+          [
+            "unauthorized",
+            "session_transport",
+            "auth_unavailable",
+            "forbidden",
+            "validation",
+            "not_found",
+            "conflict",
+            "configuration",
+          ].includes(error.kind)
+        ),
+      }));
+    },
+  });
+
+  return {
+    entries: outbox.data,
+    send: (body: string) => {
+      if (!ready || !profile.isSuccess) throw new ApiError("unauthorized");
+      const nonce = crypto.randomUUID();
+      const message: Message = {
+        id: nonce,
+        client_nonce: nonce,
+        author_id: profile.data.id,
+        author: profile.data,
+        body,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
+      };
+      queries.setQueryData<LocalConversationMessage[]>(key, (previous = []) => [
+        ...previous,
+        { message, status: "pending" },
+      ]);
+      mutation.mutate({ body, client_nonce: nonce });
+    },
+    retry: (nonce: string) => {
+      const entry = queries
+        .getQueryData<LocalConversationMessage[]>(key)
+        ?.find((entry) => entry.message.client_nonce === nonce);
+      if (!ready || entry?.status !== "failed" || !entry.retryable) return;
+      update(nonce, (entry) => ({
+        ...entry,
+        status: "pending",
+        error: undefined,
+      }));
+      mutation.mutate({ body: entry.message.body!, client_nonce: nonce });
+    },
+  };
+}
+
+export function useCreateDirectConversation() {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { recipient_id?: string; username?: string }) => {
+      if (!ready) throw new ApiError("unauthorized");
+      return endpoints.createDirectConversation(api, input);
+    },
+    onSuccess: () =>
+      queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversations,
+      }),
+  });
+}
+
+export function useCreateGroupConversation() {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { recipient_ids: string[]; name?: string }) => {
+      if (!ready) throw new ApiError("unauthorized");
+      return endpoints.createGroupConversation(api, input);
+    },
+    onSuccess: () =>
+      queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversations,
+      }),
+  });
+}
+
+export function useUpdateConversation(conversationId: string) {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name?: string }) => {
+      if (!ready) throw new ApiError("unauthorized");
+      return endpoints.updateConversation(api, conversationId, input);
+    },
+    onSuccess: (data) => {
+      queries.setQueryData(
+        conversationQueryKeys.conversation(conversationId),
+        data,
+      );
+      void queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversations,
+      });
+    },
+  });
+}
+
+export function useHideConversation() {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => {
+      if (!ready) throw new ApiError("unauthorized");
+      return endpoints.hideConversation(api, id);
+    },
+    onSuccess: () =>
+      queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversations,
+      }),
+  });
+}
+
+export function useLeaveConversation() {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => {
+      if (!ready) throw new ApiError("unauthorized");
+      return endpoints.leaveConversation(api, id);
+    },
+    onSuccess: () =>
+      queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversations,
+      }),
+  });
+}
+
+export function useAddConversationMembers(conversationId: string) {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (userIds: string[]) => {
+      if (!ready) throw new ApiError("unauthorized");
+      return endpoints.addConversationMembers(api, conversationId, userIds);
+    },
+    onSuccess: () => {
+      void queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversation(conversationId),
+      });
+      void queries.invalidateQueries({
+        queryKey: conversationQueryKeys.members(conversationId),
+      });
+      void queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversations,
+      });
+    },
+  });
+}
+
+export function useRemoveConversationMember(conversationId: string) {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => {
+      if (!ready) throw new ApiError("unauthorized");
+      return endpoints.removeConversationMember(api, conversationId, userId);
+    },
+    onSuccess: () => {
+      void queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversation(conversationId),
+      });
+      void queries.invalidateQueries({
+        queryKey: conversationQueryKeys.members(conversationId),
+      });
+      void queries.invalidateQueries({
+        queryKey: conversationQueryKeys.conversations,
+      });
+    },
+  });
+}

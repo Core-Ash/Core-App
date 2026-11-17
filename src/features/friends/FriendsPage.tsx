@@ -1,13 +1,15 @@
 import { useState, type SubmitEvent } from "react";
-import { Menu, Search, Users, UserPlus } from "lucide-react";
-import { useOutletContext, useSearchParams } from "react-router";
+import { Menu, MessageSquare, Search, Users, UserPlus } from "lucide-react";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
 import { MemberIdentity } from "@/features/community/members/MemberIdentity";
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
 import { useCurrentUser } from "@/features/community/api/hooks";
+import { useCreateDirectConversation } from "@/features/conversations/api";
 import { useFriendAction, useFriendCounts, useFriendList, type FriendRequest, type ListKind } from "@/features/friends/api";
 import { RelationshipActions } from "@/features/friends/RelationshipActions";
 import { apiErrorMessage, ApiError } from "@/lib/api/errors";
@@ -119,7 +121,72 @@ function RequestRow({ request }: { request: FriendRequest }) {
   </div></li>;
 }
 function FriendRow({ profile, blocked }: { profile: PublicProfile; blocked: boolean }) {
+  const navigate = useNavigate();
   const mutation = useFriendAction();
+  const createDirect = useCreateDirectConversation();
   const [open, setOpen] = useState(false);
-  return <li className="friend-row"><MemberIdentity profile={profile} />{blocked ? <div><Button size="sm" variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate({ action: "unblock", id: profile.id })}>Unblock</Button>{mutation.error && <p role="alert">{apiErrorMessage(mutation.error)}</p>}</div> : <details className="friend-options" onToggle={(event) => setOpen(event.currentTarget.open)}><summary aria-label={`More options for ${fullUsername(profile)}`} title="More options">•••</summary>{open && <div><MemberIdentity profile={profile} avatar={false} username={false} label="View Profile" /><RelationshipActions profile={profile} /></div>}</details>}</li>;
+
+  async function handleMessage() {
+    try {
+      const conv = await createDirect.mutateAsync({ recipient_id: profile.id });
+      navigate(`/app/messages/${conv.id}`);
+    } catch (err) {
+      alert(apiErrorMessage(err));
+    }
+  }
+
+  return (
+    <li className="friend-row">
+      <MemberIdentity profile={profile} />
+      {blocked ? (
+        <div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate({ action: "unblock", id: profile.id })}
+          >
+            Unblock
+          </Button>
+          {mutation.error && <p role="alert">{apiErrorMessage(mutation.error)}</p>}
+        </div>
+      ) : (
+        <div className="friend-row-actions">
+          <Tooltip content="Message">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => void handleMessage()}
+              disabled={createDirect.isPending}
+              aria-label={`Message ${profile.display_name}`}
+            >
+              <MessageSquare size={17} aria-hidden="true" />
+            </button>
+          </Tooltip>
+          <details
+            className="friend-options"
+            onToggle={(event) => setOpen(event.currentTarget.open)}
+          >
+            <summary
+              aria-label={`More options for ${fullUsername(profile)}`}
+              title="More options"
+            >
+              •••
+            </summary>
+            {open && (
+              <div>
+                <MemberIdentity
+                  profile={profile}
+                  avatar={false}
+                  username={false}
+                  label="View Profile"
+                />
+                <RelationshipActions profile={profile} />
+              </div>
+            )}
+          </details>
+        </div>
+      )}
+    </li>
+  );
 }

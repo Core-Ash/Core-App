@@ -12,6 +12,10 @@ import type {
   PublicProfile,
   MemberPage,
   ServerMember,
+  ConversationDetail,
+  ConversationParticipant,
+  ConversationSummary,
+  ConversationType,
 } from "@/lib/api/types";
 
 export function record(value: unknown): Record<string, unknown> {
@@ -197,3 +201,74 @@ export function parseMemberPage(value: unknown): MemberPage {
     total: count(data.total), items: parseList(value, parseMember), next_cursor: data.next_cursor === null ? null : uuid(data.next_cursor),
   };
 }
+
+export function parseConversationParticipant(value: unknown): ConversationParticipant {
+  const data = record(value);
+  const role = string(data.role);
+  if (role !== "owner" && role !== "member") throw new ApiError("invalid_response");
+  return {
+    id: uuid(data.id),
+    role,
+    joined_at: timestamp(data.joined_at),
+    profile: parsePublicProfile(data.profile),
+  };
+}
+
+export function parseConversationSummary(value: unknown): ConversationSummary {
+  const data = record(value);
+  const type = string(data.type);
+  if (type !== "direct" && type !== "group") throw new ApiError("invalid_response");
+  const role = string(data.role);
+  if (role !== "owner" && role !== "member") throw new ApiError("invalid_response");
+  if (!Array.isArray(data.members)) throw new ApiError("invalid_response");
+
+  let lastMessage: ConversationSummary["last_message"] = null;
+  if (data.last_message && typeof data.last_message === "object") {
+    const lm = record(data.last_message);
+    lastMessage = {
+      id: uuid(lm.id),
+      author_id: uuid(lm.author_id),
+      body: lm.body === null ? null : string(lm.body),
+      created_at: timestamp(lm.created_at),
+      client_nonce: uuid(lm.client_nonce),
+    };
+  }
+
+  return {
+    id: uuid(data.id),
+    type: type as ConversationType,
+    name: data.name == null ? null : string(data.name),
+    icon_url: avatarUrl(data.icon_url),
+    created_by: uuid(data.created_by),
+    created_at: timestamp(data.created_at),
+    updated_at: timestamp(data.updated_at),
+    last_message_at: timestamp(data.last_message_at),
+    role: role as "owner" | "member",
+    hidden: Boolean(data.hidden),
+    members: data.members.map(parseConversationParticipant),
+    last_message: lastMessage,
+  };
+}
+
+export function parseConversationDetail(value: unknown): ConversationDetail {
+  const data = record(value);
+  const type = string(data.type);
+  if (type !== "direct" && type !== "group") throw new ApiError("invalid_response");
+  const role = string(data.role);
+  if (role !== "owner" && role !== "member") throw new ApiError("invalid_response");
+  if (!Array.isArray(data.members)) throw new ApiError("invalid_response");
+
+  return {
+    id: uuid(data.id),
+    type: type as ConversationType,
+    name: data.name == null ? null : string(data.name),
+    icon_url: avatarUrl(data.icon_url),
+    created_by: uuid(data.created_by),
+    created_at: timestamp(data.created_at),
+    updated_at: timestamp(data.updated_at),
+    last_message_at: timestamp(data.last_message_at),
+    role: role as "owner" | "member",
+    members: data.members.map(parseConversationParticipant),
+  };
+}
+

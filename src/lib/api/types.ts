@@ -89,3 +89,47 @@ export interface ChannelAccessFilters {
   roleId: string;
   access: "allowed" | "denied";
 }
+
+export type ConversationType = "direct" | "group";
+
+export interface ConversationParticipant {
+  id: string;
+  role: "owner" | "member";
+  joined_at: string;
+  profile: PublicProfile;
+}
+
+export interface ConversationSummary {
+  id: string;
+  type: ConversationType;
+  name: string | null;
+  icon_url: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  role: "owner" | "member";
+  hidden: boolean;
+  members: ConversationParticipant[];
+  last_message?: {
+    id: string;
+    author_id: string;
+    body: string | null;
+    created_at: string;
+    client_nonce: string;
+  } | null;
+}
+
+export interface ConversationDetail {
+  id: string;
+  type: ConversationType;
+  name: string | null;
+  icon_url: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  role: "owner" | "member";
+  members: ConversationParticipant[];
+}
+
