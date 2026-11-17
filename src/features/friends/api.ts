@@ -26,7 +26,7 @@ export function useFriendCounts() {
       const data = record(await api.get("/friends/summary", { signal }));
       for (const key of ["friends", "incoming", "outgoing", "blocked"]) if (typeof data[key] !== "number" || !Number.isSafeInteger(data[key]) || (data[key] as number) < 0) throw new ApiError("invalid_response");
       return { friends: data.friends as number, incoming: data.incoming as number, outgoing: data.outgoing as number, blocked: data.blocked as number };
-    }, staleTime: 15_000, refetchOnWindowFocus: true,
+    }, staleTime: 15_000, refetchOnMount: "always", refetchOnWindowFocus: true,
   });
 }
 export function useFriendList<K extends ListKind>(kind: K, enabled = true) {
@@ -40,7 +40,7 @@ export function useFriendList<K extends ListKind>(kind: K, enabled = true) {
       (kind === "requests" ? parseRequest : parsePublicProfile) as (v: unknown) => K extends "requests" ? FriendRequest : PublicProfile,
     ),
     getNextPageParam: (page) => page.next_cursor ?? undefined,
-    refetchOnWindowFocus: true, staleTime: 15_000,
+    refetchOnMount: "always", refetchOnWindowFocus: true, staleTime: 15_000,
   });
 }
 export type Relationship = { state: "none" | "self" | "friends" | "blocked" | "incoming" | "outgoing"; request_id: string | null };

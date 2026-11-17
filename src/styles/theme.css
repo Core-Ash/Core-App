@@ -10,6 +10,8 @@
   color-scheme: dark;
   --background: #111114;
   --surface-secondary: #18181d;
+  --friends-surface: #202026;
+  --friends-inset: #151519;
   --sidebar: #151519;
   --card: #202026;
   --surface-hover: #292930;
@@ -35,7 +37,7 @@
   --ring: var(--primary);
   --radius: 0.625rem;
   --rail-width: 76px;
-  --community-width: 256px;
+  --community-width: 240px;
   --member-width: 240px;
   --chat-header-height: 56px;
   --row-height: 34px;

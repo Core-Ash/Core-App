@@ -1,6 +1,6 @@
 import { useState, type SubmitEvent } from "react";
-import { Menu, RefreshCw, Users, UserPlus } from "lucide-react";
-import { useOutletContext } from "react-router";
+import { Menu, Search, Users, UserPlus } from "lucide-react";
+import { useOutletContext, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiNotice } from "@/components/common/ApiNotice";
@@ -18,8 +18,14 @@ type Tab = ListKind | "add";
 export function FriendsPage() {
   const me = useCurrentUser();
   const counts = useFriendCounts();
+  const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>("friends");
   const navigation = useOutletContext<WorkspaceNavigation | undefined>();
+  const activeTab: Tab = params.has("search") ? "friends" : tab;
+  function selectTab(next: Tab) {
+    if (params.has("search")) setParams({}, { replace: true });
+    setTab(next);
+  }
   if (!me.isSuccess) return <ApplicationProfileState />;
   return <div className="friends-page">
     <header className="friends-header">
@@ -28,12 +34,12 @@ export function FriendsPage() {
       <nav aria-label="Friends filters">
         <button disabled title="Presence is not available yet">Online</button>
         {([ ["friends", "All"], ["requests", "Pending"], ["blocked", "Blocked"], ["add", "Add Friend"] ] as const).map(([key, label]) =>
-          <button key={key} aria-current={tab === key ? "page" : undefined} className={key === "add" ? "friends-add-tab" : ""} onClick={() => setTab(key)}>{label}{key === "requests" && counts.data && counts.data.incoming + counts.data.outgoing > 0 ? ` (${counts.data.incoming + counts.data.outgoing})` : ""}</button>)}
+          <button key={key} aria-current={activeTab === key ? "page" : undefined} className={key === "add" ? "friends-add-tab" : ""} onClick={() => selectTab(key)}>{label}{key === "requests" && counts.data && counts.data.incoming + counts.data.outgoing > 0 ? ` (${counts.data.incoming + counts.data.outgoing})` : ""}</button>)}
       </nav>
     </header>
     <div className="friends-workspace">
-      <div className="friends-content">{tab === "add" ? <AddFriend /> : <FriendList key={tab} kind={tab} />}</div>
-      {tab !== "add" && <aside className="friends-activity" aria-label="Friend activity"><h2>Active Now</h2><div><h3>A little quiet in here</h3><p>Live friend activity will appear here when presence is available.</p></div></aside>}
+      <div className="friends-content">{activeTab === "add" ? <AddFriend /> : <FriendList key={activeTab} kind={activeTab} onAdd={() => selectTab("add")} />}</div>
+      <aside className="friends-activity" aria-label="Friend activity"><h2>Active Now</h2><div className="friends-activity-empty"><h3>It's quiet for now</h3><p>When your friends start playing games or joining activities, you'll see them here.</p></div></aside>
     </div>
   </div>;
 }
@@ -71,23 +77,32 @@ function AddFriend() {
   </section>;
 }
 
-function FriendList({ kind }: { kind: ListKind }) {
+function FriendList({ kind, onAdd }: { kind: ListKind; onAdd: () => void }) {
+  const [search, setSearch] = useState("");
+  const [params] = useSearchParams();
   const query = useFriendList(kind);
   const counts = useFriendCounts();
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
   const unique = [...new Map(items.map((item) => [item.id, item])).values()];
+  const matching = unique.filter((item) => {
+    if (kind !== "friends") return true;
+    const profile = item as PublicProfile;
+    return `${profile.display_name} ${fullUsername(profile)}`.toLowerCase().includes(search.trim().toLowerCase());
+  });
   const label = kind === "friends" ? "All friends" : kind === "blocked" ? "Blocked users" : "Pending requests";
   if (query.isPending) return <ApiNotice loading={`Loading ${label.toLowerCase()}…`} />;
   if (query.isError && !query.data) return <ApiNotice error={query.error} onRetry={() => void query.refetch()} />;
   const requests = kind === "requests" ? unique as FriendRequest[] : [];
-  return <section aria-label={label}>
-    <div className="friends-list-heading"><h2>{label} <span>— {counts.data ? (kind === "requests" ? counts.data.incoming + counts.data.outgoing : counts.data[kind]) : `${unique.length}${query.hasNextPage ? "+" : ""}`}</span></h2><Button size="sm" variant="ghost" disabled={query.isFetching} onClick={() => { void query.refetch(); void counts.refetch(); }}><RefreshCw size={14} aria-hidden="true" />Refresh</Button></div>
+  return <section className="friends-list-section" aria-label={label}>
+    {kind === "friends" && <div className="friends-search"><label className="sr-only" htmlFor="friends-search">Search friends</label><Input id="friends-search" autoFocus={params.has("search")} placeholder="Search friends" value={search} onChange={(event) => setSearch(event.target.value)} /><Search size={18} aria-hidden="true" /></div>}
+    <div className="friends-list-heading"><h2>{label} <span>— {counts.data ? (kind === "requests" ? counts.data.incoming + counts.data.outgoing : counts.data[kind]) : `${unique.length}${query.hasNextPage ? "+" : ""}`}</span></h2></div>
     {query.error && <ApiNotice error={query.error} onRetry={() => void query.refetch()} />}
-    {!unique.length && <div className="friends-empty"><Users size={48} aria-hidden="true" /><h3>{kind === "friends" ? "Your people are out there" : kind === "requests" ? "You’re all caught up" : "No blocked users"}</h3><p>{kind === "friends" ? "Open Add Friend and send someone a request with their Core username." : kind === "requests" ? "Incoming and outgoing friend requests will appear here." : "You can manage blocked accounts here."}</p></div>}
-    {kind === "requests" ? <>
+    {!matching.length && <div className="friends-empty"><Users size={32} aria-hidden="true" /><h3>{kind === "friends" ? (search.trim() ? "No matching friends" : "No friends yet") : kind === "requests" ? "You’re all caught up" : "No blocked users"}</h3><p>{kind === "friends" ? (search.trim() ? "Try another display name or complete Core username." : "Add someone using their Core username to get started.") : kind === "requests" ? "Incoming and outgoing friend requests will appear here." : "You can manage blocked accounts here."}</p>{kind === "friends" && !search.trim() && <Button size="sm" onClick={onAdd}>Add Friend</Button>}</div>}
+    {kind === "requests" && unique.length > 0 ? <>
       <RequestSection title="Incoming Friend Requests" total={counts.data?.incoming} requests={requests.filter((request) => request.incoming)} />
       <RequestSection title="Outgoing Friend Requests" total={counts.data?.outgoing} requests={requests.filter((request) => !request.incoming)} />
-    </> : <ul className="friends-list">{(unique as PublicProfile[]).map((profile) => <FriendRow key={profile.id} profile={profile} blocked={kind === "blocked"} />)}</ul>}
+    </> : <ul className="friends-list">{(matching as PublicProfile[]).map((profile) => <FriendRow key={profile.id} profile={profile} blocked={kind === "blocked"} />)}</ul>}
+    {search.trim() && query.hasNextPage && <p className="friends-search-note">Searching loaded friends. Load more to include the rest.</p>}
     {query.hasNextPage && <Button variant="outline" className="mt-4" disabled={query.isFetching} onClick={() => void query.fetchNextPage()}>{query.isFetching ? "Loading…" : "Load more"}</Button>}
   </section>;
 }

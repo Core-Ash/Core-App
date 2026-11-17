@@ -79,6 +79,20 @@ try {
   assert.equal(await evaluate("document.body.innerText.includes('Ash#0007')"), true);
   assert.equal(requests.some((r) => r.path.endsWith("/relationship")), false, "Closed menus must not cause per-row queries");
   await screenshot("all-desktop");
+  for (const [width, height] of [[1920,1080],[1440,900],[1280,720],[1024,768],[800,768]]) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    await screenshot(`all-${width}`);
+    assert.equal(await evaluate("document.documentElement.scrollWidth <= innerWidth"), true, `Overflow at ${width}`);
+  }
+  await call("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  const searchRequests = requests.length;
+  await evaluate("(()=>{const input=document.querySelector('#friends-search');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'nobody');input.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await until("document.body.innerText.includes('No matching friends')");
+  await screenshot("search-no-results");
+  await evaluate("(()=>{const input=document.querySelector('#friends-search');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'ash#0007');input.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await until("document.querySelector('.friend-row')?.textContent.includes('Ashley')");
+  assert.equal(requests.length, searchRequests, "Friend filtering must not issue API requests");
+  await evaluate("(()=>{const input=document.querySelector('#friends-search');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'');input.dispatchEvent(new Event('input',{bubbles:true}));})()");
   await evaluate("document.querySelector('.friend-options summary').click()");
   await until("document.querySelector('.friend-options')?.textContent.includes('Remove Friend')");
   await evaluate("document.querySelector('.friend-options .member-identity').click()");

@@ -44,9 +44,12 @@ describe("public identity and friends", () => {
   });
   it("shows honest empty/presence states, validates full tags, sends and refreshes outgoing requests", async () => {
     const { fetcher } = setup();
-    expect(await screen.findByText("Your people are out there")).toBeInTheDocument();
+    expect(await screen.findByText("No friends yet")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Refresh/i })).not.toBeInTheDocument();
+    expect(screen.getByText("It's quiet for now")).toBeInTheDocument();
+    expect(screen.getByText("When your friends start playing games or joining activities, you'll see them here.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Online" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Add Friend" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Add Friend" })[0]!);
     fireEvent.change(screen.getByLabelText("Full username"), { target: { value: "Ash" } });
     fireEvent.click(screen.getByRole("button", { name: "Send Friend Request" }));
     expect(screen.getByRole("alert")).toHaveTextContent("complete Core username");
@@ -80,8 +83,8 @@ describe("public identity and friends", () => {
   });
   it("keeps the entered username and confirmed state when a send fails", async () => {
     const { fetcher } = setup();
-    await screen.findByText("Your people are out there");
-    fireEvent.click(screen.getByRole("button", { name: "Add Friend" }));
+    await screen.findByText("No friends yet");
+    fireEvent.click(screen.getAllByRole("button", { name: "Add Friend" })[0]!);
     fireEvent.change(screen.getByLabelText("Full username"), { target: { value: "Ash#0007" } });
     fetcher.mockResolvedValueOnce(new Response(null, { status: 503 }));
     fireEvent.click(screen.getByRole("button", { name: "Send Friend Request" }));
