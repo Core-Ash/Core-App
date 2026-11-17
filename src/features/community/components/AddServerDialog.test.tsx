@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppDataProvider } from "@/app/AppDataProvider";
 import { AuthContext } from "@/features/auth/auth-context";
 import { AddServerDialog } from "@/features/community/components/AddServerDialog";
+import { CreateCommunityDialog } from "@/features/community/components/CreateResourceDialog";
 import { InvitePage } from "@/features/invites/InvitePage";
 import { inviteDestination } from "@/features/invites/invite-link";
 import { communityFixture } from "@/test/api-fixtures";
@@ -82,6 +83,48 @@ describe("add server", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close add server dialog" }));
     fireEvent.click(trigger); fireEvent.click(screen.getByRole("button", { name: "Join a server" }));
     expect(screen.getByRole("textbox")).toHaveValue("");
+  });
+  it("allows switching between creating a server and joining with an invite link", async () => {
+    setup();
+    const trigger = screen.getByRole("button", { name: "Add server" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: "Create a server" }));
+    expect(screen.getByRole("dialog", { name: "Create a server" })).toBeInTheDocument();
+
+    // From Create a server -> Join with an invite link
+    fireEvent.click(screen.getByRole("button", { name: "Join an existing server with an invite link" }));
+    expect(screen.getByRole("dialog", { name: "Join a server" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Invite link or code" })).toBeInTheDocument();
+
+    // From Join a server -> Create a server instead
+    fireEvent.click(screen.getByRole("button", { name: "Create a server instead" }));
+    expect(screen.getByRole("dialog", { name: "Create a server" })).toBeInTheDocument();
+
+    // From Create a server -> Back to choices
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("dialog", { name: "Add a server" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create a server" })).toHaveFocus());
+  });
+  it("offers join link option in standalone CreateCommunityDialog", () => {
+    render(
+      <AuthContext.Provider value={{ ...signedOutState, session: sessionFixture }}>
+        <AppDataProvider>
+          <MemoryRouter initialEntries={["/app"]}>
+            <CreateCommunityDialog open>
+              <button>Open</button>
+            </CreateCommunityDialog>
+          </MemoryRouter>
+        </AppDataProvider>
+      </AuthContext.Provider>
+    );
+    expect(screen.getByRole("dialog", { name: "Create a server" })).toBeInTheDocument();
+    const joinButton = screen.getByRole("button", { name: "Join an existing server with an invite link" });
+    expect(joinButton).toBeInTheDocument();
+    fireEvent.click(joinButton);
+    expect(screen.getByRole("dialog", { name: "Join a server" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Invite link or code" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to create" }));
+    expect(screen.getByRole("dialog", { name: "Create a server" })).toBeInTheDocument();
   });
 });
 describe("invite link extraction", () => {

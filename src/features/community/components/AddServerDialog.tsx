@@ -13,11 +13,14 @@ export function AddServerDialog({ children }: { children: ReactElement }) {
   const [step, setStep] = useState<"choose" | "create" | "join">("choose");
   const [link, setLink] = useState("");
   const [error, setError] = useState("");
-  const trigger = useRef<HTMLButtonElement>(null), input = useRef<HTMLInputElement>(null), joinChoice = useRef<HTMLButtonElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null), input = useRef<HTMLInputElement>(null), joinChoice = useRef<HTMLButtonElement>(null), createChoice = useRef<HTMLButtonElement>(null);
   const previous = useRef(step);
   useLayoutEffect(() => {
     if (step === "join") input.current?.focus();
-    else if (step === "choose" && previous.current === "join") joinChoice.current?.focus();
+    else if (step === "choose") {
+      if (previous.current === "join") joinChoice.current?.focus();
+      else if (previous.current === "create") createChoice.current?.focus();
+    }
     previous.current = step;
   }, [step]);
   return <>
@@ -56,8 +59,18 @@ export function AddServerDialog({ children }: { children: ReactElement }) {
               <Button variant="ghost" onClick={() => { setStep("choose"); setError(""); }}><ArrowLeft size={16} aria-hidden="true" />Back</Button>
               <Button type="submit">Continue to invite<ArrowRight size={16} aria-hidden="true" /></Button>
             </footer>
+            <div className="px-6 pb-4 pt-1 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Don't have an invite?</span>
+              <button
+                type="button"
+                className="text-link hover:underline font-medium"
+                onClick={() => { setStep("create"); setError(""); }}
+              >
+                Create a server instead
+              </button>
+            </div>
           </form> : <div className="add-server-body add-server-choices">
-            <button type="button" className="add-server-choice" aria-label="Create a server" onClick={() => setStep("create")}>
+            <button type="button" ref={createChoice} className="add-server-choice" aria-label="Create a server" onClick={() => setStep("create")}>
               <span className="add-server-choice-icon"><Plus size={24} aria-hidden="true" /></span>
               <span><strong>Create a server</strong><span>A fresh start for your community.</span></span>
               <ArrowRight size={18} aria-hidden="true" />
@@ -72,6 +85,17 @@ export function AddServerDialog({ children }: { children: ReactElement }) {
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-    <CreateCommunityDialog open={open && step === "create"} onOpenChange={setOpen} returnFocusRef={trigger} />
+    <CreateCommunityDialog
+      open={open && step === "create"}
+      onOpenChange={(value) => {
+        if (!value) {
+          setOpen(false);
+          setStep("choose");
+        }
+      }}
+      returnFocusRef={trigger}
+      onBack={() => setStep("choose")}
+      onSwitchToJoin={() => setStep("join")}
+    />
   </>;
 }

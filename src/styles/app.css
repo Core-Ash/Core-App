@@ -1990,4 +1990,6 @@
 .add-server-choice-icon { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; background: var(--primary-subtle); color: var(--link); }
 .add-server-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface-secondary); }
 .create-resource-dialog { padding: 24px; }
+.create-community-switch { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem; }
+.create-community-switch p { font-size: 0.8125rem; color: var(--muted-foreground); margin: 0; }
 @media (max-width: 380px) { .add-server-body { padding: 20px; } .add-server-choice { padding: 12px; gap: 10px; } .add-server-choice-icon { width: 36px; height: 36px; } .add-server-footer { padding: 16px; } }
