@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   User,
   UserCheck,
-  UserCog,
   Users,
   X,
 } from "lucide-react";
@@ -56,13 +55,6 @@ const SETTINGS_NAV_ITEMS: readonly NavItem[] = [
     category: "USER SETTINGS",
     keywords: ["account", "username", "discriminator", "tag", "email", "identity", "verified"],
     icon: User,
-  },
-  {
-    id: "profiles",
-    label: "Profiles",
-    category: "USER SETTINGS",
-    keywords: ["profile", "display name", "avatar", "banner", "bio", "about me"],
-    icon: UserCog,
   },
   {
     id: "privacy-safety",
@@ -296,9 +288,11 @@ export function SettingsWorkspace({
   return (
     <div className="settings-modal-layout">
       <aside className="settings-sidebar" aria-label="Settings navigation">
-        <SidebarUserHeader
-          onEditProfile={() => selectSection("profiles")}
-        />
+        <div className="settings-sidebar-profile">
+          <div className="settings-sidebar-profile-card">
+            <SidebarUserHeader />
+          </div>
+        </div>
         <div className="settings-sidebar-search">
           <Search size={14} aria-hidden="true" />
           <input
@@ -417,12 +411,8 @@ export function SettingsWorkspace({
           <div className="settings-content">
             {section === "my-account" && (
               <MyAccountSection
-                onOpenProfiles={() => selectSection("profiles")}
                 onDirtyChange={onDirtyChange}
               />
-            )}
-            {section === "profiles" && (
-              <ProfilesSection onOpenAccount={() => selectSection("my-account")} />
             )}
             {section === "privacy-safety" && <PrivacySafetySection />}
             {section === "friend-requests" && <FriendRequestsSection />}
@@ -437,7 +427,7 @@ export function SettingsWorkspace({
   );
 }
 
-function SidebarUserHeader({ onEditProfile }: { onEditProfile: () => void }) {
+function SidebarUserHeader() {
   const { session } = useAuth();
   const data = useOptionalAppData();
   const profile = useCurrentUser();
@@ -450,33 +440,22 @@ function SidebarUserHeader({ onEditProfile }: { onEditProfile: () => void }) {
   const avatarImage = user ? user.avatar_url : session?.user.image;
 
   return (
-    <div className="settings-sidebar-profile">
-      <button
-        type="button"
-        className="settings-sidebar-profile-trigger"
-        onClick={onEditProfile}
-        title="View Profiles settings"
-      >
-        <UserAvatar
-          user={{ name, email: "", image: avatarImage }}
-          className="size-10 shrink-0"
-        />
-        <div className="min-w-0 flex-1 text-left">
-          <p className="settings-sidebar-profile-name">{name}</p>
-          <p className="settings-sidebar-profile-tag">
-            {tag || "Edit Profile"}
-          </p>
-        </div>
-      </button>
+    <div className="flex items-center gap-2.5 min-w-0">
+      <UserAvatar
+        user={{ name, email: "", image: avatarImage }}
+        className="size-9 shrink-0"
+      />
+      <div className="min-w-0 flex-1 text-left">
+        <p className="settings-sidebar-profile-name">{name}</p>
+        {tag && <p className="settings-sidebar-profile-tag">{tag}</p>}
+      </div>
     </div>
   );
 }
 
 function MyAccountSection({
-  onOpenProfiles,
   onDirtyChange,
 }: {
-  onOpenProfiles: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const profile = useCurrentUser();
@@ -489,7 +468,6 @@ function MyAccountSection({
   return (
     <AccountProfileCard
       user={profile.data}
-      onOpenProfiles={onOpenProfiles}
       onDirtyChange={onDirtyChange}
     />
   );
@@ -497,11 +475,9 @@ function MyAccountSection({
 
 function AccountProfileCard({
   user,
-  onOpenProfiles,
   onDirtyChange,
 }: {
   user: Profile;
-  onOpenProfiles: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [editingUsername, setEditingUsername] = useState(false);
@@ -555,23 +531,8 @@ function AccountProfileCard({
           <dl className="settings-detail-list">
             <div className="settings-detail-row">
               <div className="min-w-0">
-                <dt>Display name</dt>
-                <dd>{publicIdentityLabel(user.display_name, user.id) || "Not set"}</dd>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onOpenProfiles}
-              >
-                View Profile
-              </Button>
-            </div>
-
-            <div className="settings-detail-row">
-              <div className="min-w-0">
                 <dt>Username</dt>
-                <dd>{usernameOnly}</dd>
+                <dd>{fullTag || usernameOnly}</dd>
               </div>
               <Button
                 type="button"
@@ -621,83 +582,6 @@ function AccountProfileCard({
           </dl>
         </div>
       </section>
-    </div>
-  );
-}
-
-function ProfilesSection({ onOpenAccount }: { onOpenAccount: () => void }) {
-  const profile = useCurrentUser();
-  const data = useOptionalAppData();
-
-  if (data?.configurationError)
-    return <ApiNotice error={new ApiError("configuration")} />;
-  if (!profile.isSuccess) return <ApplicationProfileState />;
-
-  const user = profile.data;
-  const name = displayName(user);
-  const handle = fullUsername(user) || publicUsername(user);
-
-  return (
-    <div className="settings-section-stack">
-      <p className="settings-description">
-        Preview how your identity appears across Core communities and member lists.
-      </p>
-
-      <div className="settings-profiles-grid">
-        <div className="settings-group">
-          <div className="settings-field">
-            <span className="settings-label">Display Name</span>
-            <div className="settings-readonly-box">
-              <span>{publicIdentityLabel(user.display_name, user.id) || "Not set"}</span>
-              <span className="settings-badge-unavailable">Read-only</span>
-            </div>
-            <p className="settings-field-hint">
-              Your display name is initialized from your verified Core account. Your public username can be updated in My Account without changing your four-digit tag.
-            </p>
-          </div>
-
-          <div className="settings-field">
-            <span className="settings-label">Public Handle</span>
-            <div className="settings-readonly-box">
-              <span>{handle || "Not set"}</span>
-              <Button type="button" variant="outline" size="sm" onClick={onOpenAccount}>
-                Edit Username
-              </Button>
-            </div>
-          </div>
-
-          <div className="settings-field">
-            <span className="settings-label">Avatar & Profile Banner</span>
-            <div className="settings-disabled-row">
-              <div>
-                <strong>Custom media uploads unavailable</strong>
-                <p>Custom avatar images, profile banners, and About Me biographies are not supported yet.</p>
-              </div>
-              <span className="settings-badge-unavailable">Unavailable</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="settings-profile-preview-wrap" aria-label="Profile card preview">
-          <span className="settings-label">Preview</span>
-          <div className="settings-profile-preview-card">
-            <div className="member-profile-banner" aria-hidden="true" />
-            <div className="settings-preview-avatar">
-              <UserAvatar
-                user={{ name, email: user.email, image: user.avatar_url }}
-                className="size-16"
-              />
-            </div>
-            <div className="settings-preview-body">
-              <h3>{name}</h3>
-              {handle && <p className="settings-preview-handle">{handle}</p>}
-              <div className="mt-3">
-                <CopyUsername profile={user} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

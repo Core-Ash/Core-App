@@ -280,15 +280,13 @@
 }
 .community-banner-art {
   position: absolute;
-  inset: 26px 14px 0 0;
-  border-radius: 16px 16px 0 0;
+  inset: 0;
+  border-radius: 0;
   background:
     linear-gradient(0deg, #131114 0, #13111444 48%, transparent 80%),
     url("/artwork/core-gaming-banner.png");
-  background-size:
-    100% 100%,
-    100% auto;
-  background-position: top;
+  background-size: cover;
+  background-position: center top;
   background-repeat: no-repeat;
 }
 .community-picker strong {
@@ -1370,14 +1368,14 @@
   left: 50%;
   z-index: 55;
   transform: translate(-50%, -50%);
-  width: min(1140px, calc(100vw - 32px));
-  height: min(86dvh, calc(100dvh - 32px));
-  max-height: calc(100dvh - 32px);
+  width: min(1600px, 96vw);
+  height: min(96vh, 96dvh);
+  max-height: 96dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--friends-surface);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.68);
   outline: none;
@@ -1385,7 +1383,7 @@
 }
 .settings-modal-layout {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-columns: 245px minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -1395,11 +1393,12 @@
 .settings-sidebar {
   display: flex;
   flex-direction: column;
+  width: 245px;
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--border);
   background: var(--sidebar);
-  padding: 16px 10px 14px;
+  padding: 18px 12px 16px;
 }
 .settings-sidebar-profile {
   padding: 0 4px 12px;
@@ -1411,8 +1410,8 @@
   min-width: 0;
   align-items: center;
   gap: 10px;
-  padding: 8px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   background: transparent;
   transition: background-color 120ms;
 }
@@ -1496,7 +1495,7 @@
   gap: 2px;
 }
 .settings-nav-heading {
-  padding: 6px 8px 4px;
+  padding: 14px 8px 6px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1507,11 +1506,11 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  height: 33px;
+  height: 34px;
   align-items: center;
   gap: 10px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--muted-foreground);
   font-size: 14px;
   font-weight: 500;
@@ -1574,6 +1573,7 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
+  flex: 1;
   background: var(--friends-surface);
 }
 .settings-main-header {
@@ -1581,8 +1581,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 58px;
-  padding: 12px 28px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 32px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -1590,9 +1591,9 @@
   min-width: 0;
 }
 .settings-main-title-group h1 {
-  font-size: 18px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1606,8 +1607,8 @@
 }
 .settings-close-button {
   display: inline-flex;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
@@ -1639,7 +1640,9 @@
 .settings-content {
   width: 100%;
   max-width: 740px;
-  padding: 24px 28px 36px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  box-sizing: border-box;
 }
 .settings-section-stack {
   display: flex;
