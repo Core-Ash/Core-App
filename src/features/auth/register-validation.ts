@@ -3,6 +3,7 @@ import {
   type LoginErrors,
   type LoginValues,
 } from "./login-validation";
+import { validUsername } from "@/lib/display-name";
 
 // Core-auth src/lib/auth.ts sets 12; Better Auth's unchanged maximum is 128.
 // Keep these hints aligned with the service. Server validation remains authoritative.
@@ -12,18 +13,21 @@ export const registrationPasswordPolicy = {
 } as const;
 
 export interface RegisterValues extends LoginValues {
+  username: string;
   name: string;
   confirmPassword: string;
 }
 
 export interface RegisterErrors extends LoginErrors {
+  username?: string;
   name?: string;
   confirmPassword?: string;
 }
 
 export function validateRegistration(values: RegisterValues): RegisterErrors {
   const errors: RegisterErrors = { ...validateLogin(values) };
-  if (!values.name.trim()) errors.name = "Enter your name.";
+  if (values.name.trim().length > 80 || /\p{Cc}/u.test(values.name.trim())) errors.name = "Use up to 80 characters without control characters.";
+  if (!validUsername(values.username)) errors.username = "Use 2–32 letters, numbers or underscores. System names are reserved.";
   if (
     values.password &&
     values.password.length < registrationPasswordPolicy.minLength
@@ -44,6 +48,10 @@ export function signUpErrorMessage(error: {
   status?: number;
 }): string {
   switch (error.code) {
+    case "IDENTITY_CAPACITY_REACHED":
+      return "All 10,000 user tags are assigned. Registration is currently unavailable.";
+    case "INVALID_USERNAME":
+      return "Choose a username with 2–32 letters, numbers or underscores. System names are reserved.";
     case "USER_ALREADY_EXISTS":
     case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
       return "An account with this email already exists. Try signing in instead.";

@@ -1,6 +1,7 @@
 export interface PublicProfile {
   id: string;
   username: string;
+  discriminator?: string | null;
   display_name: string;
   avatar_url: string | null;
 }

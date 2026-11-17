@@ -2,6 +2,7 @@
 @import "./theme.css";
 @import "./app.css";
 @import "./auth.css";
+@import "./friends.css";
 
 @custom-variant dark (&:is(.dark *));
 

@@ -57,7 +57,9 @@ function avatarUrl(value: unknown): string | null {
 }
 export function parsePublicProfile(value: unknown): PublicProfile {
   const data = record(value);
-  return { id: uuid(data.id), username: string(data.username), display_name: string(data.display_name), avatar_url: avatarUrl(data.avatar_url) };
+  const discriminator = data.discriminator == null ? null : string(data.discriminator);
+  if (discriminator !== null && !/^[0-9]{4}$/.test(discriminator)) throw new ApiError("invalid_response");
+  return { id: uuid(data.id), username: string(data.username), discriminator, display_name: string(data.display_name), avatar_url: avatarUrl(data.avatar_url) };
 }
 export function parseBootstrap(value: unknown) {
   const data = record(value);

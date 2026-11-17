@@ -7,7 +7,7 @@ describe("public member profile contracts", () => {
   it("accepts public avatar URLs and nullable missing authors without exposing private fields", () => {
     expect(parsePublicProfile({ ...profileFixture, avatar_url: "https://cdn.example.com/member.png" })).toEqual({
       id: profileFixture.id, username: profileFixture.username, display_name: profileFixture.display_name,
-      avatar_url: "https://cdn.example.com/member.png",
+      avatar_url: "https://cdn.example.com/member.png", discriminator: null,
     });
     expect(parseMessage({ ...messageFixture, author: null }).author).toBeNull();
   });

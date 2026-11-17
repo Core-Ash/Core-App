@@ -6,10 +6,11 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
 import { RegisterPage } from "@/features/auth/RegisterPage";
 import { SessionRedirect } from "@/features/auth/SessionRedirect";
-import { UnavailablePage } from "@/features/home/UnavailablePage";
+import { MessagesPage } from "@/features/messages/MessagesPage";
 import { CommunityPage } from "@/features/community/CommunityPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { InvitePage } from "@/features/invites/InvitePage";
+import { FriendsPage } from "@/features/friends/FriendsPage";
 
 export function AppRoutes() {
   return (
@@ -26,11 +27,11 @@ export function AppRoutes() {
           <Route path="/app/communities" element={<CommunityPage />} />
           <Route
             path="/app/messages"
-            element={<UnavailablePage feature="messages" />}
+            element={<MessagesPage />}
           />
           <Route
             path="/app/friends"
-            element={<UnavailablePage feature="friends" />}
+            element={<FriendsPage />}
           />
           <Route path="/app/settings" element={<SettingsPage />} />
         </Route>

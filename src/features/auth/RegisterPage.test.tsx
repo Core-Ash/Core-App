@@ -37,7 +37,8 @@ function fillRegistration(
   password = "a-long-password",
   confirmation = password,
 ) {
-  fireEvent.change(screen.getByLabelText("Name", { exact: true }), {
+  fireEvent.change(screen.getByLabelText("Username", { exact: true }), { target: { value: " Alex " } });
+  fireEvent.change(screen.getByLabelText("Display name (optional)", { exact: true }), {
     target: { value: " Alex Morgan " },
   });
   fireEvent.change(screen.getByLabelText("Email address"), {
@@ -55,10 +56,10 @@ describe("registration form", () => {
   it("blocks invalid input and focuses the first invalid field", () => {
     const { signUp } = renderRegistration();
     fireEvent.click(screen.getByRole("button", { name: "Sign up" }));
-    expect(screen.getByLabelText("Name", { exact: true })).toHaveFocus();
+    expect(screen.getByLabelText("Username", { exact: true })).toHaveFocus();
     expect(
-      screen.getByLabelText("Name", { exact: true }),
-    ).toHaveAccessibleDescription("Enter your name.");
+      screen.getByLabelText("Username", { exact: true }),
+    ).toHaveAttribute("aria-invalid", "true");
     expect(signUp).not.toHaveBeenCalled();
   });
   it.each([
@@ -83,6 +84,7 @@ describe("registration form", () => {
     ).toBeInTheDocument();
     expect(signUp).toHaveBeenCalledWith(
       {
+        username: "Alex",
         name: "Alex Morgan",
         email: "alex@example.com",
         password: "a-long-password",
@@ -190,7 +192,7 @@ describe("registration form", () => {
     expect(
       screen.getByRole("button", { name: "Creating account…" }),
     ).toBeDisabled();
-    expect(screen.getByLabelText("Name", { exact: true })).toBeDisabled();
+    expect(screen.getByLabelText("Display name (optional)", { exact: true })).toBeDisabled();
     finish({ error: { status: 503 } });
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Sign up" })).toBeEnabled(),

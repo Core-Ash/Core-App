@@ -4,12 +4,16 @@ import { X } from "lucide-react";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import type { MemberRole, PublicProfile } from "@/lib/api/types";
 import { displayName, publicUsername } from "@/lib/display-name";
+import { fullUsername } from "@/lib/display-name";
+import { CopyUsername } from "@/features/friends/CopyUsername";
+import { RelationshipActions } from "@/features/friends/RelationshipActions";
+import { useOptionalAppData } from "@/app/app-data-context";
 
-export function MemberIdentity({ profile, roles, joinedAt, avatar = true, username = true }: {
-  profile: PublicProfile; roles?: MemberRole[]; joinedAt?: string; avatar?: boolean; username?: boolean;
+export function MemberIdentity({ profile, roles, joinedAt, avatar = true, username = true, label }: {
+  profile: PublicProfile; roles?: MemberRole[]; joinedAt?: string; avatar?: boolean; username?: boolean; label?: string;
 }) {
   const name = displayName(profile);
-  const handle = publicUsername(profile);
+  const handle = fullUsername(profile) || publicUsername(profile);
   const user = { name, email: "", image: profile.avatar_url };
   const trigger = useRef<HTMLButtonElement>(null);
   return (
@@ -18,8 +22,8 @@ export function MemberIdentity({ profile, roles, joinedAt, avatar = true, userna
         <button ref={trigger} className="member-identity" title={name} aria-label={`View profile for ${name}`}>
           {avatar && <UserAvatar user={user} className="size-9 shrink-0" />}
           <span className="min-w-0 text-left">
-            <span className="block truncate font-medium">{name}</span>
-            {username && handle && <span className="block truncate text-xs text-muted-foreground">@{handle}</span>}
+            <span className="block truncate font-medium">{label ?? name}</span>
+            {username && handle && <span className="block truncate text-xs text-muted-foreground">{fullUsername(profile) || `@${handle}`}</span>}
           </span>
         </button>
       </Dialog.Trigger>
@@ -35,7 +39,8 @@ function MemberProfileCard({ anchor, profile, roles, joinedAt }: {
 }) {
   const content = useRef<HTMLDivElement>(null);
   const name = displayName(profile);
-  const handle = publicUsername(profile);
+  const handle = fullUsername(profile) || publicUsername(profile);
+  const data = useOptionalAppData();
 
   useLayoutEffect(() => {
     const card = content.current;
@@ -83,8 +88,10 @@ function MemberProfileCard({ anchor, profile, roles, joinedAt }: {
       <div className="member-profile-body">
         <Dialog.Title className="member-profile-name">{name}</Dialog.Title>
         <Dialog.Description className={handle ? "member-profile-handle" : "sr-only"}>
-          {handle ? `@${handle}` : "Core member profile"}
+          {handle ? (fullUsername(profile) || `@${handle}`) : "Core member profile"}
         </Dialog.Description>
+        <CopyUsername profile={profile} />
+        {data?.ready && fullUsername(profile) && <RelationshipActions profile={profile} />}
         {roles && <section className="member-profile-section" aria-label="Member roles">
           <h3>Roles</h3>
           {roles.length ? <ul className="member-profile-roles">{roles.map((role) => <li key={role.id} className="member-profile-role">

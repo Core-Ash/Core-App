@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { Brand } from "@/components/common/Brand";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AddServerDialog } from "@/features/community/components/AddServerDialog";
@@ -13,9 +13,11 @@ import { cn } from "@/lib/utils";
 export function LiveNavigationRail() {
   const { communityItems, community } = useCommunitySelection();
   const profile = useCurrentUser();
+  const { pathname } = useLocation();
+  const personal = pathname === "/app/friends" || pathname === "/app/messages";
   return (
     <nav className="navigation-rail" aria-label="Communities">
-      <Link to="/app" className="rail-logo" aria-label="Core home">
+      <Link to="/app/friends" className={cn("rail-logo", personal && "is-active")} aria-label="Core home" title="Friends and direct messages" aria-current={personal ? "page" : undefined}>
         <Brand markOnly />
       </Link>
       <div className="rail-links">
@@ -24,10 +26,10 @@ export function LiveNavigationRail() {
             <Link
               to={communityHref(item.id)}
               aria-label={item.name}
-              aria-current={community?.id === item.id ? "page" : undefined}
+              aria-current={!personal && community?.id === item.id ? "page" : undefined}
               className={cn(
                 "rail-link",
-                community?.id === item.id && "is-active",
+                !personal && community?.id === item.id && "is-active",
               )}
             >
               <span className="text-sm font-semibold" aria-hidden="true">

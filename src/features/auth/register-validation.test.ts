@@ -6,6 +6,7 @@ import {
 } from "./register-validation";
 
 const validValues: RegisterValues = {
+  username: "Alex",
   name: "Alex Morgan",
   email: "alex@example.com",
   password: "a-long-password",
@@ -16,13 +17,14 @@ describe("Core-auth registration validation", () => {
   it("requires all fields", () => {
     expect(
       validateRegistration({
+        username: "",
         name: " ",
         email: "",
         password: "",
         confirmPassword: "",
       }),
     ).toEqual({
-      name: "Enter your name.",
+      username: "Use 2–32 letters, numbers or underscores. System names are reserved.",
       email: "Enter your email address.",
       password: "Enter your password.",
       confirmPassword: "Confirm your password.",
@@ -36,6 +38,10 @@ describe("Core-auth registration validation", () => {
         email: " alex@example.com ",
       }),
     ).toEqual({});
+  });
+  it("allows an omitted display name while requiring a valid public username", () => {
+    expect(validateRegistration({ ...validValues, name: "" })).toEqual({});
+    expect(validateRegistration({ ...validValues, username: "admin" }).username).toBeTruthy();
   });
   it("rejects malformed email", () => {
     expect(

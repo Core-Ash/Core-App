@@ -8,6 +8,8 @@ import { ApplicationProfileState } from "@/features/community/components/Applica
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { ApiError } from "@/lib/api/errors";
 import { displayName, publicIdentityLabel, publicUsername } from "@/lib/display-name";
+import { UsernameSettings } from "@/features/friends/UsernameSettings";
+import { CopyUsername } from "@/features/friends/CopyUsername";
 
 export function SettingsPage() {
   const { session } = useAuth();
@@ -81,13 +83,16 @@ function BackendAccountProfile() {
           <dd>{publicUsername(user) || "Not set"}</dd>
         </div>
         <div>
+          <dt>User tag</dt>
+          <dd>{user.discriminator ? `#${user.discriminator}` : "Unavailable"}</dd>
+        </div>
+        <div>
           <dt>Email address</dt>
           <dd>{user.email || "Not available"}</dd>
         </div>
       </dl>
-      <p className="settings-note">
-        Profile editing isn't available here yet. Your public profile comes from Core-auth.
-      </p>
+      <CopyUsername profile={user} />
+      <UsernameSettings profile={user} />
     </section>
   );
 }

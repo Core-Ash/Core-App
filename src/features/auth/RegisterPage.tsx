@@ -18,6 +18,7 @@ import {
 } from "./register-validation";
 
 const emptyValues: RegisterValues = {
+  username: "",
   name: "",
   email: "",
   password: "",
@@ -36,6 +37,7 @@ export function RegisterPage() {
     "sign-in" | "session-unavailable" | null
   >(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLInputElement>(null);
@@ -72,7 +74,7 @@ export function RegisterPage() {
     setErrors(validation);
     setAuthError(null);
     if (Object.values(validation).some(Boolean)) {
-      const first = validation.name
+      const first = validation.username ? usernameRef : validation.name
         ? nameRef
         : validation.email
           ? emailRef
@@ -94,12 +96,14 @@ export function RegisterPage() {
     try {
       // Keep the form mounted until the cookie-backed session check resolves.
       // Only the official session hook can grant access to the protected app.
-      const result = await client.signUp.email(
-        {
-          name: values.name.trim(),
+      const registration = {
+          username: values.username.trim(),
+          name: values.name.trim() || values.username.trim(),
           email: values.email.trim(),
           password: values.password,
-        },
+      };
+      const result = await client.signUp.email(
+        registration,
         { disableSignal: true },
       );
       if (result.error) {
@@ -201,15 +205,21 @@ export function RegisterPage() {
           className="space-y-5"
         >
           <div className="space-y-2">
+            <label htmlFor="signup-username" className="text-sm font-medium">Username</label>
+            <Input ref={usernameRef} id="signup-username" name="username" autoComplete="username" maxLength={32} required placeholder="Ash" value={values.username} onChange={(event) => update("username", event.target.value)} disabled={busy} aria-invalid={Boolean(errors.username)} aria-describedby="signup-username-help" />
+            <p id="signup-username-help" className="text-xs text-muted-foreground">2–32 letters, numbers or underscores. We’ll assign your unique four-digit user tag.</p>
+            {errors.username && <p role="alert" className="text-xs text-destructive">{errors.username}</p>}
+          </div>
+          <div className="space-y-2">
             <label htmlFor="name" className="text-sm font-medium">
-              Name
+              Display name (optional)
             </label>
             <Input
               ref={nameRef}
               id="name"
               name="name"
               autoComplete="name"
-              required
+              maxLength={80}
               placeholder="What should we call you?"
               value={values.name}
               onChange={(event) => update("name", event.target.value)}
