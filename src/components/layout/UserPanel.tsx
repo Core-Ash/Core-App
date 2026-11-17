@@ -5,6 +5,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useAuth } from "@/features/auth/auth-context";
 import { useOptionalAppData } from "@/app/app-data-context";
 import { useCurrentUser } from "@/features/community/api/hooks";
+import { useOptionalSettingsModal } from "@/features/settings/settings-context";
 import type { AuthUser } from "@/lib/auth-client";
 import { displayName, publicIdentityLabel } from "@/lib/display-name";
 
@@ -43,6 +44,7 @@ function UserPanelView({
   user: Pick<AuthUser, "name" | "email" | "image">;
   onNavigate?: () => void;
 }) {
+  const settingsModal = useOptionalSettingsModal();
   return (
     <section className="user-panel" aria-label="Signed-in account">
       <div className="user-panel-profile">
@@ -72,14 +74,31 @@ function UserPanelView({
             </button>
           </Tooltip>
           <Tooltip content="Account settings and sign out">
-            <Link
-              className="icon-button"
-              to="/app/settings"
-              aria-label="Account settings"
-              onClick={onNavigate}
-            >
-              <Settings size={22} aria-hidden="true" />
-            </Link>
+            {settingsModal ? (
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Account settings"
+                aria-haspopup="dialog"
+                aria-expanded={settingsModal.open}
+                onClick={(event) => {
+                  const trigger = event.currentTarget;
+                  onNavigate?.();
+                  settingsModal.openSettings("my-account", trigger);
+                }}
+              >
+                <Settings size={22} aria-hidden="true" />
+              </button>
+            ) : (
+              <Link
+                className="icon-button"
+                to="/app/settings"
+                aria-label="Account settings"
+                onClick={onNavigate}
+              >
+                <Settings size={22} aria-hidden="true" />
+              </Link>
+            )}
           </Tooltip>
         </div>
       </div>

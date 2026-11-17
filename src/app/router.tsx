@@ -8,7 +8,6 @@ import { RegisterPage } from "@/features/auth/RegisterPage";
 import { SessionRedirect } from "@/features/auth/SessionRedirect";
 import { MessagesPage } from "@/features/messages/MessagesPage";
 import { CommunityPage } from "@/features/community/CommunityPage";
-import { SettingsPage } from "@/features/settings/SettingsPage";
 import { InvitePage } from "@/features/invites/InvitePage";
 import { FriendsPage } from "@/features/friends/FriendsPage";
 
@@ -33,7 +32,7 @@ export function AppRoutes() {
             path="/app/friends"
             element={<FriendsPage />}
           />
-          <Route path="/app/settings" element={<SettingsPage />} />
+          <Route path="/app/settings" element={<CommunityPage />} />
         </Route>
       </Route>
       <Route path="*" element={<NotFoundPage />} />
