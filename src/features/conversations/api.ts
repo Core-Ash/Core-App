@@ -4,7 +4,7 @@ import { useCurrentUser } from "@/features/community/api/hooks";
 import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
 import { endpoints } from "@/lib/api/endpoints";
 import { ApiError, apiErrorMessage } from "@/lib/api/errors";
-import type { Message, MessageCursor } from "@/lib/api/types";
+import type { ConversationSummary, Message, MessageCursor } from "@/lib/api/types";
 
 export const conversationQueryKeys = {
   conversations: ["conversations"] as const,
@@ -189,14 +189,43 @@ export function useCreateDirectConversation() {
   const { api, ready } = useAppData();
   const queries = useQueryClient();
   return useMutation({
-    mutationFn: (input: { recipient_id?: string; username?: string }) => {
+    mutationFn: async (input: { recipient_id?: string; username?: string }) => {
       if (!ready) throw new ApiError("unauthorized");
-      return endpoints.createDirectConversation(api, input);
+      const existing = queries.getQueryData<ConversationSummary[]>(conversationQueryKeys.conversations)
+        ?.find((conversation) => conversation.type === "direct" && !conversation.hidden &&
+          conversation.members.some((member) => input.recipient_id
+            ? member.id === input.recipient_id
+            : `${member.profile.username}#${member.profile.discriminator}`.toLowerCase() === input.username?.trim().toLowerCase()));
+      if (existing) return existing;
+      // QueryClient shares the same in-flight promise across every entry point.
+      return queries.fetchQuery({
+        queryKey: ["resolve-direct", input.recipient_id ?? input.username?.trim().toLowerCase()],
+        queryFn: async () => {
+          try {
+            return await endpoints.createDirectConversation(api, input);
+          } catch (error) {
+            if (import.meta.env.DEV) console.debug("Direct conversation resolution failed", {
+              kind: error instanceof ApiError ? error.kind : "unknown",
+              status: error instanceof ApiError ? error.status : undefined,
+            });
+            throw error;
+          }
+        },
+        staleTime: 0,
+        gcTime: 0,
+        retry: false,
+      });
     },
-    onSuccess: () =>
-      queries.invalidateQueries({
-        queryKey: conversationQueryKeys.conversations,
-      }),
+    onSuccess: (conversation) => {
+      const cached = queries.getQueryData<ConversationSummary[]>(conversationQueryKeys.conversations);
+      if (cached?.some((item) => item.id === conversation.id && !item.hidden)) return;
+      // Summary responses can include a preview; preserve it when reopening.
+      queries.setQueryData<ConversationSummary[]>(conversationQueryKeys.conversations, (previous = []) => [
+        { ...conversation, hidden: false, last_message: previous.find((item) => item.id === conversation.id)?.last_message ?? null },
+        ...previous.filter((item) => item.id !== conversation.id),
+      ]);
+      void queries.invalidateQueries({ queryKey: conversationQueryKeys.conversations, exact: true });
+    },
   });
 }
 
@@ -208,10 +237,14 @@ export function useCreateGroupConversation() {
       if (!ready) throw new ApiError("unauthorized");
       return endpoints.createGroupConversation(api, input);
     },
-    onSuccess: () =>
-      queries.invalidateQueries({
-        queryKey: conversationQueryKeys.conversations,
-      }),
+    onSuccess: (conversation) => {
+      queries.setQueryData(conversationQueryKeys.conversation(conversation.id), conversation);
+      queries.setQueryData<ConversationSummary[]>(conversationQueryKeys.conversations, (previous = []) => [
+        { ...conversation, hidden: false, last_message: null },
+        ...previous.filter((item) => item.id !== conversation.id),
+      ]);
+      void queries.invalidateQueries({ queryKey: conversationQueryKeys.conversations, exact: true });
+    },
   });
 }
 

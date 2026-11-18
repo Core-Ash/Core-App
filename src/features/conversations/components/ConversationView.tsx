@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ApiNotice } from "@/components/common/ApiNotice";
 import { useCurrentUser } from "@/features/community/api/hooks";
 import { MessageComposer } from "@/features/community/components/MessageComposer";
 import { MessageList } from "@/features/community/components/MessageList";
@@ -112,10 +113,8 @@ export function ConversationView({
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
         <MessageSquare size={48} className="text-muted-foreground" />
-        <h2 className="text-xl font-semibold">Conversation not found</h2>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          This conversation may have been closed or you are no longer a participant.
-        </p>
+        <h2 className="text-xl font-semibold">Unable to load conversation</h2>
+        <ApiNotice error={conversationQuery.error} onRetry={() => void conversationQuery.refetch()} />
       </div>
     );
   }

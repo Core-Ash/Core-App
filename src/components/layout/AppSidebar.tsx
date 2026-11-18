@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { MessageSquare, Plus, Search, Users, X } from "lucide-react";
+import { Plus, Users, X } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router";
+import { ApiNotice } from "@/components/common/ApiNotice";
+import { ConversationSearchDialog } from "@/features/conversations/components/ConversationSearchDialog";
 import { UserPanel } from "@/components/layout/UserPanel";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useCurrentUser } from "@/features/community/api/hooks";
@@ -10,6 +12,7 @@ import {
   useConversations,
   useHideConversation,
 } from "@/features/conversations/api";
+import { DmUserMenu } from "@/features/conversations/components/DmUserMenu";
 import { CreateGroupDmDialog } from "@/features/conversations/components/CreateGroupDmDialog";
 import type { ConversationSummary } from "@/lib/api/types";
 
@@ -36,15 +39,14 @@ function PersonalSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const profile = useCurrentUser();
   const conversationsQuery = useConversations();
   const hideConversation = useHideConversation();
+  const [searchOpen, setSearchOpen] = useState(false);
   const [createDmOpen, setCreateDmOpen] = useState(false);
 
   const currentUserId = profile.data?.id ?? "";
   const conversations = conversationsQuery.data ?? [];
 
-  function handleHide(e: React.MouseEvent, conversationId: string) {
-    e.preventDefault();
-    e.stopPropagation();
-    hideConversation.mutate(conversationId);
+  async function closeConversation(conversationId: string) {
+    await hideConversation.mutateAsync(conversationId);
     if (pathname === `/app/messages/${conversationId}`) {
       navigate("/app/messages");
     }
@@ -56,10 +58,9 @@ function PersonalSidebar({ onNavigate }: { onNavigate?: () => void }) {
         <button
           type="button"
           className="w-full text-left"
-          onClick={() => setCreateDmOpen(true)}
+          onClick={() => setSearchOpen(true)}
           title="Find or start a conversation"
         >
-          <Search size={14} aria-hidden="true" />
           <span>Find or start a conversation</span>
         </button>
       </div>
@@ -75,17 +76,6 @@ function PersonalSidebar({ onNavigate }: { onNavigate?: () => void }) {
           >
             <Users size={20} aria-hidden="true" />
             <span>Friends</span>
-          </NavLink>
-          <NavLink
-            to="/app/messages"
-            end
-            className={({ isActive }) =>
-              `sidebar-link${isActive ? " is-active" : ""}`
-            }
-            onClick={onNavigate}
-          >
-            <MessageSquare size={20} aria-hidden="true" />
-            <span>Messages</span>
           </NavLink>
         </nav>
 
@@ -118,7 +108,8 @@ function PersonalSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 key={conv.id}
                 conversation={conv}
                 currentUserId={currentUserId}
-                onHide={(e) => handleHide(e, conv.id)}
+                onHide={(event) => { event.preventDefault(); event.stopPropagation(); void closeConversation(conv.id).catch(() => {}); }}
+                onCloseConversation={() => closeConversation(conv.id)}
                 onNavigate={onNavigate}
               />
             ))}
@@ -126,9 +117,13 @@ function PersonalSidebar({ onNavigate }: { onNavigate?: () => void }) {
         )}
       </div>
 
+      {searchOpen && <ConversationSearchDialog onClose={() => setSearchOpen(false)} onNavigate={onNavigate} />}
+      {conversationsQuery.error && <ApiNotice compact error={conversationsQuery.error} onRetry={() => void conversationsQuery.refetch()} />}
+      {hideConversation.error && <ApiNotice compact error={hideConversation.error} />}
       <CreateGroupDmDialog
         open={createDmOpen}
         onOpenChange={setCreateDmOpen}
+        onCreated={onNavigate}
       />
     </>
   );
@@ -138,11 +133,13 @@ function ConversationSidebarRow({
   conversation,
   currentUserId,
   onHide,
+  onCloseConversation,
   onNavigate,
 }: {
   conversation: ConversationSummary;
   currentUserId: string;
   onHide: (e: React.MouseEvent) => void;
+  onCloseConversation: () => Promise<void>;
   onNavigate?: () => void;
 }) {
   const isDirect = conversation.type === "direct";
@@ -166,8 +163,7 @@ function ConversationSidebarRow({
 
   const lastSnippet = conversation.last_message?.body ?? "";
 
-  return (
-    <li className="dm-sidebar-item">
+  const link = (
       <NavLink
         to={`/app/messages/${conversation.id}`}
         className={({ isActive }) =>
@@ -210,6 +206,8 @@ function ConversationSidebarRow({
           <X size={14} aria-hidden="true" />
         </button>
       </NavLink>
-    </li>
   );
+  return <li className="dm-sidebar-item">{otherMember ?
+    <DmUserMenu profile={otherMember.profile} conversationId={conversation.id} onCloseConversation={onCloseConversation}>{link}</DmUserMenu> : link
+  }</li>;
 }

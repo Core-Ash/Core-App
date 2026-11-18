@@ -8,6 +8,8 @@ import { fullUsername } from "@/lib/display-name";
 import { CopyUsername } from "@/features/friends/CopyUsername";
 import { RelationshipActions } from "@/features/friends/RelationshipActions";
 import { useOptionalAppData } from "@/app/app-data-context";
+import { useInRouterContext } from "react-router";
+import { ConversationProfileName } from "@/features/conversations/components/ConversationProfileName";
 
 export function MemberIdentity({ profile, roles, joinedAt, avatar = true, username = true, label }: {
   profile: PublicProfile; roles?: MemberRole[]; joinedAt?: string; avatar?: boolean; username?: boolean; label?: string;
@@ -34,13 +36,14 @@ export function MemberIdentity({ profile, roles, joinedAt, avatar = true, userna
   );
 }
 
-function MemberProfileCard({ anchor, profile, roles, joinedAt }: {
-  anchor: RefObject<HTMLButtonElement | null>; profile: PublicProfile; roles?: MemberRole[]; joinedAt?: string;
+export function MemberProfileCard({ anchor, profile, roles, joinedAt, returnFocus }: {
+  anchor: RefObject<HTMLElement | null>; profile: PublicProfile; roles?: MemberRole[]; joinedAt?: string; returnFocus?: RefObject<HTMLElement | null>;
 }) {
   const content = useRef<HTMLDivElement>(null);
   const name = displayName(profile);
   const handle = fullUsername(profile) || publicUsername(profile);
   const data = useOptionalAppData();
+  const inRouter = useInRouterContext();
 
   useLayoutEffect(() => {
     const card = content.current;
@@ -82,11 +85,13 @@ function MemberProfileCard({ anchor, profile, roles, joinedAt }: {
   }, [anchor]);
 
   return (
-    <Dialog.Content ref={content} className="member-profile-dialog">
+    <Dialog.Content ref={content} className="member-profile-dialog" onCloseAutoFocus={(event) => {
+      if (returnFocus) { event.preventDefault(); returnFocus.current?.focus(); }
+    }}>
       <div className="member-profile-banner" aria-hidden="true" />
       <UserAvatar user={{ name, email: "", image: profile.avatar_url }} className="member-profile-avatar" />
       <div className="member-profile-body">
-        <Dialog.Title className="member-profile-name">{name}</Dialog.Title>
+        <Dialog.Title className="member-profile-name">{data?.ready && inRouter ? <ConversationProfileName id={profile.id} name={name} /> : name}</Dialog.Title>
         <Dialog.Description className={handle ? "member-profile-handle" : "sr-only"}>
           {handle ? (fullUsername(profile) || `@${handle}`) : "Core member profile"}
         </Dialog.Description>

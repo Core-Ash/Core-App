@@ -89,7 +89,12 @@ export const endpoints = {
   createDirectConversation: async (
     api: ApiClient,
     input: { recipient_id?: string; username?: string },
-  ) => parseConversationDetail(await api.post("/conversations/direct", input)),
+  ) => {
+    const result = parseConversationDetail(await api.post("/conversations/direct", input), true);
+    if (result.type !== "direct" || (input.recipient_id && !result.members.some((m) => m.id === input.recipient_id)))
+      throw new ApiError("invalid_response");
+    return result;
+  },
   createGroupConversation: async (
     api: ApiClient,
     input: { recipient_ids: string[]; name?: string },

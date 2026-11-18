@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Loader2, Search, Users, X } from "lucide-react";
 import { useNavigate } from "react-router";
+import { ModalContent } from "@/components/ui/modal-content";
 import { Button } from "@/components/ui/button";
 import { MemberAvatar } from "@/features/community/components/MemberAvatar";
 import {
   useAddConversationMembers,
-  useCreateDirectConversation,
   useCreateGroupConversation,
 } from "@/features/conversations/api";
+import { useCurrentUser } from "@/features/community/api/hooks";
+import { ApiNotice } from "@/components/common/ApiNotice";
 import { useFriendList } from "@/features/friends/api";
 import { apiErrorMessage } from "@/lib/api/errors";
 import type { PublicProfile } from "@/lib/api/types";
@@ -17,6 +19,7 @@ import { fullUsername } from "@/lib/display-name";
 interface CreateGroupDmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: () => void;
   mode?: "create" | "add_members" | "add_to_dm";
   conversationId?: string;
   existingMemberIds?: string[];
@@ -26,6 +29,7 @@ interface CreateGroupDmDialogProps {
 export function CreateGroupDmDialog({
   open,
   onOpenChange,
+  onCreated,
   mode = "create",
   conversationId,
   existingMemberIds = [],
@@ -37,7 +41,9 @@ export function CreateGroupDmDialog({
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
   const [error, setError] = useState<string | null>(null);
 
-  const createDirect = useCreateDirectConversation();
+  const me = useCurrentUser();
+  const searchInput = useRef<HTMLInputElement>(null);
+  const submitting = useRef(false);
   const createGroup = useCreateGroupConversation();
   const addMembers = useAddConversationMembers(conversationId ?? "");
 
@@ -45,10 +51,10 @@ export function CreateGroupDmDialog({
     const list = friendsQuery.data?.pages.flatMap((page) => page.items) ?? [];
     const unique = new Map<string, PublicProfile>();
     for (const item of list) {
-      unique.set(item.id, item);
+      if (item.id !== me.data?.id) unique.set(item.id, item);
     }
     return Array.from(unique.values());
-  }, [friendsQuery.data]);
+  }, [friendsQuery.data, me.data?.id]);
 
   const filteredFriends = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -63,90 +69,52 @@ export function CreateGroupDmDialog({
     });
   }, [friends, search]);
 
-  // Max selectable:
-  // In "create" mode: up to 9 friends (total 10 with creator)
-  // In "add_to_dm" mode: existingMemberIds has 1 friend, so up to 8 more (total 10)
-  // In "add_members" mode: 10 - existingMemberIds.length
-  const maxAllowed =
-    mode === "add_members"
-      ? Math.max(0, 10 - existingMemberIds.length)
-      : mode === "add_to_dm"
-        ? Math.max(0, 9 - existingMemberIds.length)
-        : 9;
+  const existingIds = [...new Set(existingMemberIds)].filter((id) => id !== me.data?.id);
+  const maxAllowed = mode === "create" ? 8 : Math.max(0, 9 - existingIds.length);
+  const selection = [...new Set(selectedIds)].filter((id) =>
+    id !== me.data?.id && !existingIds.includes(id) && friends.some((friend) => friend.id === id),
+  );
+  const validSelection = me.isSuccess && selection.length > 0 && selection.length <= maxAllowed &&
+    (mode !== "add_members" || Boolean(conversationId));
 
   function toggle(id: string) {
-    if (existingMemberIds.includes(id)) return;
+    if (submitting.current || id === me.data?.id || existingIds.includes(id)) return;
     setError(null);
-    setSelectedIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id);
-      }
-      if (prev.length >= maxAllowed) {
-        setError(`You can only add up to ${maxAllowed} friends.`);
-        return prev;
-      }
-      return [...prev, id];
-    });
+    if (selection.includes(id)) setSelectedIds(selection.filter((item) => item !== id));
+    else if (selection.length < maxAllowed) setSelectedIds([...selection, id]);
+    else setError(`You can only add up to ${maxAllowed} friends.`);
   }
 
-  const isSubmitting =
-    createDirect.isPending || createGroup.isPending || addMembers.isPending;
+  const isSubmitting = createGroup.isPending || addMembers.isPending;
 
   async function handleSubmit() {
-    if (selectedIds.length === 0 || isSubmitting) return;
+    if (!validSelection || submitting.current) return;
+    submitting.current = true;
     setError(null);
-
     try {
-      if (mode === "create") {
-        if (selectedIds.length === 1) {
-          const result = await createDirect.mutateAsync({
-            recipient_id: selectedIds[0],
-          });
-          onOpenChange(false);
-          setSelectedIds([]);
-          navigate(`/app/messages/${result.id}`);
-        } else {
-          const result = await createGroup.mutateAsync({
-            recipient_ids: selectedIds,
-          });
-          onOpenChange(false);
-          setSelectedIds([]);
-          navigate(`/app/messages/${result.id}`);
-        }
-      } else if (mode === "add_to_dm") {
-        // Creating a new Group DM with existing DM participant + new friends
-        const allRecipientIds = Array.from(
-          new Set([...existingMemberIds, ...selectedIds]),
-        );
-        const result = await createGroup.mutateAsync({
-          recipient_ids: allRecipientIds,
-        });
-        onOpenChange(false);
-        setSelectedIds([]);
+      if (mode === "add_members") {
+        await addMembers.mutateAsync(selection);
+      } else {
+        // A new group has its own ID and history; the original DM stays intact.
+        const recipientIds = mode === "add_to_dm" ? [...new Set([...existingIds, ...selection])] : selection;
+        const result = await createGroup.mutateAsync({ recipient_ids: recipientIds });
         navigate(`/app/messages/${result.id}`);
-      } else if (mode === "add_members") {
-        if (!conversationId) return;
-        await addMembers.mutateAsync(selectedIds);
-        onOpenChange(false);
-        setSelectedIds([]);
       }
+      setSelectedIds([]); setSearch(""); onOpenChange(false); onCreated?.();
     } catch (err) {
       setError(apiErrorMessage(err));
+    } finally {
+      submitting.current = false;
     }
   }
 
-  const title =
-    mode === "add_members"
-      ? "Add Friends to Group"
-      : mode === "add_to_dm"
-        ? "Create Group DM"
-        : "Select Friends";
+  const title = mode === "add_members" ? "Add Friends to Group" : "Create Group DM";
 
   return (
     <Dialog.Root
       open={open}
       onOpenChange={(next) => {
-        if (!isSubmitting) {
+        if (!submitting.current) {
           if (!next) {
             setSelectedIds([]);
             setError(null);
@@ -158,8 +126,9 @@ export function CreateGroupDmDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content
-          className="dialog-content group-dm-dialog"
+        <ModalContent
+          className="group-dm-dialog"
+          onOpenAutoFocus={(event) => { event.preventDefault(); searchInput.current?.focus(); }}
           aria-describedby="group-dm-dialog-description"
         >
           <div className="group-dm-dialog-header">
@@ -167,19 +136,19 @@ export function CreateGroupDmDialog({
               <Dialog.Title className="group-dm-dialog-title">
                 {title}
               </Dialog.Title>
-              <p
+              <Dialog.Description
                 id="group-dm-dialog-description"
                 className="group-dm-dialog-subtitle"
               >
                 {maxAllowed > 0
                   ? `You can select up to ${maxAllowed} more friends.`
                   : "Group is full (maximum 10 participants)."}
-              </p>
+              </Dialog.Description>
             </div>
             <Dialog.Close asChild>
               <button
                 type="button"
-                className="icon-button dialog-close"
+                className="icon-button"
                 disabled={isSubmitting}
                 aria-label="Close"
               >
@@ -191,17 +160,19 @@ export function CreateGroupDmDialog({
           <div className="group-dm-search-wrap">
             <Search size={16} aria-hidden="true" />
             <input
+              ref={searchInput}
+              aria-label="Search friends"
               type="text"
               className="group-dm-search-input"
               placeholder="Search friends"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               disabled={isSubmitting}
-              autoFocus
             />
           </div>
 
-          <div className="group-dm-friends-list">
+          {friendsQuery.error && <ApiNotice error={friendsQuery.error} onRetry={() => void friendsQuery.refetch()} />}
+          <div className="group-dm-friends-list" aria-label="Friends to select" aria-busy={isSubmitting}>
             {friendsQuery.isPending && (
               <div className="group-dm-loading">
                 <Loader2 className="animate-spin" size={20} />
@@ -221,8 +192,8 @@ export function CreateGroupDmDialog({
             )}
 
             {filteredFriends.map((friend) => {
-              const isExisting = existingMemberIds.includes(friend.id);
-              const isSelected = isExisting || selectedIds.includes(friend.id);
+              const isExisting = existingIds.includes(friend.id);
+              const isSelected = isExisting || selection.includes(friend.id);
 
               return (
                 <button
@@ -261,6 +232,7 @@ export function CreateGroupDmDialog({
                 </button>
               );
             })}
+            {friendsQuery.hasNextPage && <Button variant="ghost" disabled={friendsQuery.isFetchingNextPage || isSubmitting} onClick={() => void friendsQuery.fetchNextPage()}>Load more friends</Button>}
           </div>
 
           {error && (
@@ -271,11 +243,11 @@ export function CreateGroupDmDialog({
 
           <div className="group-dm-footer">
             <span className="group-dm-counter">
-              Selected: {selectedIds.length}/{maxAllowed}
+              Selected: {selection.length}/{maxAllowed}
             </span>
             <Button
               type="button"
-              disabled={selectedIds.length === 0 || isSubmitting}
+              disabled={!validSelection || isSubmitting}
               onClick={handleSubmit}
             >
               {isSubmitting ? (
@@ -283,8 +255,6 @@ export function CreateGroupDmDialog({
                   <Loader2 className="animate-spin mr-2" size={16} />
                   <span>Processing…</span>
                 </>
-              ) : mode === "create" && selectedIds.length === 1 ? (
-                "Create DM"
               ) : mode === "add_members" ? (
                 "Add Members"
               ) : (
@@ -292,7 +262,7 @@ export function CreateGroupDmDialog({
               )}
             </Button>
           </div>
-        </Dialog.Content>
+        </ModalContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

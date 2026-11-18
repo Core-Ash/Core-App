@@ -21,13 +21,9 @@ export function GroupMemberList({
   const isOwner = currentUserRole === "owner";
   const removeMember = useRemoveConversationMember(conversationId);
 
-  async function handleRemove(memberId: string, name: string) {
-    if (!window.confirm(`Remove ${name} from this group conversation?`)) return;
-    try {
-      await removeMember.mutateAsync(memberId);
-    } catch (err) {
-      alert(apiErrorMessage(err));
-    }
+  function handleRemove(memberId: string, name: string) {
+    if (removeMember.isPending || !window.confirm(`Remove ${name} from this group conversation?`)) return;
+    removeMember.mutate(memberId);
   }
 
   // Sort: owner first, then alphabetically
@@ -91,6 +87,7 @@ export function GroupMemberList({
                         member.profile.display_name,
                       )
                     }
+                    disabled={removeMember.isPending}
                     title={`Remove ${member.profile.display_name}`}
                     aria-label={`Remove ${member.profile.display_name}`}
                   >
@@ -102,6 +99,7 @@ export function GroupMemberList({
           );
         })}
       </ul>
+      {removeMember.error && <p role="alert" className="p-3 text-xs text-destructive">{apiErrorMessage(removeMember.error)}</p>}
     </div>
   );
 }

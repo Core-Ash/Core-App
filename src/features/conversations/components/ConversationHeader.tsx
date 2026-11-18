@@ -70,15 +70,9 @@ export function ConversationHeader({
     }
   }
 
-  async function handleLeave() {
-    if (!window.confirm("Are you sure you want to leave this group conversation?"))
-      return;
-    try {
-      await leaveConv.mutateAsync(conversation.id);
-      navigate("/app/messages");
-    } catch (err) {
-      alert(apiErrorMessage(err));
-    }
+  function handleLeave() {
+    if (leaveConv.isPending || !window.confirm("Are you sure you want to leave this group conversation?")) return;
+    leaveConv.mutate(conversation.id, { onSuccess: () => navigate("/app/messages") });
   }
 
   return (
@@ -192,6 +186,7 @@ export function ConversationHeader({
               variant="ghost"
               size="sm"
               className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              aria-label={isDirect ? "Add Friends to DM" : "Add Members"}
               onClick={() => setAddFriendsOpen(true)}
             >
               <UserPlus size={16} aria-hidden="true" />
@@ -219,7 +214,7 @@ export function ConversationHeader({
           )}
 
           {/* Search messages */}
-          <div className="chat-search">
+          <label className="conversation-search">
             <Search size={14} aria-hidden="true" />
             <input
               type="search"
@@ -228,7 +223,7 @@ export function ConversationHeader({
               onChange={(e) => onSearch(e.target.value)}
               aria-label="Search conversation messages"
             />
-          </div>
+          </label>
 
           {/* Leave group */}
           {!isDirect && (
@@ -238,6 +233,7 @@ export function ConversationHeader({
                 className="icon-button text-destructive hover:bg-destructive/10"
                 onClick={() => void handleLeave()}
                 aria-label="Leave group conversation"
+                disabled={leaveConv.isPending}
               >
                 <LogOut size={17} aria-hidden="true" />
               </button>
@@ -245,6 +241,7 @@ export function ConversationHeader({
           )}
         </div>
       </header>
+      {leaveConv.error && <p role="alert" className="p-3 text-sm text-destructive">{apiErrorMessage(leaveConv.error)}</p>}
 
       {/* Add Friends Dialog */}
       <CreateGroupDmDialog

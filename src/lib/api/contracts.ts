@@ -250,11 +250,13 @@ export function parseConversationSummary(value: unknown): ConversationSummary {
   };
 }
 
-export function parseConversationDetail(value: unknown): ConversationDetail {
+export function parseConversationDetail(value: unknown, directOpen = false): ConversationDetail {
   const data = record(value);
   const type = string(data.type);
   if (type !== "direct" && type !== "group") throw new ApiError("invalid_response");
-  const role = string(data.role);
+  // Rust's direct-open response omits role; both participants are members.
+  // Keep GET/group contracts strict and never infer group ownership.
+  const role = string(directOpen && type === "direct" && data.role === undefined ? "member" : data.role);
   if (role !== "owner" && role !== "member") throw new ApiError("invalid_response");
   if (!Array.isArray(data.members)) throw new ApiError("invalid_response");
 

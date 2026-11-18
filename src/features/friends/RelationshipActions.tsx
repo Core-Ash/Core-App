@@ -1,16 +1,14 @@
-import { MessageSquare } from "lucide-react";
-import { useInRouterContext, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
-import { useCreateDirectConversation } from "@/features/conversations/api";
-import { useFriendAction, useRelationship } from "@/features/friends/api";
+import { useFriendAction, useRelationship, type FriendAction } from "@/features/friends/api";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { fullUsername } from "@/lib/display-name";
 import type { PublicProfile } from "@/lib/api/types";
 
-export function RelationshipActions({ profile }: { profile: PublicProfile }) {
-  const inRouter = useInRouterContext();
+export function RelationshipActions({ profile, menu = false, onComplete }: { profile: PublicProfile; menu?: boolean; onComplete?: () => void }) {
   const relationship = useRelationship(profile.id);
   const mutation = useFriendAction();
+
+  function act(input: FriendAction) { mutation.mutate(input, { onSuccess: onComplete }); }
 
   if (relationship.isPending)
     return (
@@ -23,6 +21,7 @@ export function RelationshipActions({ profile }: { profile: PublicProfile }) {
       <div>
         <p role="alert">{apiErrorMessage(relationship.error)}</p>
         <Button
+            role={menu ? "menuitem" : undefined}
           variant="ghost"
           size="sm"
           onClick={() => void relationship.refetch()}
@@ -38,12 +37,13 @@ export function RelationshipActions({ profile }: { profile: PublicProfile }) {
 
   return (
     <div className="space-y-2" aria-busy={mutation.isPending}>
-      <div className="flex flex-wrap gap-2">
+      <div className={menu ? "dm-user-menu-relationships" : "flex flex-wrap gap-2"}>
         {state === "none" && tag && (
           <Button
+            role={menu ? "menuitem" : undefined}
             size="sm"
             disabled={mutation.isPending}
-            onClick={() => mutation.mutate({ action: "send", username: tag })}
+            onClick={() => act({ action: "send", username: tag })}
           >
             Add Friend
           </Button>
@@ -51,20 +51,22 @@ export function RelationshipActions({ profile }: { profile: PublicProfile }) {
         {state === "incoming" && request_id && (
           <>
             <Button
+            role={menu ? "menuitem" : undefined}
               size="sm"
               disabled={mutation.isPending}
               onClick={() =>
-                mutation.mutate({ action: "accept", id: request_id })
+                act({ action: "accept", id: request_id })
               }
             >
               Accept
             </Button>
             <Button
+            role={menu ? "menuitem" : undefined}
               size="sm"
               variant="outline"
               disabled={mutation.isPending}
               onClick={() =>
-                mutation.mutate({ action: "decline", id: request_id })
+                act({ action: "decline", id: request_id })
               }
             >
               Decline
@@ -73,11 +75,12 @@ export function RelationshipActions({ profile }: { profile: PublicProfile }) {
         )}
         {state === "outgoing" && request_id && (
           <Button
+            role={menu ? "menuitem" : undefined}
             size="sm"
             variant="outline"
             disabled={mutation.isPending}
             onClick={() =>
-              mutation.mutate({ action: "cancel", id: request_id })
+              act({ action: "cancel", id: request_id })
             }
           >
             Cancel Request
@@ -85,17 +88,14 @@ export function RelationshipActions({ profile }: { profile: PublicProfile }) {
         )}
         {state === "friends" && (
           <>
-            {inRouter ? (
-              <MessageButtonWithRouter profileId={profile.id} />
-            ) : (
-              <MessageButtonNoRouter profileId={profile.id} />
-            )}
             <Button
+            role={menu ? "menuitem" : undefined}
+              data-destructive={menu ? "true" : undefined}
               size="sm"
               variant="outline"
               disabled={mutation.isPending}
               onClick={() =>
-                mutation.mutate({ action: "remove", id: profile.id })
+                act({ action: "remove", id: profile.id })
               }
             >
               Remove Friend
@@ -103,11 +103,13 @@ export function RelationshipActions({ profile }: { profile: PublicProfile }) {
           </>
         )}
         <Button
+            role={menu ? "menuitem" : undefined}
+          data-destructive={menu && state !== "blocked" ? "true" : undefined}
           size="sm"
           variant="ghost"
           disabled={mutation.isPending}
           onClick={() =>
-            mutation.mutate({
+            act({
               action: state === "blocked" ? "unblock" : "block",
               id: profile.id,
             })
@@ -127,45 +129,5 @@ export function RelationshipActions({ profile }: { profile: PublicProfile }) {
         </p>
       )}
     </div>
-  );
-}
-
-function MessageButtonWithRouter({ profileId }: { profileId: string }) {
-  const navigate = useNavigate();
-  const createDirect = useCreateDirectConversation();
-
-  async function handleMessage() {
-    try {
-      const conv = await createDirect.mutateAsync({ recipient_id: profileId });
-      navigate(`/app/messages/${conv.id}`);
-    } catch (err) {
-      alert(apiErrorMessage(err));
-    }
-  }
-
-  return (
-    <Button
-      size="sm"
-      disabled={createDirect.isPending}
-      onClick={() => void handleMessage()}
-    >
-      <MessageSquare size={14} className="mr-1.5" />
-      Message
-    </Button>
-  );
-}
-
-function MessageButtonNoRouter({ profileId }: { profileId: string }) {
-  const createDirect = useCreateDirectConversation();
-
-  return (
-    <Button
-      size="sm"
-      disabled={createDirect.isPending}
-      onClick={() => void createDirect.mutateAsync({ recipient_id: profileId })}
-    >
-      <MessageSquare size={14} className="mr-1.5" />
-      Message
-    </Button>
   );
 }

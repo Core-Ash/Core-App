@@ -134,6 +134,7 @@ describe("CreateGroupDmDialog", () => {
   function setupDialog() {
     const fetcher = vi.fn(async (url: string) => {
       const path = new URL(url).pathname;
+      if (path === "/bootstrap") return Response.json({ profile: profileFixture, communities: { items: [] } });
       if (path === "/friends") {
         return Response.json({
           items: [userB, userC],
@@ -179,16 +180,16 @@ describe("CreateGroupDmDialog", () => {
 
     expect(await screen.findByText("Dragon Slayer")).toBeInTheDocument();
     expect(screen.getByText("Player One")).toBeInTheDocument();
-    expect(screen.getByText("Selected: 0/9")).toBeInTheDocument();
+    expect(screen.getByText("Selected: 0/8")).toBeInTheDocument();
 
     // Select Dragon
     fireEvent.click(screen.getByText("Dragon Slayer"));
-    expect(screen.getByText("Selected: 1/9")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create DM" })).toBeEnabled();
+    expect(screen.getByText("Selected: 1/8")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Group DM" })).toBeEnabled();
 
     // Select Player (now 2, button switches to Group DM)
     fireEvent.click(screen.getByText("Player One"));
-    expect(screen.getByText("Selected: 2/9")).toBeInTheDocument();
+    expect(screen.getByText("Selected: 2/8")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Create Group DM" }),
     ).toBeEnabled();
