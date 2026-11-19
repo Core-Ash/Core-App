@@ -22,6 +22,7 @@ export type ServerSettingsSection =
 
 export interface ServerSettingsPermissions {
   owner: boolean;
+  administrator?: boolean;
   manage_community: boolean;
   manage_roles: boolean;
   manage_members: boolean;
@@ -79,6 +80,17 @@ export interface ServerRoleData {
   position: number;
   permissions: string[];
   member_count: number;
+  hoist?: boolean;
+  mentionable?: boolean;
+  is_default?: boolean;
+}
+
+export interface RoleMemberData {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+  custom_status: string | null;
 }
 
 export interface ServerBanData {

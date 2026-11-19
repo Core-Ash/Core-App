@@ -216,30 +216,30 @@ describe("ServerSettingsLayout", () => {
     expect(await screen.findByText("Only the server owner can permanently delete this server.")).toBeInTheDocument();
   });
 
-  it("allows owner to delete server after entering exact server name confirmation", async () => {
+  it("allows assigning and removing member roles via Discord-style quick role popover", async () => {
     const { apiMock } = renderSettings({ isOwner: true });
 
-    // Navigate to Delete Server
-    fireEvent.click(screen.getByRole("link", { name: "Delete Server" }));
-    expect(await screen.findByText("Delete Server Permanently")).toBeInTheDocument();
+    // Navigate to Members
+    fireEvent.click(screen.getByRole("link", { name: "Members" }));
+    expect(await screen.findByText("Scout User")).toBeInTheDocument();
 
-    const deleteBtn = screen.getByRole("button", { name: "Delete Server Permanently" });
-    expect(deleteBtn).toBeDisabled();
+    // Click quick role assign "+" button for Scout User
+    const assignBtn = screen.getByRole("button", { name: "Assign roles to Scout User" });
+    fireEvent.click(assignBtn);
 
-    // Enter incorrect name
-    const input = screen.getByPlaceholderText(mockCommunity.name);
-    fireEvent.change(input, { target: { value: "wrong name" } });
-    expect(deleteBtn).toBeDisabled();
+    // Popover opens with search and roles list
+    expect(await screen.findByPlaceholderText("Search roles")).toBeInTheDocument();
+    expect(screen.getByText("Admin")).toBeInTheDocument();
 
-    // Enter exact name
-    fireEvent.change(input, { target: { value: mockCommunity.name } });
-    expect(deleteBtn).not.toBeDisabled();
+    // Toggle Admin role
+    const adminCheckbox = screen.getByRole("menuitemcheckbox", { name: /Admin/i });
+    expect(adminCheckbox).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(adminCheckbox);
 
-    fireEvent.click(deleteBtn);
     await waitFor(() => {
-      expect(apiMock.delete).toHaveBeenCalledWith(
-        `/communities/${mockCommunity.id}`,
-        { confirm_name: mockCommunity.name }
+      expect(apiMock.post).toHaveBeenCalledWith(
+        `/communities/${mockCommunity.id}/roles/r1/members/u2`,
+        {}
       );
     });
   });

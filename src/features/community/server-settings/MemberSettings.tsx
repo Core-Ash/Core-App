@@ -1,16 +1,15 @@
 import { useState } from "react";
-import { Users, Search, UserX, Ban } from "lucide-react";
+import { Users, Search, UserX, Ban, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { useAppData } from "@/app/app-data-context";
 import { useQuery } from "@tanstack/react-query";
 import {
-  useServerRoles,
-  useUpdateMemberRoles,
   useKickMember,
   useBanMember,
 } from "./api";
+import { MemberRoleSelector } from "./MemberRoleSelector";
 import type { ServerMember } from "@/lib/api/types";
 import type { ServerSettingsData } from "./types";
 
@@ -25,10 +24,7 @@ export function MemberSettings({
   const [search, setSearch] = useState("");
   const [banReason, setBanReason] = useState("");
   const [banningUser, setBanningUser] = useState<ServerMember | null>(null);
-  const [editingRoleUser, setEditingRoleUser] = useState<ServerMember | null>(null);
 
-  const rolesQuery = useServerRoles(settings.id);
-  const updateMemberRoles = useUpdateMemberRoles(settings.id);
   const kickMember = useKickMember(settings.id);
   const banMember = useBanMember(settings.id);
 
@@ -43,7 +39,6 @@ export function MemberSettings({
   });
 
   const members = membersQuery.data?.items ?? [];
-  const serverRoles = rolesQuery.data?.items ?? [];
 
   const handleKick = (member: ServerMember) => {
     if (window.confirm(`Are you sure you want to kick ${member.display_name}?`)) {
@@ -111,6 +106,12 @@ export function MemberSettings({
                 ? joined.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                 : "—";
 
+              // Filter out @everyone from display
+              const visibleRoles = (member.roles ?? []).filter(
+                (r) => r.name !== "@everyone"
+              );
+              const assignedRoleIds = visibleRoles.map((r) => r.id);
+
               return (
                 <tr key={member.id} className="hover:bg-surface-hover/50 transition-colors">
                   {/* Member Name & Avatar */}
@@ -141,13 +142,13 @@ export function MemberSettings({
                     </div>
                   </td>
 
-                  {/* Roles badges */}
+                  {/* Roles badges + Discord-style Quick Role Selector */}
                   <td className="py-3 px-4">
-                    <div className="flex flex-wrap items-center gap-1">
-                      {member.roles?.map((r) => (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {visibleRoles.map((r) => (
                         <span
                           key={r.id}
-                          className="px-2 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1"
+                          className="px-2 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1.5"
                           style={{
                             borderColor: `${r.color || "#99aab5"}60`,
                             backgroundColor: `${r.color || "#99aab5"}15`,
@@ -161,18 +162,28 @@ export function MemberSettings({
                           {r.name}
                         </span>
                       ))}
-                      {(!member.roles || member.roles.length === 0) && (
+                      {visibleRoles.length === 0 && (
                         <span className="text-xs text-muted-foreground">No roles</span>
                       )}
-                      {canManage && !isOwner && (
-                        <button
-                          type="button"
-                          className="size-5 rounded-full border border-dashed border-border hover:border-primary text-muted-foreground hover:text-primary flex items-center justify-center text-xs"
-                          title="Assign roles"
-                          onClick={() => setEditingRoleUser(member)}
-                        >
-                          +
-                        </button>
+                      {canManage && (
+                        <MemberRoleSelector
+                          communityId={settings.id}
+                          targetUserId={member.id}
+                          targetUserName={member.display_name}
+                          assignedRoleIds={assignedRoleIds}
+                          canManage={canManage}
+                          isTargetOwner={isOwner}
+                          trigger={
+                            <button
+                              type="button"
+                              aria-label={`Assign roles to ${member.display_name}`}
+                              className="size-5 rounded-full border border-dashed border-border/80 hover:border-primary text-muted-foreground hover:text-primary flex items-center justify-center text-xs transition-colors"
+                              title="Assign roles"
+                            >
+                              <Plus className="size-3" />
+                            </button>
+                          }
+                        />
                       )}
                     </div>
                   </td>
@@ -226,62 +237,6 @@ export function MemberSettings({
           </tbody>
         </table>
       </div>
-
-      {/* Role Assignment Modal */}
-      {editingRoleUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-popover border border-border rounded-xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
-            <div className="font-bold text-foreground">
-              Manage Roles for {editingRoleUser.display_name}
-            </div>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {serverRoles.map((role) => {
-                const hasRole = editingRoleUser.roles?.some((r) => r.id === role.id);
-                return (
-                  <label
-                    key={role.id}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-surface-hover cursor-pointer text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={hasRole}
-                      onChange={(e) => {
-                        const currentRoleIds = editingRoleUser.roles?.map((r) => r.id) ?? [];
-                        const nextIds = e.target.checked
-                          ? [...currentRoleIds, role.id]
-                          : currentRoleIds.filter((id) => id !== role.id);
-
-                        updateMemberRoles.mutate(
-                          { userId: editingRoleUser.id, roleIds: nextIds },
-                          {
-                            onSuccess: () => {
-                              setEditingRoleUser({
-                                ...editingRoleUser,
-                                roles: serverRoles.filter((r) => nextIds.includes(r.id)),
-                              });
-                            },
-                          }
-                        );
-                      }}
-                      className="rounded border-border"
-                    />
-                    <span
-                      className="size-2.5 rounded-full"
-                      style={{ backgroundColor: role.color || "#99aab5" }}
-                    />
-                    <span>{role.name}</span>
-                  </label>
-                );
-              })}
-            </div>
-            <div className="flex justify-end pt-2 border-t border-border">
-              <Button type="button" onClick={() => setEditingRoleUser(null)}>
-                Done
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Ban Dialog */}
       {banningUser && (

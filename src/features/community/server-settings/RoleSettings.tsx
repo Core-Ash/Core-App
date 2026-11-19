@@ -1,29 +1,95 @@
-import { useState } from "react";
-import { Shield, Plus, Trash2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import {
+  Plus,
+  Pencil,
+  MoreHorizontal,
+  Trash2,
+  Copy,
+  Users,
+  Search,
+  ChevronRight,
+  ArrowLeft,
+  Check,
+  AlertTriangle,
+  GripVertical,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import * as Dialog from "@radix-ui/react-dialog";
 import {
   useServerRoles,
   useCreateServerRole,
   useUpdateServerRole,
   useDeleteServerRole,
+  useReorderServerRoles,
+  useRoleMembers,
+  useAddRoleMember,
+  useRemoveRoleMember,
 } from "./api";
+import { useQuery } from "@tanstack/react-query";
+import { useAppData } from "@/app/app-data-context";
+import type { ServerMember } from "@/lib/api/types";
 import type { ServerRoleData, ServerSettingsData } from "./types";
+import { cn } from "@/lib/utils";
 
-const ALL_PERMISSIONS = [
-  { key: "channels.view", label: "View Channels", category: "General", desc: "Allows members to view channels by default." },
-  { key: "channels.manage", label: "Manage Channels", category: "General", desc: "Allows members to create, edit, and delete channels." },
-  { key: "community.manage", label: "Manage Server", category: "General", desc: "Allows members to change server settings and name." },
-  { key: "roles.manage", label: "Manage Roles", category: "General", desc: "Allows members to create, modify, and assign roles." },
-  { key: "emojis.manage", label: "Manage Emojis & Stickers", category: "General", desc: "Allows members to add, edit, or remove custom expression media." },
-  { key: "audit.view", label: "View Audit Log", category: "General", desc: "Allows members to view the audit log of administrative actions." },
-  { key: "invites.create", label: "Create Invites", category: "Membership", desc: "Allows members to create invite links for other users." },
-  { key: "invites.manage", label: "Manage Invites", category: "Membership", desc: "Allows members to view and revoke server invitations." },
-  { key: "members.manage", label: "Kick Members", category: "Membership", desc: "Allows members to remove members from the server." },
-  { key: "bans.manage", label: "Ban Members", category: "Membership", desc: "Allows members to ban and unban members." },
-  { key: "messages.send", label: "Send Messages", category: "Text", desc: "Allows members to send messages in text channels." },
-  { key: "messages.moderate", label: "Manage Messages", category: "Text", desc: "Allows members to delete messages sent by other members." },
+const DISCORD_PALETTE = [
+  "#1abc9c", "#2ecc71", "#3498db", "#9b59b6", "#e91e63", "#f1c40f",
+  "#e67e22", "#e74c3c", "#95a5a6", "#607d8b", "#11806a", "#1f8b4c",
+  "#206694", "#71368a", "#ad1457", "#c27c0e", "#a84300", "#992d22",
+];
+
+interface PermissionDef {
+  key: string;
+  label: string;
+  desc: string;
+  dangerous?: boolean;
+}
+
+interface PermissionGroupDef {
+  category: string;
+  permissions: PermissionDef[];
+}
+
+const PERMISSION_GROUPS: PermissionGroupDef[] = [
+  {
+    category: "General Server Permissions",
+    permissions: [
+      { key: "channels.view", label: "View Channels", desc: "Allows members to view channels by default (excluding private channels)." },
+      { key: "channels.manage", label: "Manage Channels", desc: "Allows members to create, edit, or delete channels and categories." },
+      { key: "roles.manage", label: "Manage Roles", desc: "Allows members to create new roles and edit or delete roles below their highest role." },
+      { key: "emojis.manage", label: "Manage Expressions", desc: "Allows members to add or delete custom emojis, stickers, and soundboard sounds." },
+      { key: "audit.view", label: "View Audit Log", desc: "Allows members to view the audit log of administrative actions taken on the server." },
+      { key: "community.manage", label: "Manage Server", desc: "Allows members to change the server's name, description, and settings." },
+    ],
+  },
+  {
+    category: "Membership Permissions",
+    permissions: [
+      { key: "invites.create", label: "Create Invites", desc: "Allows members to create instant invite links to this server." },
+      { key: "invites.manage", label: "Manage Invites", desc: "Allows members to view and revoke existing server invites." },
+      { key: "members.manage", label: "Kick Members", desc: "Allows members to remove other members below their highest role from the server." },
+      { key: "bans.manage", label: "Ban Members", desc: "Allows members to ban other members below their highest role from the server." },
+    ],
+  },
+  {
+    category: "Text Channel Permissions",
+    permissions: [
+      { key: "messages.send", label: "Send Messages", desc: "Allows members to send messages in text channels." },
+      { key: "messages.moderate", label: "Manage Messages", desc: "Allows members to delete messages sent by other members or pin messages." },
+    ],
+  },
+  {
+    category: "Advanced Permissions",
+    permissions: [
+      {
+        key: "administrator",
+        label: "Administrator",
+        desc: "Members with this permission have access to all server permissions and can bypass channel-specific permission restrictions (including viewing private channels). Granting this permission is dangerous.",
+        dangerous: true,
+      },
+    ],
+  },
 ];
 
 export function RoleSettings({
@@ -33,237 +99,1014 @@ export function RoleSettings({
   settings: ServerSettingsData;
   canManage: boolean;
 }) {
-  const roles = useServerRoles(settings.id);
+  const rolesQuery = useServerRoles(settings.id);
   const createRole = useCreateServerRole(settings.id);
-  const updateRole = useUpdateServerRole(settings.id);
-  const deleteRole = useDeleteServerRole(settings.id);
+  const reorderRoles = useReorderServerRoles(settings.id);
 
-  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
-  const [roleName, setRoleName] = useState("");
-  const [roleColor, setRoleColor] = useState("#99aab5");
-  const [rolePosition, setRolePosition] = useState(0);
-  const [rolePerms, setRolePerms] = useState<string[]>([]);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newRoleName, setNewRoleName] = useState("");
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [contextMenuRoleId, setContextMenuRoleId] = useState<string | null>(null);
+  const [deleteConfirmRole, setDeleteConfirmRole] = useState<ServerRoleData | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
-  const items = roles.data?.items ?? [];
-  const selectedRole = items.find((r) => r.id === selectedRoleId) ?? items[0];
+  // Drag and drop state
+  const [draggedRoleId, setDraggedRoleId] = useState<string | null>(null);
+  const [dragOverRoleId, setDragOverRoleId] = useState<string | null>(null);
 
-  const handleSelect = (role: ServerRoleData) => {
-    setSelectedRoleId(role.id);
-    setRoleName(role.name);
-    setRoleColor(role.color ?? "#99aab5");
-    setRolePosition(role.position);
-    setRolePerms(role.permissions ?? []);
-  };
+  const items = rolesQuery.data?.items ?? [];
+  const defaultRole = items.find((r) => r.is_default || r.name === "@everyone");
+  const customRoles = items.filter((r) => !r.is_default && r.name !== "@everyone");
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newRoleName.trim()) return;
-    createRole.mutate(
-      { name: newRoleName.trim(), color: "#99aab5", position: items.length },
-      {
-        onSuccess: (newRole: unknown) => {
-          setNewRoleName("");
-          setShowCreate(false);
-          const r = newRole as { id?: string } | undefined;
-          if (r?.id) setSelectedRoleId(r.id);
-        },
+  const filteredRoles = useMemo(() => {
+    if (!search.trim()) return customRoles;
+    const lower = search.toLowerCase();
+    return customRoles.filter((r) => r.name.toLowerCase().includes(lower));
+  }, [customRoles, search]);
+
+  const handleCreateRole = async () => {
+    try {
+      const highestPos = customRoles.reduce((max, r) => Math.max(max, r.position), 0);
+      const res = await createRole.mutateAsync({
+        name: "new role",
+        color: "#99aab5",
+        position: highestPos + 1,
+        permissions: ["channels.view", "messages.send"],
+      });
+      const created = res as { id: string };
+      if (created?.id) {
+        setEditingRoleId(created.id);
       }
-    );
+    } catch {
+      // handled
+    }
   };
 
-  const handleSaveRole = () => {
-    if (!selectedRole) return;
-    updateRole.mutate({
-      roleId: selectedRole.id,
-      name: roleName.trim() || selectedRole.name,
-      color: roleColor,
-      position: rolePosition,
-      permissions: rolePerms,
-    });
+  const handleDragEnd = async () => {
+    if (!draggedRoleId || !dragOverRoleId || draggedRoleId === dragOverRoleId) {
+      setDraggedRoleId(null);
+      setDragOverRoleId(null);
+      return;
+    }
+
+    const currentOrder = [...customRoles];
+    const sourceIdx = currentOrder.findIndex((r) => r.id === draggedRoleId);
+    const targetIdx = currentOrder.findIndex((r) => r.id === dragOverRoleId);
+
+    if (sourceIdx !== -1 && targetIdx !== -1) {
+      const [moving] = currentOrder.splice(sourceIdx, 1);
+      if (moving) {
+        currentOrder.splice(targetIdx, 0, moving);
+        const orderIds = currentOrder.map((r) => r.id);
+        void reorderRoles.mutateAsync(orderIds);
+      }
+    }
+
+    setDraggedRoleId(null);
+    setDragOverRoleId(null);
   };
+
+  // If editing a role, render the 3-column Discord Role Editor
+  if (editingRoleId) {
+    const roleToEdit = items.find((r) => r.id === editingRoleId) ?? defaultRole;
+    if (roleToEdit) {
+      return (
+        <RoleEditorView
+          communityId={settings.id}
+          roles={items}
+          selectedRole={roleToEdit}
+          canManage={canManage}
+          onSelectRole={(r) => setEditingRoleId(r.id)}
+          onBack={() => setEditingRoleId(null)}
+          onCreateRole={handleCreateRole}
+        />
+      );
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Shield className="size-5 text-primary" /> Roles
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Use roles to group server members and assign permissions.
-          </p>
+      <div>
+        <h2 className="text-2xl font-bold text-foreground">Roles</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Use roles to organize your server members and customize their permissions.
+        </p>
+      </div>
+
+      {/* Default Permissions Panel (@everyone) */}
+      {defaultRole && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setEditingRoleId(defaultRole.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setEditingRoleId(defaultRole.id);
+            }
+          }}
+          className="flex items-center justify-between p-4 rounded-xl border border-border/80 bg-card/60 hover:bg-surface-hover transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-full bg-muted/60 flex items-center justify-center text-muted-foreground">
+              <Users size={20} />
+            </div>
+            <div>
+              <div className="font-semibold text-foreground">Default Permissions</div>
+              <div className="text-xs text-muted-foreground">
+                @everyone • applies to all members of the server
+              </div>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground" />
+        </div>
+      )}
+
+      {/* Search and Create Role */}
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search roles"
+            className="pl-9 h-10 bg-background"
+          />
         </div>
         {canManage && (
           <Button
             type="button"
-            size="sm"
-            onClick={() => setShowCreate(true)}
+            onClick={handleCreateRole}
+            disabled={createRole.isPending}
+            className="gap-2"
           >
-            <Plus className="size-4 mr-1.5" /> Create Role
+            <Plus size={16} /> Create Role
           </Button>
         )}
       </div>
 
-      {showCreate && (
-        <form onSubmit={handleCreate} className="p-4 rounded-lg border border-border bg-card space-y-3">
-          <div className="text-sm font-semibold text-foreground">Create New Role</div>
-          <div className="flex items-center gap-2 max-w-md">
-            <Input
-              placeholder="e.g. Moderator"
-              maxLength={64}
-              value={newRoleName}
-              onChange={(e) => setNewRoleName(e.target.value)}
-            />
-            <Button type="submit" disabled={createRole.isPending}>
-              Create
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
+      <div className="text-xs text-muted-foreground leading-relaxed">
+        Members use the color of the highest role they have on this list. Drag roles to reorder their hierarchy.
+      </div>
 
-      {/* Two column roles interface */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left column: Role list */}
-        <div className="space-y-1.5">
-          <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-2 pb-1">
-            Roles ({items.length})
-          </div>
-          {items.map((role) => {
-            const isSelected = selectedRole?.id === role.id;
-            return (
-              <button
+      {/* Roles List Table */}
+      <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <span>Roles — {customRoles.length}</span>
+          <span>Members</span>
+        </div>
+
+        <div className="divide-y divide-border/60">
+          {filteredRoles.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              {search.trim() ? "No roles match your search." : "No custom roles created yet."}
+            </div>
+          ) : (
+            filteredRoles.map((role) => (
+              <div
                 key={role.id}
-                type="button"
-                onClick={() => handleSelect(role)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors text-left ${
-                  isSelected
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-surface-hover text-foreground"
-                }`}
+                draggable={canManage}
+                onDragStart={() => setDraggedRoleId(role.id)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (canManage && draggedRoleId !== role.id) {
+                    setDragOverRoleId(role.id);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverRoleId === role.id) setDragOverRoleId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  void handleDragEnd();
+                }}
+                className={cn(
+                  "flex items-center justify-between px-4 py-3 hover:bg-surface-hover/60 transition-colors group relative",
+                  dragOverRoleId === role.id && "border-t-2 border-primary bg-primary/5",
+                  draggedRoleId === role.id && "opacity-40",
+                )}
               >
-                <div className="flex items-center gap-2 truncate">
+                <div className="flex items-center gap-3 min-w-0">
+                  {canManage && (
+                    <GripVertical
+                      size={16}
+                      className="text-muted-foreground/40 group-hover:text-muted-foreground cursor-grab shrink-0"
+                    />
+                  )}
                   <span
                     className="size-3 rounded-full shrink-0"
                     style={{ backgroundColor: role.color || "#99aab5" }}
                   />
-                  <span className="truncate">{role.name}</span>
+                  <span className="font-medium text-foreground truncate">{role.name}</span>
                 </div>
-                <span className={`text-xs ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-                  {role.member_count}
-                </span>
+
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span>{role.member_count}</span>
+                    <Users size={14} />
+                  </span>
+
+                  {canManage && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingRoleId(role.id)}
+                        className="size-8 p-0"
+                        title="Edit Role"
+                      >
+                        <Pencil size={15} />
+                      </Button>
+
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setContextMenuRoleId(contextMenuRoleId === role.id ? null : role.id)
+                          }
+                          className="size-8 p-0"
+                          title="More Actions"
+                        >
+                          <MoreHorizontal size={15} />
+                        </Button>
+
+                        {contextMenuRoleId === role.id && (
+                          <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-border bg-popover shadow-xl z-50 py-1 text-sm animate-in fade-in zoom-in-95">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContextMenuRoleId(null);
+                                setEditingRoleId(role.id);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-accent text-left"
+                            >
+                              <Pencil size={14} /> Edit Role
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContextMenuRoleId(null);
+                                void navigator.clipboard.writeText(role.id);
+                                setCopyFeedback(role.id);
+                                setTimeout(() => setCopyFeedback(null), 2000);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-accent text-left"
+                            >
+                              <Copy size={14} />
+                              {copyFeedback === role.id ? "Copied!" : "Copy Role ID"}
+                            </button>
+                            <div className="my-1 border-t border-border" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContextMenuRoleId(null);
+                                setDeleteConfirmRole(role);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-destructive hover:bg-destructive/10 text-left"
+                            >
+                              <Trash2 size={14} /> Delete Role
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Delete Role Confirmation Dialog */}
+      {deleteConfirmRole && (
+        <DeleteRoleDialog
+          communityId={settings.id}
+          role={deleteConfirmRole}
+          open={Boolean(deleteConfirmRole)}
+          onOpenChange={(open) => {
+            if (!open) setDeleteConfirmRole(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Discord-Style Role Editor (Three-Column Layout: Navigation | Roles | Editor)
+// ---------------------------------------------------------------------------
+
+function RoleEditorView({
+  communityId,
+  roles,
+  selectedRole,
+  canManage,
+  onSelectRole,
+  onBack,
+  onCreateRole,
+}: {
+  communityId: string;
+  roles: ServerRoleData[];
+  selectedRole: ServerRoleData;
+  canManage: boolean;
+  onSelectRole: (role: ServerRoleData) => void;
+  onBack: () => void;
+  onCreateRole: () => void;
+}) {
+  const updateRole = useUpdateServerRole(communityId);
+
+  const [activeTab, setActiveTab] = useState<"display" | "permissions" | "links" | "members">("display");
+
+  // Draft changes
+  const [draftName, setDraftName] = useState(selectedRole.name);
+  const [draftColor, setDraftColor] = useState(selectedRole.color || "#99aab5");
+  const [draftHoist, setDraftHoist] = useState(Boolean(selectedRole.hoist));
+  const [draftMentionable, setDraftMentionable] = useState(Boolean(selectedRole.mentionable));
+  const [draftPerms, setDraftPerms] = useState<string[]>(selectedRole.permissions || []);
+  const [permSearch, setPermSearch] = useState("");
+  const [adminConfirmOpen, setAdminConfirmOpen] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Sync draft when selectedRole changes
+  const handleRoleSwitch = (target: ServerRoleData) => {
+    if (target.id === selectedRole.id) return;
+    onSelectRole(target);
+    setDraftName(target.name);
+    setDraftColor(target.color || "#99aab5");
+    setDraftHoist(Boolean(target.hoist));
+    setDraftMentionable(Boolean(target.mentionable));
+    setDraftPerms(target.permissions || []);
+    setHasChanges(false);
+  };
+
+  const markDirty = () => setHasChanges(true);
+
+  const handleReset = () => {
+    setDraftName(selectedRole.name);
+    setDraftColor(selectedRole.color || "#99aab5");
+    setDraftHoist(Boolean(selectedRole.hoist));
+    setDraftMentionable(Boolean(selectedRole.mentionable));
+    setDraftPerms(selectedRole.permissions || []);
+    setHasChanges(false);
+  };
+
+  const handleSave = async () => {
+    try {
+      await updateRole.mutateAsync({
+        roleId: selectedRole.id,
+        name: selectedRole.is_default ? undefined : draftName.trim(),
+        color: selectedRole.is_default ? null : draftColor,
+        hoist: draftHoist,
+        mentionable: draftMentionable,
+        permissions: draftPerms,
+      });
+      setHasChanges(false);
+    } catch {
+      // error handled
+    }
+  };
+
+  const isDefaultRole = Boolean(selectedRole.is_default || selectedRole.name === "@everyone");
+
+  return (
+    <div className="flex h-full min-h-[600px] border border-border rounded-xl overflow-hidden bg-background">
+      {/* Middle Column: Role List Sidebar */}
+      <div className="w-60 border-r border-border bg-card/30 flex flex-col shrink-0">
+        <div className="p-3 border-b border-border flex items-center justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="gap-1.5 text-xs font-semibold"
+          >
+            <ArrowLeft size={14} /> Back
+          </Button>
+          {canManage && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onCreateRole}
+              className="size-8 p-0"
+              title="Create Role"
+            >
+              <Plus size={16} />
+            </Button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {roles.map((r) => {
+            const isSelected = r.id === selectedRole.id;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => handleRoleSwitch(r)}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left font-medium transition-colors",
+                  isSelected
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+                )}
+              >
+                <span
+                  className="size-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: r.color || "#99aab5" }}
+                />
+                <span className="truncate flex-1">{r.name}</span>
               </button>
             );
           })}
         </div>
+      </div>
 
-        {/* Right column: Role Editor */}
-        {selectedRole ? (
-          <div className="md:col-span-2 space-y-5 p-5 rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="font-bold text-foreground">
-                Edit Role: {selectedRole.name}
-              </div>
-              {canManage && selectedRole.name !== "Member" && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:bg-destructive/10"
-                  onClick={() => deleteRole.mutate(selectedRole.id)}
-                >
-                  <Trash2 className="size-4 mr-1.5" /> Delete Role
-                </Button>
-              )}
-            </div>
+      {/* Right Column: Selected Role Editor */}
+      <div className="flex-1 flex flex-col min-w-0 bg-background relative overflow-y-auto">
+        <header className="p-6 pb-0 border-b border-border bg-card/10">
+          <h2 className="text-xl font-bold text-foreground">
+            Edit Role — {selectedRole.name}
+          </h2>
 
-            {/* Role Name & Color */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Role Name
+          <div className="flex items-center gap-6 mt-4 border-b border-transparent">
+            {(["display", "permissions", "links", "members"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "pb-3 text-sm font-semibold capitalize transition-colors relative",
+                  activeTab === tab
+                    ? "text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {tab === "display" && "Display"}
+                {tab === "permissions" && "Permissions"}
+                {tab === "links" && "Links"}
+                {tab === "members" && `Manage Members (${selectedRole.member_count})`}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <div className="p-6 space-y-6 flex-1 pb-24">
+          {/* TAB 1: DISPLAY */}
+          {activeTab === "display" && (
+            <div className="space-y-6 max-w-xl">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                  Role Name {isDefaultRole && "(Fixed for @everyone)"}
                 </label>
                 <Input
-                  disabled={!canManage}
-                  value={roleName || selectedRole.name}
+                  disabled={!canManage || isDefaultRole}
+                  value={draftName}
                   maxLength={64}
-                  onChange={(e) => setRoleName(e.target.value)}
+                  onChange={(e) => {
+                    setDraftName(e.target.value);
+                    markDirty();
+                  }}
+                  className="h-10 bg-background"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Role Color
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
+              {/* Role Color Picker */}
+              {!isDefaultRole && (
+                <div className="space-y-3">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                    Role Color
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Members use the color of the highest role they have on this list.
+                  </p>
+
+                  <div className="grid grid-cols-9 gap-2">
+                    {DISCORD_PALETTE.map((hex) => {
+                      const selected = draftColor.toLowerCase() === hex.toLowerCase();
+                      return (
+                        <button
+                          key={hex}
+                          type="button"
+                          onClick={() => {
+                            setDraftColor(hex);
+                            markDirty();
+                          }}
+                          className={cn(
+                            "size-8 rounded-md flex items-center justify-center transition-transform hover:scale-105",
+                            selected && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
+                          )}
+                          style={{ backgroundColor: hex }}
+                          title={hex}
+                        >
+                          {selected && <Check size={16} className="text-white drop-shadow" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <input
+                      type="color"
+                      disabled={!canManage}
+                      value={draftColor}
+                      onChange={(e) => {
+                        setDraftColor(e.target.value);
+                        markDirty();
+                      }}
+                      className="size-9 rounded-md border border-border cursor-pointer bg-transparent"
+                    />
+                    <Input
+                      disabled={!canManage}
+                      value={draftColor}
+                      maxLength={7}
+                      onChange={(e) => {
+                        setDraftColor(e.target.value);
+                        markDirty();
+                      }}
+                      className="w-28 font-mono text-xs uppercase bg-background"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDraftColor("#99aab5");
+                        markDirty();
+                      }}
+                    >
+                      Default
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Live Chat Preview */}
+              <div className="space-y-2 pt-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                  Role Preview
+                </span>
+                <div className="p-4 rounded-xl border border-border/80 bg-card/60 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="size-10 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center">
+                      U
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm" style={{ color: draftColor }}>
+                          Username
+                        </span>
+                        <span className="text-[10px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded font-bold uppercase">
+                          {draftName || selectedRole.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">Today at 12:00 PM</span>
+                      </div>
+                      <p className="text-sm text-foreground/90 mt-0.5">
+                        Here is what chat messages will look like with this role color applied!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Display Options */}
+              <div className="space-y-4 pt-4 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">
+                      Display role members separately from online members
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Hoist this role into its own header section in the server members list.
+                    </div>
+                  </div>
+                  <Switch
                     disabled={!canManage}
-                    value={roleColor}
-                    onChange={(e) => setRoleColor(e.target.value)}
-                    className="size-10 rounded border border-border cursor-pointer bg-transparent"
+                    checked={draftHoist}
+                    onCheckedChange={(checked) => {
+                      setDraftHoist(checked);
+                      markDirty();
+                    }}
                   />
-                  <span className="text-xs font-mono text-muted-foreground">{roleColor}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">
+                      Allow anyone to @mention this role
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Members can ping everyone with this role in chat messages.
+                    </div>
+                  </div>
+                  <Switch
+                    disabled={!canManage}
+                    checked={draftMentionable}
+                    onCheckedChange={(checked) => {
+                      setDraftMentionable(checked);
+                      markDirty();
+                    }}
+                  />
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Permission Matrix Toggles */}
-            <div className="space-y-3 pt-3 border-t border-border">
-              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Permissions
+          {/* TAB 2: PERMISSIONS */}
+          {activeTab === "permissions" && (
+            <div className="space-y-6 max-w-2xl">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={permSearch}
+                  onChange={(e) => setPermSearch(e.target.value)}
+                  placeholder="Search permissions"
+                  className="pl-9 h-10 bg-background"
+                />
               </div>
-              <div className="space-y-3">
-                {ALL_PERMISSIONS.map((perm) => {
-                  const hasPerm = rolePerms.includes(perm.key);
+
+              <div className="space-y-6">
+                {PERMISSION_GROUPS.map((group) => {
+                  const filtered = group.permissions.filter((p) => {
+                    if (!permSearch.trim()) return true;
+                    const q = permSearch.toLowerCase();
+                    return p.label.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q);
+                  });
+
+                  if (filtered.length === 0) return null;
+
                   return (
-                    <div
-                      key={perm.key}
-                      className="flex items-start justify-between p-2.5 rounded-lg border border-border/50 bg-background/50"
-                    >
-                      <div className="pr-4">
-                        <div className="text-sm font-medium text-foreground">{perm.label}</div>
-                        <div className="text-xs text-muted-foreground">{perm.desc}</div>
+                    <div key={group.category} className="space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        {group.category}
+                      </h3>
+
+                      <div className="rounded-xl border border-border divide-y divide-border/60 bg-card/30">
+                        {filtered.map((perm) => {
+                          const enabled = draftPerms.includes(perm.key);
+                          return (
+                            <div
+                              key={perm.key}
+                              className={cn(
+                                "flex items-start justify-between p-4 transition-colors",
+                                perm.dangerous && "bg-destructive/5",
+                              )}
+                            >
+                              <div className="pr-4 min-w-0">
+                                <div className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                  {perm.label}
+                                  {perm.dangerous && (
+                                    <AlertTriangle size={14} className="text-destructive" />
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                                  {perm.desc}
+                                </div>
+                              </div>
+                              <Switch
+                                disabled={!canManage}
+                                checked={enabled}
+                                onCheckedChange={(checked) => {
+                                  if (perm.dangerous && checked) {
+                                    setAdminConfirmOpen(true);
+                                  } else {
+                                    if (checked) {
+                                      setDraftPerms([...draftPerms, perm.key]);
+                                    } else {
+                                      setDraftPerms(draftPerms.filter((k) => k !== perm.key));
+                                    }
+                                    markDirty();
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
-                      <Switch
-                        disabled={!canManage}
-                        checked={hasPerm}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setRolePerms([...rolePerms, perm.key]);
-                          } else {
-                            setRolePerms(rolePerms.filter((p) => p !== perm.key));
-                          }
-                        }}
-                      />
                     </div>
                   );
                 })}
               </div>
             </div>
+          )}
 
-            {canManage && (
-              <div className="pt-3 border-t border-border flex justify-end">
-                <Button
-                  type="button"
-                  disabled={updateRole.isPending}
-                  onClick={handleSaveRole}
-                >
-                  Save Role Changes
-                </Button>
+          {/* TAB 3: LINKS */}
+          {activeTab === "links" && (
+            <div className="max-w-xl space-y-4 text-sm text-muted-foreground">
+              <p>
+                Role links allow third-party bots and apps to associate verified external accounts with this role.
+              </p>
+              <div className="p-4 rounded-xl border border-border bg-card/30 text-xs">
+                No external verification applications are linked to this server yet.
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="md:col-span-2 py-12 text-center text-sm text-muted-foreground">
-            Select a role to configure permissions.
+            </div>
+          )}
+
+          {/* TAB 4: MANAGE MEMBERS */}
+          {activeTab === "members" && (
+            <RoleMembersManager
+              communityId={communityId}
+              role={selectedRole}
+              canManage={canManage}
+            />
+          )}
+        </div>
+
+        {/* Unsaved Changes Floating Bar */}
+        {hasChanges && (
+          <div className="sticky bottom-4 left-6 right-6 mx-6 p-3 rounded-xl border border-border bg-popover/95 backdrop-blur-md shadow-2xl flex items-center justify-between z-40 animate-in slide-in-from-bottom-2">
+            <span className="text-sm font-medium text-foreground">
+              Careful — you have unsaved changes!
+            </span>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
+                Reset
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={updateRole.isPending}
+              >
+                {updateRole.isPending ? "Saving…" : "Save Changes"}
+              </Button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Dangerous Administrator Confirmation Dialog */}
+      <Dialog.Root open={adminConfirmOpen} onOpenChange={setAdminConfirmOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="dialog-overlay" />
+          <Dialog.Content className="standard-dialog max-w-md w-full bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border space-y-4">
+            <div className="flex items-center gap-3 text-destructive font-bold text-lg">
+              <AlertTriangle className="size-6 shrink-0" />
+              <span>Enable Administrator Permission?</span>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Members with this permission will have access to <strong>all server permissions</strong> and will be able to <strong>bypass all channel-specific restrictions</strong> (including viewing every private channel and category).
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setAdminConfirmOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  setDraftPerms((prev) => [...prev, "administrator"]);
+                  markDirty();
+                  setAdminConfirmOpen(false);
+                }}
+              >
+                Confirm & Enable
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Role Members Manager Sub-Component
+// ---------------------------------------------------------------------------
+
+function RoleMembersManager({
+  communityId,
+  role,
+  canManage,
+}: {
+  communityId: string;
+  role: ServerRoleData;
+  canManage: boolean;
+}) {
+  const { api, ready } = useAppData();
+  const roleMembers = useRoleMembers(communityId, role.id);
+  const addRoleMember = useAddRoleMember(communityId);
+  const removeRoleMember = useRemoveRoleMember(communityId);
+
+  const [memberSearch, setMemberSearch] = useState("");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  const communityMembersQuery = useQuery<{ items: ServerMember[]; total: number }>({
+    queryKey: ["members", communityId],
+    queryFn: ({ signal }) =>
+      api.get(`/communities/${communityId}/members`, { signal }),
+    enabled: ready && Boolean(communityId),
+  });
+
+  const assignedMembers = useMemo(() => roleMembers.data ?? [], [roleMembers.data]);
+  const allMembers = useMemo(() => communityMembersQuery.data?.items ?? [], [communityMembersQuery.data?.items]);
+
+  const filteredAssigned = useMemo(() => {
+    if (!memberSearch.trim()) return assignedMembers;
+    const q = memberSearch.toLowerCase();
+    return assignedMembers.filter(
+      (m: import("./types").RoleMemberData) =>
+        m.username.toLowerCase().includes(q) ||
+        m.display_name.toLowerCase().includes(q),
+    );
+  }, [assignedMembers, memberSearch]);
+
+  const candidatesToAdd = useMemo(() => {
+    const assignedIds = new Set(assignedMembers.map((m: import("./types").RoleMemberData) => m.id));
+    return allMembers.filter((m: ServerMember) => !assignedIds.has(m.id));
+  }, [allMembers, assignedMembers]);
+
+  return (
+    <div className="space-y-4 max-w-xl">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+            placeholder="Search members"
+            className="pl-9 h-10 bg-background"
+          />
+        </div>
+        {canManage && (
+          <Button
+            type="button"
+            onClick={() => setAddDialogOpen(true)}
+            size="sm"
+            className="gap-1.5"
+          >
+            <Plus size={15} /> Add Members
+          </Button>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border divide-y divide-border/60 bg-card/30">
+        {filteredAssigned.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            No members are currently assigned to this role.
+          </div>
+        ) : (
+          filteredAssigned.map((member) => (
+            <div
+              key={member.id}
+              className="flex items-center justify-between p-3 px-4 hover:bg-surface-hover/50 transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="size-8 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center text-xs overflow-hidden">
+                  {member.avatar_url ? (
+                    <img
+                      src={member.avatar_url}
+                      alt={member.display_name}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    member.display_name.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-medium text-sm text-foreground truncate">
+                    {member.display_name}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    @{member.username}
+                  </div>
+                </div>
+              </div>
+
+              {canManage && !role.is_default && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    removeRoleMember.mutate({ roleId: role.id, userId: member.id })
+                  }
+                  className="size-8 p-0 text-muted-foreground hover:text-destructive"
+                  title="Remove from role"
+                >
+                  <Trash2 size={15} />
+                </Button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Add Member Modal */}
+      <Dialog.Root open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="dialog-overlay" />
+          <Dialog.Content className="standard-dialog max-w-md w-full bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border space-y-4">
+            <Dialog.Title className="text-lg font-bold text-foreground">
+              Add Members to {role.name}
+            </Dialog.Title>
+            <div className="max-h-60 overflow-y-auto divide-y divide-border/60 border border-border rounded-lg">
+              {candidatesToAdd.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  All community members already have this role.
+                </div>
+              ) : (
+                candidatesToAdd.map((cand) => (
+                  <div
+                    key={cand.id}
+                    className="flex items-center justify-between p-2.5 px-3 hover:bg-surface-hover"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-foreground truncate">
+                        {cand.display_name}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        @{cand.username}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        addRoleMember.mutate({ roleId: role.id, userId: cand.id });
+                      }}
+                      disabled={addRoleMember.isPending}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button type="button" variant="ghost" onClick={() => setAddDialogOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Delete Role Dialog
+// ---------------------------------------------------------------------------
+
+function DeleteRoleDialog({
+  communityId,
+  role,
+  open,
+  onOpenChange,
+}: {
+  communityId: string;
+  role: ServerRoleData;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const deleteRole = useDeleteServerRole(communityId);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    try {
+      setError(null);
+      await deleteRole.mutateAsync(role.id);
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete role");
+    }
+  };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="dialog-overlay" />
+        <Dialog.Content className="standard-dialog max-w-sm w-full bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border space-y-4">
+          <Dialog.Title className="text-lg font-bold text-foreground">
+            Delete Role
+          </Dialog.Title>
+          <Dialog.Description className="text-sm text-muted-foreground leading-relaxed">
+            Are you sure you want to delete <strong className="text-foreground">{role.name}</strong>? This will remove the role from all {role.member_count} assigned members. This action cannot be undone.
+          </Dialog.Description>
+          {error && <p className="text-xs text-destructive font-medium">{error}</p>}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              disabled={deleteRole.isPending}
+            >
+              {deleteRole.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

@@ -8,6 +8,7 @@ import type {
   ServerOnboardingData,
   ServerRoleData,
   ServerSettingsData,
+  ServerSettingsPermissions,
   ServerSoundData,
   ServerStickerData,
   ServerTemplateData,
@@ -16,6 +17,7 @@ import type {
 
 export const serverSettingsKeys = {
   settings: (communityId: string) => ["server-settings", communityId] as const,
+  permissions: (communityId: string) => ["server-permissions", communityId] as const,
   roles: (communityId: string) => ["server-roles", communityId] as const,
   bans: (communityId: string) => ["server-bans", communityId] as const,
   auditLogs: (communityId: string, filter?: string) =>
@@ -29,6 +31,17 @@ export const serverSettingsKeys = {
   tagPreference: (communityId: string) =>
     ["server-tag-preference", communityId] as const,
 };
+
+export function useServerPermissions(communityId?: string) {
+  const { api, ready } = useAppData();
+  return useQuery<ServerSettingsPermissions>({
+    queryKey: communityId ? serverSettingsKeys.permissions(communityId) : ["server-permissions"],
+    queryFn: ({ signal }) =>
+      api.get(`/communities/${communityId}/permissions`, { signal }),
+    enabled: ready && Boolean(communityId),
+    staleTime: 30_000,
+  });
+}
 
 export function useServerSettings(communityId: string) {
   const { api, ready } = useAppData();
@@ -90,6 +103,8 @@ export function useCreateServerRole(communityId: string) {
       color?: string;
       position?: number;
       permissions?: string[];
+      hoist?: boolean;
+      mentionable?: boolean;
     }) => api.post(`/communities/${communityId}/roles`, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -112,6 +127,8 @@ export function useUpdateServerRole(communityId: string) {
       color?: string | null;
       position?: number;
       permissions?: string[];
+      hoist?: boolean;
+      mentionable?: boolean;
     }) => api.patch(`/communities/${communityId}/roles/${roleId}`, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -130,6 +147,74 @@ export function useDeleteServerRole(communityId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: serverSettingsKeys.roles(communityId),
+      });
+    },
+  });
+}
+
+export function useReorderServerRoles(communityId: string) {
+  const { api } = useAppData();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (order: string[]) =>
+      api.post(`/communities/${communityId}/roles/reorder`, { order }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: serverSettingsKeys.roles(communityId),
+      });
+    },
+  });
+}
+
+export function useRoleMembers(communityId?: string, roleId?: string) {
+  const { api, ready } = useAppData();
+  return useQuery({
+    queryKey: ["community", communityId, "roles", roleId, "members"],
+    queryFn: async () => {
+      const res = await api.get<{ items: import("./types").RoleMemberData[] }>(
+        `/communities/${communityId}/roles/${roleId}/members`,
+      );
+      return res.items ?? [];
+    },
+    enabled: ready && Boolean(communityId && roleId),
+  });
+}
+
+export function useAddRoleMember(communityId: string) {
+  const { api } = useAppData();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) =>
+      api.post(`/communities/${communityId}/roles/${roleId}/members/${userId}`, {}),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["community", communityId, "roles", variables.roleId, "members"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: serverSettingsKeys.roles(communityId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["members", communityId],
+      });
+    },
+  });
+}
+
+export function useRemoveRoleMember(communityId: string) {
+  const { api } = useAppData();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) =>
+      api.delete(`/communities/${communityId}/roles/${roleId}/members/${userId}`),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["community", communityId, "roles", variables.roleId, "members"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: serverSettingsKeys.roles(communityId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["members", communityId],
       });
     },
   });
