@@ -186,7 +186,70 @@ export function useAddRoleMember(communityId: string) {
   return useMutation({
     mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) =>
       api.post(`/communities/${communityId}/roles/${roleId}/members/${userId}`, {}),
-    onSuccess: (_data, variables) => {
+    onMutate: async ({ roleId, userId }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["members", communityId] });
+      await queryClient.cancelQueries({ queryKey: serverSettingsKeys.roles(communityId) });
+
+      // Snapshot previous values
+      const previousMembersQueries = queryClient.getQueriesData<{ items: import("@/lib/api/types").ServerMember[]; total: number }>({
+        queryKey: ["members", communityId],
+      });
+      const previousRoles = queryClient.getQueryData<{ items: import("./types").ServerRoleData[] }>(
+        serverSettingsKeys.roles(communityId)
+      );
+
+      // Find role info for badge
+      const role = previousRoles?.items?.find((r) => r.id === roleId);
+
+      // Optimistically update all matching members queries
+      queryClient.setQueriesData<{ items: import("@/lib/api/types").ServerMember[]; total: number }>(
+        { queryKey: ["members", communityId] },
+        (old) => {
+          if (!old?.items) return old;
+          return {
+            ...old,
+            items: old.items.map((m) => {
+              if (m.id !== userId) return m;
+              if (m.roles?.some((r) => r.id === roleId)) return m;
+              const newRole = role
+                ? { id: role.id, name: role.name, color: role.color, position: role.position }
+                : { id: roleId, name: "Role", color: null, position: 0 };
+              const nextRoles = [...(m.roles ?? []), newRole].sort((a, b) => b.position - a.position);
+              return { ...m, roles: nextRoles };
+            }),
+          };
+        }
+      );
+
+      // Optimistically update role member_count
+      queryClient.setQueryData<{ items: import("./types").ServerRoleData[] }>(
+        serverSettingsKeys.roles(communityId),
+        (old) => {
+          if (!old?.items) return old;
+          return {
+            ...old,
+            items: old.items.map((r) =>
+              r.id === roleId ? { ...r, member_count: r.member_count + 1 } : r
+            ),
+          };
+        }
+      );
+
+      return { previousMembersQueries, previousRoles };
+    },
+    onError: (_err, _vars, context) => {
+      // Rollback on failure
+      if (context?.previousMembersQueries) {
+        for (const [key, data] of context.previousMembersQueries) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+      if (context?.previousRoles) {
+        queryClient.setQueryData(serverSettingsKeys.roles(communityId), context.previousRoles);
+      }
+    },
+    onSettled: (_data, _error, variables) => {
       void queryClient.invalidateQueries({
         queryKey: ["community", communityId, "roles", variables.roleId, "members"],
       });
@@ -206,7 +269,65 @@ export function useRemoveRoleMember(communityId: string) {
   return useMutation({
     mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) =>
       api.delete(`/communities/${communityId}/roles/${roleId}/members/${userId}`),
-    onSuccess: (_data, variables) => {
+    onMutate: async ({ roleId, userId }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["members", communityId] });
+      await queryClient.cancelQueries({ queryKey: serverSettingsKeys.roles(communityId) });
+
+      // Snapshot previous values
+      const previousMembersQueries = queryClient.getQueriesData<{ items: import("@/lib/api/types").ServerMember[]; total: number }>({
+        queryKey: ["members", communityId],
+      });
+      const previousRoles = queryClient.getQueryData<{ items: import("./types").ServerRoleData[] }>(
+        serverSettingsKeys.roles(communityId)
+      );
+
+      // Optimistically update all matching members queries
+      queryClient.setQueriesData<{ items: import("@/lib/api/types").ServerMember[]; total: number }>(
+        { queryKey: ["members", communityId] },
+        (old) => {
+          if (!old?.items) return old;
+          return {
+            ...old,
+            items: old.items.map((m) => {
+              if (m.id !== userId) return m;
+              return {
+                ...m,
+                roles: (m.roles ?? []).filter((r) => r.id !== roleId),
+              };
+            }),
+          };
+        }
+      );
+
+      // Optimistically update role member_count
+      queryClient.setQueryData<{ items: import("./types").ServerRoleData[] }>(
+        serverSettingsKeys.roles(communityId),
+        (old) => {
+          if (!old?.items) return old;
+          return {
+            ...old,
+            items: old.items.map((r) =>
+              r.id === roleId ? { ...r, member_count: Math.max(0, r.member_count - 1) } : r
+            ),
+          };
+        }
+      );
+
+      return { previousMembersQueries, previousRoles };
+    },
+    onError: (_err, _vars, context) => {
+      // Rollback on failure
+      if (context?.previousMembersQueries) {
+        for (const [key, data] of context.previousMembersQueries) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+      if (context?.previousRoles) {
+        queryClient.setQueryData(serverSettingsKeys.roles(communityId), context.previousRoles);
+      }
+    },
+    onSettled: (_data, _error, variables) => {
       void queryClient.invalidateQueries({
         queryKey: ["community", communityId, "roles", variables.roleId, "members"],
       });

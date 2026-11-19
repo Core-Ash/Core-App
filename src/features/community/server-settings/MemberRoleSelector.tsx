@@ -22,7 +22,6 @@ export function MemberRoleSelector({
   targetUserId,
   assignedRoleIds,
   canManage,
-  isTargetOwner = false,
   trigger,
   align = "start",
   side = "bottom",
@@ -31,6 +30,18 @@ export function MemberRoleSelector({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const [optimisticOverrides, setOptimisticOverrides] = useState<Record<string, boolean>>({});
+
+  // Compute effective assigned roles by merging assignedRoleIds with active optimistic overrides
+  const effectiveAssignedIds = useMemo(() => {
+    const set = new Set(assignedRoleIds);
+    for (const [roleId, isAdded] of Object.entries(optimisticOverrides)) {
+      if (isAdded) set.add(roleId);
+      else set.delete(roleId);
+    }
+    return Array.from(set);
+  }, [assignedRoleIds, optimisticOverrides]);
 
   const rolesQuery = useServerRoles(communityId);
   const addRoleMember = useAddRoleMember(communityId);
@@ -52,23 +63,40 @@ export function MemberRoleSelector({
     return assignableRoles.filter((r) => r.name.toLowerCase().includes(q));
   }, [assignableRoles, search]);
 
-  const handleToggleRole = async (roleId: string, currentChecked: boolean) => {
+  const handleToggleRole = (roleId: string, currentChecked: boolean) => {
     setActionError(null);
-    try {
-      if (currentChecked) {
-        await removeRoleMember.mutateAsync({ roleId, userId: targetUserId });
-        onRoleToggled?.(roleId, false);
-      } else {
-        await addRoleMember.mutateAsync({ roleId, userId: targetUserId });
-        onRoleToggled?.(roleId, true);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to update role";
-      setActionError(msg);
-    }
-  };
 
-  const isPending = addRoleMember.isPending || removeRoleMember.isPending;
+    // Optimistically toggle immediately
+    const nextChecked = !currentChecked;
+    setOptimisticOverrides((prev) => ({ ...prev, [roleId]: nextChecked }));
+
+    const promise = currentChecked
+      ? removeRoleMember.mutateAsync({ roleId, userId: targetUserId })
+      : addRoleMember.mutateAsync({ roleId, userId: targetUserId });
+
+    promise
+      .then(() => {
+        onRoleToggled?.(roleId, nextChecked);
+      })
+      .catch((err: unknown) => {
+        // Rollback on rejection and show error
+        setOptimisticOverrides((prev) => {
+          const next = { ...prev };
+          delete next[roleId];
+          return next;
+        });
+        const msg = err instanceof Error ? err.message : "Failed to update role";
+        setActionError(msg);
+      })
+      .finally(() => {
+        // Clear optimistic override once background mutation settles
+        setOptimisticOverrides((prev) => {
+          const next = { ...prev };
+          delete next[roleId];
+          return next;
+        });
+      });
+  };
 
   return (
     <Popover.Root open={open} onOpenChange={(val) => {
@@ -114,8 +142,8 @@ export function MemberRoleSelector({
           {/* Roles List */}
           <div className="max-h-56 overflow-y-auto space-y-0.5 custom-scrollbar pr-0.5" role="menu">
             {filteredRoles.map((role) => {
-              const isAssigned = assignedRoleIds.includes(role.id);
-              const isDisabled = !canManage || isTargetOwner;
+              const isAssigned = effectiveAssignedIds.includes(role.id);
+              const isDisabled = !canManage;
 
               return (
                 <button
@@ -123,14 +151,14 @@ export function MemberRoleSelector({
                   type="button"
                   role="menuitemcheckbox"
                   aria-checked={isAssigned}
-                  disabled={isDisabled || isPending}
+                  disabled={isDisabled}
                   onClick={() => handleToggleRole(role.id, isAssigned)}
                   className={cn(
-                    "w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors group",
+                    "w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors group cursor-pointer",
                     isAssigned
                       ? "bg-surface-hover/80 text-foreground"
                       : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
-                    isDisabled && "opacity-50 cursor-not-allowed"
+                    isDisabled && "opacity-50 cursor-not-allowed pointer-events-none"
                   )}
                 >
                   <div className="flex items-center gap-2 min-w-0 pr-2">
