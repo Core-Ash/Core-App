@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactElement, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Link2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Hash, Link2, Volume2, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import {
   useCreateChannel,
   useCreateCommunity,
 } from "@/features/community/api/hooks";
+import { useCategories } from "@/features/community/categories/api";
 import { communityHref } from "@/features/community/api/use-community-selection";
 import { inviteDestination } from "@/features/invites/invite-link";
 import { apiErrorMessage } from "@/lib/api/errors";
@@ -292,33 +293,227 @@ export function CreateCommunityDialog({
 }
 export function CreateChannelDialog({
   communityId,
+  defaultCategoryId,
+  defaultKind = "text",
   children,
-  open,
+  open: controlledOpen,
   onOpenChange,
   returnFocusRef,
 }: {
   communityId: string;
+  defaultCategoryId?: string;
+  defaultKind?: "text" | "voice";
   children?: ReactElement;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   returnFocusRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const mutation = useCreateChannel(communityId);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const categoriesQuery = useCategories(open ? communityId : undefined);
+  const categories = categoriesQuery.data?.items ?? [];
   const navigate = useNavigate();
+  const setOpen = (value: boolean) => {
+    setInternalOpen(value);
+    onOpenChange?.(value);
+    if (!value) {
+      setName("");
+      setValidation("");
+      setKind(defaultKind);
+      setSelectedCategory(defaultCategoryId ?? "");
+    }
+  };
+
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<"text" | "voice">(defaultKind);
+  const [selectedCategory, setSelectedCategory] = useState<string>(defaultCategoryId ?? "");
+  const [validation, setValidation] = useState("");
+  const submitting = useRef(false);
+
+  useEffect(() => {
+    if (defaultCategoryId) setSelectedCategory(defaultCategoryId);
+  }, [defaultCategoryId]);
+
+  useEffect(() => {
+    if (defaultKind) setKind(defaultKind);
+  }, [defaultKind]);
+
   return (
-    <CreateDialog
-      kind="channel"
+    <Dialog.Root
       open={open}
-      onOpenChange={onOpenChange}
-      returnFocusRef={returnFocusRef}
-      pending={mutation.isPending}
-      error={mutation.error}
-      create={async (name) => {
-        const channel = await mutation.mutateAsync(name);
-        navigate(communityHref(communityId, channel.id));
+      onOpenChange={(value) => {
+        if (!mutation.isPending) setOpen(value);
       }}
     >
-      {children}
-    </CreateDialog>
+      {children && <Dialog.Trigger asChild>{children}</Dialog.Trigger>}
+      <Dialog.Portal>
+        <Dialog.Overlay className="dialog-overlay" />
+        <Dialog.Content
+          className="standard-dialog create-resource-dialog"
+          onCloseAutoFocus={(event) => {
+            if (returnFocusRef?.current) {
+              event.preventDefault();
+              returnFocusRef.current.focus();
+            }
+          }}
+        >
+          <Dialog.Title className="text-xl font-semibold">
+            Create a channel
+          </Dialog.Title>
+          <Dialog.Description className="mt-2 text-sm text-muted-foreground">
+            Configure your new channel. Choose between text or voice, and select its category.
+          </Dialog.Description>
+
+          <form
+            aria-label="Create a channel"
+            className="mt-5 space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (mutation.isPending || submitting.current) return;
+              const value = name.trim();
+              if (!value || Array.from(value).length > 100 || value.includes("\0")) {
+                setValidation("Enter a name with 1–100 characters.");
+                return;
+              }
+              setValidation("");
+              submitting.current = true;
+              const payload = selectedCategory || kind !== "text"
+                ? { name: value, category_id: selectedCategory || null, kind }
+                : value;
+              void mutation
+                .mutateAsync(payload)
+                .then((channel) => {
+                  setName("");
+                  setOpen(false);
+                  navigate(communityHref(communityId, channel.id));
+                })
+                .catch(() => {})
+                .finally(() => {
+                  submitting.current = false;
+                });
+            }}
+          >
+            {/* Channel Type Choice */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Channel Type
+              </label>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Channel type">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={kind === "text"}
+                  className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-colors ${
+                    kind === "text"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border hover:bg-surface-hover text-muted-foreground"
+                  }`}
+                  onClick={() => setKind("text")}
+                >
+                  <Hash className="size-5 shrink-0" />
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Text</div>
+                    <div className="text-[11px] text-muted-foreground">Post messages, links, emojis</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={kind === "voice"}
+                  className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-colors ${
+                    kind === "voice"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border hover:bg-surface-hover text-muted-foreground"
+                  }`}
+                  onClick={() => setKind("voice")}
+                >
+                  <Volume2 className="size-5 shrink-0" />
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Voice</div>
+                    <div className="text-[11px] text-muted-foreground">Hang out and chat in voice</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Channel Name */}
+            <div>
+              <label htmlFor="create-channel-name" className="block text-sm">
+                Name
+              </label>
+              <Input
+                id="create-channel-name"
+                value={name}
+                maxLength={100}
+                required
+                disabled={mutation.isPending}
+                aria-invalid={Boolean(validation)}
+                aria-describedby={
+                  validation || mutation.error ? "create-channel-error" : undefined
+                }
+                onChange={(event) => {
+                  setName(event.target.value);
+                  setValidation("");
+                }}
+                placeholder={kind === "voice" ? "General Voice" : "new-channel"}
+              />
+            </div>
+
+            {/* Category Selection */}
+            {categories.length > 0 && (
+              <div>
+                <label
+                  htmlFor="create-channel-category"
+                  className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1"
+                >
+                  Category
+                </label>
+                <select
+                  id="create-channel-category"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  disabled={mutation.isPending}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">(None / Uncategorized)</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {Boolean(validation || mutation.error) && (
+              <p id="create-channel-error" role="alert" className="text-sm text-destructive">
+                {validation || apiErrorMessage(mutation.error)}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={mutation.isPending}
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending ? "Creating..." : "Create channel"}
+              </Button>
+            </div>
+          </form>
+
+          <Dialog.Close asChild>
+            <button className="icon-button dialog-close" aria-label="Close">
+              <X size={18} aria-hidden="true" />
+            </button>
+          </Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

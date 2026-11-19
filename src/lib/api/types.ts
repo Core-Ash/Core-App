@@ -31,11 +31,22 @@ export interface Community {
   name: string;
   owner_id: string;
 }
+export interface ChannelCategory {
+  id: string;
+  name: string;
+  position: number;
+  is_private: boolean;
+  is_collapsed: boolean;
+  is_muted: boolean;
+}
 export interface Channel {
   id: string;
   name: string;
   topic: string;
   position: number;
+  category_id?: string | null;
+  kind?: "text" | "voice";
+  is_muted?: boolean;
 }
 export interface Message {
   id: string;

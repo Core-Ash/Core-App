@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api/errors";
 import {
   parseBootstrap,
   parseChannel,
+  parseChannelCategory,
   parseCommunity,
   parseList,
   parseMessage,
@@ -57,10 +58,88 @@ export const endpoints = {
       await api.get(`/communities/${communityId}/channels`, { signal }),
       parseChannel,
     ),
-  createChannel: async (api: ApiClient, communityId: string, name: string) =>
-    parseChannel(
-      await api.post(`/communities/${communityId}/channels`, { name }),
+  createChannel: async (
+    api: ApiClient,
+    communityId: string,
+    input: string | { name: string; category_id?: string | null; kind?: "text" | "voice" },
+  ) => {
+    const body = typeof input === "string" ? { name: input } : (
+      input.category_id !== undefined || input.kind !== undefined
+        ? input
+        : { name: input.name }
+    );
+    return parseChannel(
+      await api.post(`/communities/${communityId}/channels`, body),
+    );
+  },
+  categories: async (api: ApiClient, communityId: string, signal?: AbortSignal) => {
+    const res = await api.get<{ items: unknown[]; hide_muted_channels: boolean }>(
+      `/communities/${communityId}/categories`,
+      { signal },
+    );
+    return {
+      items: (res.items || []).map(parseChannelCategory),
+      hide_muted_channels: Boolean(res.hide_muted_channels),
+    };
+  },
+  createCategory: async (
+    api: ApiClient,
+    communityId: string,
+    payload: { name: string; is_private?: boolean; roles?: string[] },
+  ) =>
+    parseChannelCategory(
+      await api.post(`/communities/${communityId}/categories`, payload),
     ),
+  updateCategory: async (
+    api: ApiClient,
+    communityId: string,
+    categoryId: string,
+    payload: { name?: string; is_private?: boolean; position?: number; roles?: string[] },
+  ) =>
+    parseChannelCategory(
+      await api.patch(`/communities/${communityId}/categories/${categoryId}`, payload),
+    ),
+  deleteCategory: async (api: ApiClient, communityId: string, categoryId: string) => {
+    await api.delete(`/communities/${communityId}/categories/${categoryId}`);
+  },
+  reorderCategories: async (api: ApiClient, communityId: string, order: string[]) => {
+    await api.post(`/communities/${communityId}/categories/reorder`, { order });
+  },
+  reorderChannels: async (
+    api: ApiClient,
+    communityId: string,
+    items: { id: string; category_id: string | null; position: number }[],
+  ) => {
+    await api.post(`/communities/${communityId}/channels/reorder`, { items });
+  },
+  updateChannel: async (
+    api: ApiClient,
+    communityId: string,
+    channelId: string,
+    payload: { name?: string; topic?: string; category_id?: string | null; position?: number },
+  ) =>
+    parseChannel(
+      await api.patch(`/communities/${communityId}/channels/${channelId}`, payload),
+    ),
+  setCommunityPreferences: async (
+    api: ApiClient,
+    communityId: string,
+    payload: { hide_muted_channels: boolean },
+  ) => {
+    return await api.put<{ hide_muted_channels: boolean }>(
+      `/communities/${communityId}/preferences`,
+      payload,
+    );
+  },
+  setChannelMute: async (api: ApiClient, channelId: string, is_muted: boolean) => {
+    return await api.put<{ is_muted: boolean }>(`/channels/${channelId}/mute`, { is_muted });
+  },
+  setCategoryMute: async (api: ApiClient, categoryId: string, is_muted: boolean) => {
+    return await api.put<{ is_muted: boolean }>(`/categories/${categoryId}/mute`, { is_muted });
+  },
+  setCategoryCollapse: async (api: ApiClient, categoryId: string, is_collapsed: boolean) => {
+    return await api.put<{ is_collapsed: boolean }>(`/categories/${categoryId}/collapse`, { is_collapsed });
+  },
   messages: async (
     api: ApiClient,
     channelId: string,

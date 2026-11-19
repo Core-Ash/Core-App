@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, Eye, LockKeyhole, RefreshCw, Settings, Shield, X } from "lucide-react";
+import { ArrowLeft, Eye, Folder, LockKeyhole, RefreshCw, Settings, Shield, X } from "lucide-react";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { EmptyState } from "@/components/common/EmptyState";
 import { MemberIdentity } from "@/features/community/members/MemberIdentity";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useChannelAccess } from "@/features/community/api/hooks";
+import { useCategories, useUpdateChannel } from "@/features/community/categories/api";
 import type { AccessSource, Channel, Community } from "@/lib/api/types";
 
 function sourceLabel(source: AccessSource): string {
@@ -24,7 +25,8 @@ function sourceLabel(source: AccessSource): string {
 
 export function ChannelSettings({ community, channel }: { community: Community; channel: Channel }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<"permissions" | "access">("permissions");
+  const [view, setView] = useState<"overview" | "permissions" | "access">("permissions");
+
   return (
     <Dialog.Root open={open} onOpenChange={(value) => {
       setOpen(value);
@@ -43,17 +45,30 @@ export function ChannelSettings({ community, channel }: { community: Community; 
           <header className="channel-settings-heading">
             <Dialog.Title className="text-xl font-semibold">#{channel.name} settings</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-              {community.name} · Channel permissions
+              {community.name} · Channel settings
             </Dialog.Description>
           </header>
           <div className="channel-settings-body">
             <nav aria-label="Channel settings sections" className="channel-settings-navigation">
-              <Button variant="default" onClick={() => setView("permissions")} aria-current="page">
+              <Button
+                variant={view === "overview" ? "default" : "ghost"}
+                onClick={() => setView("overview")}
+                aria-current={view === "overview" ? "page" : undefined}
+              >
+                <Folder aria-hidden="true" /> Overview
+              </Button>
+              <Button
+                variant={view === "permissions" || view === "access" ? "default" : "ghost"}
+                onClick={() => setView("permissions")}
+                aria-current={view === "permissions" || view === "access" ? "page" : undefined}
+              >
                 <Shield aria-hidden="true" /> Permissions
               </Button>
             </nav>
-            <section className="channel-permissions-panel" aria-label="Permissions">
-              {view === "permissions" ? (
+            <section className="channel-permissions-panel" aria-label={view === "overview" ? "Overview" : "Permissions"}>
+              {view === "overview" ? (
+                <ChannelOverviewForm key={channel.id} community={community} channel={channel} />
+              ) : view === "permissions" ? (
                 <>
                   <h2 className="text-lg font-semibold">Permissions</h2>
                   <p className="my-3 text-sm text-muted-foreground">
@@ -81,6 +96,85 @@ export function ChannelSettings({ community, channel }: { community: Community; 
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+function ChannelOverviewForm({ community, channel }: { community: Community; channel: Channel }) {
+  const categoriesQuery = useCategories(community.id);
+  const updateChannel = useUpdateChannel(community.id);
+  const [selectedCategory, setSelectedCategory] = useState<string>(channel.category_id ?? "");
+  const [name, setName] = useState(channel.name);
+  const [topic, setTopic] = useState(channel.topic ?? "");
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveOverview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateChannel.mutateAsync({
+        channelId: channel.id,
+        name: name.trim(),
+        topic: topic.trim() || undefined,
+        category_id: selectedCategory || null,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch {
+      // error handled by mutation
+    }
+  };
+
+  return (
+    <form onSubmit={handleSaveOverview} className="space-y-4">
+      <h2 className="text-lg font-semibold">Overview</h2>
+      <div>
+        <label htmlFor="channel-name-input" className="mb-1 block text-sm font-medium">Channel Name</label>
+        <Input
+          id="channel-name-input"
+          value={name}
+          maxLength={100}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="channel-topic-input" className="mb-1 block text-sm font-medium">Channel Topic</label>
+        <Input
+          id="channel-topic-input"
+          value={topic}
+          maxLength={1024}
+          placeholder="Let everyone know how to use this channel"
+          onChange={(e) => setTopic(e.target.value)}
+        />
+      </div>
+      <div>
+        <label htmlFor="channel-category-select" className="mb-1 block text-sm font-medium">Category</label>
+        <select
+          id="channel-category-select"
+          className="access-role-select w-full"
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+        >
+          <option value="">(No Category / Uncategorized)</option>
+          {categoriesQuery.data?.items.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Organize where this channel lives in the sidebar.
+        </p>
+      </div>
+      {updateChannel.isError && (
+        <p className="text-sm text-destructive">Failed to save channel changes.</p>
+      )}
+      {saveSuccess && (
+        <p className="text-sm text-green-500">Channel updated successfully!</p>
+      )}
+      <Button type="submit" disabled={updateChannel.isPending}>
+        {updateChannel.isPending ? "Saving..." : "Save Changes"}
+      </Button>
+    </form>
   );
 }
 

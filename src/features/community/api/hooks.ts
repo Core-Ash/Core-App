@@ -95,9 +95,11 @@ export function useCreateChannel(communityId?: string) {
   const { api, ready } = useAppData();
   const queries = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => {
+    mutationFn: (
+      input: string | { name: string; category_id?: string | null; kind?: "text" | "voice" },
+    ) => {
       if (!ready || !communityId) throw new ApiError("unauthorized");
-      return endpoints.createChannel(api, communityId, name);
+      return endpoints.createChannel(api, communityId, input);
     },
     onSuccess: () =>
       queries.invalidateQueries({ queryKey: queryKeys.channels(communityId) }),

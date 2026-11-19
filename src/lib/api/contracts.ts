@@ -1,6 +1,7 @@
 import { ApiError } from "@/lib/api/errors";
 import type {
   Channel,
+  ChannelCategory,
   Community,
   Message,
   MessagePage,
@@ -80,6 +81,24 @@ export function parseCommunity(value: unknown): Community {
     owner_id: uuid(data.owner_id),
   };
 }
+export function parseChannelCategory(value: unknown): ChannelCategory {
+  const data = record(value);
+  if (
+    typeof data.position !== "number" ||
+    !Number.isInteger(data.position) ||
+    data.position < 0
+  )
+    throw new ApiError("invalid_response");
+  return {
+    id: uuid(data.id),
+    name: string(data.name),
+    position: data.position,
+    is_private: Boolean(data.is_private),
+    is_collapsed: Boolean(data.is_collapsed),
+    is_muted: Boolean(data.is_muted),
+  };
+}
+
 export function parseChannel(value: unknown): Channel {
   const data = record(value);
   if (
@@ -93,6 +112,9 @@ export function parseChannel(value: unknown): Channel {
     name: string(data.name),
     topic: string(data.topic),
     position: data.position,
+    category_id: data.category_id ? uuid(data.category_id) : null,
+    kind: data.kind === "voice" ? "voice" : "text",
+    is_muted: Boolean(data.is_muted),
   };
 }
 export function parseMessage(value: unknown): Message {
