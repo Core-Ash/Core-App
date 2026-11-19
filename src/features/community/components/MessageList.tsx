@@ -9,11 +9,13 @@ export function MessageList({
   channel,
   searching,
   historyControls,
+  communityId,
 }: {
   messages: readonly ChatMessageData[];
   channel: { name: string };
   searching: boolean;
   historyControls?: ReactNode;
+  communityId?: string;
 }) {
   const scrollArea = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
@@ -97,6 +99,7 @@ export function MessageList({
                     key={message.renderKey ?? message.id}
                     message={message}
                     grouped={grouped}
+                    communityId={communityId}
                   />
                 );
               })}

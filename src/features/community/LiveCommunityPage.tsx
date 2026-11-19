@@ -143,6 +143,7 @@ function LiveConversation({
             ) : (
               <>
                 <MessageList
+                  communityId={community.id}
                   channel={channel}
                   messages={messages}
                   searching={Boolean(search.trim())}

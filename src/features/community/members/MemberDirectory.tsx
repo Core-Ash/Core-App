@@ -19,7 +19,7 @@ export function MemberDirectory({ communityId, channelId }: { communityId: strin
             {[0,1,2,3].map((value) => <div key={value} className="h-10 animate-pulse rounded-md bg-muted motion-reduce:animate-none" aria-hidden="true" />)}
           </div> : members.length ? <>
             <ul className="member-list" aria-label="Members">{members.map((member) => <li className="member-row" key={member.id}>
-              <MemberIdentity profile={member} roles={member.roles} joinedAt={member.joined_at} username={false} />
+              <MemberIdentity profile={member} communityId={communityId} roles={member.roles} joinedAt={member.joined_at} username={false} />
             </li>)}</ul>
             {query.hasNextPage && <Button size="sm" variant="ghost" disabled={query.isFetching} onClick={() => { void query.fetchNextPage(); }}>
               {query.isFetchingNextPage ? "Loading members…" : "Load more members"}

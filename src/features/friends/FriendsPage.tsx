@@ -1,5 +1,5 @@
 import { useState, type SubmitEvent } from "react";
-import { Menu, Search, Users, UserPlus } from "lucide-react";
+import { Menu, Search, Users, UserPlus, MessageCircle } from "lucide-react";
 import { useOutletContext, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,6 @@ import { MemberIdentity } from "@/features/community/members/MemberIdentity";
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
 import { useCurrentUser } from "@/features/community/api/hooks";
 import { useOpenConversation } from "@/features/conversations/use-open-conversation";
-import { UserAvatar } from "@/components/common/UserAvatar";
 import { useFriendAction, useFriendCounts, useFriendList, type FriendRequest, type ListKind } from "@/features/friends/api";
 import { RelationshipActions } from "@/features/friends/RelationshipActions";
 import { apiErrorMessage, ApiError } from "@/lib/api/errors";
@@ -128,14 +127,7 @@ function FriendRow({ profile, blocked }: { profile: PublicProfile; blocked: bool
 
   return (
     <li className={`friend-row${blocked ? "" : " friend-row-clickable"}`}>
-      {blocked ? <MemberIdentity profile={profile} /> : <button
-        type="button" className="friend-open" disabled={conversation.isPending}
-        aria-label={`Open conversation with ${profile.display_name}`}
-        onClick={() => { void conversation.openDirect(profile.id).catch(() => {}); }}
-      >
-        <UserAvatar user={{ name: profile.display_name, email: "", image: profile.avatar_url }} className="size-9 shrink-0" />
-        <span className="min-w-0 text-left"><span className="block truncate font-medium">{profile.display_name}</span><span className="block truncate text-xs text-muted-foreground">{fullUsername(profile)}</span></span>
-      </button>}
+      <MemberIdentity profile={profile} />
       {conversation.error && <p role="alert" className="friend-open-error text-xs text-destructive">{apiErrorMessage(conversation.error)}</p>}
       {blocked ? (
         <div>

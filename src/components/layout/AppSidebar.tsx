@@ -14,6 +14,7 @@ import {
 } from "@/features/conversations/api";
 import { DmUserMenu } from "@/features/conversations/components/DmUserMenu";
 import { CreateGroupDmDialog } from "@/features/conversations/components/CreateGroupDmDialog";
+import { UserProfilePopover } from "@/features/profiles/UserProfilePopover";
 import type { ConversationSummary } from "@/lib/api/types";
 
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -142,6 +143,8 @@ function ConversationSidebarRow({
   onCloseConversation: () => Promise<void>;
   onNavigate?: () => void;
 }) {
+  const { pathname } = useLocation();
+  const active = pathname === `/app/messages/${conversation.id}`;
   const isDirect = conversation.type === "direct";
   const otherMember = isDirect
     ? conversation.members.find((m) => m.profile.id !== currentUserId) ??
@@ -163,50 +166,45 @@ function ConversationSidebarRow({
 
   const lastSnippet = conversation.last_message?.body ?? "";
 
-  const link = (
-      <NavLink
-        to={`/app/messages/${conversation.id}`}
-        className={({ isActive }) =>
-          `dm-sidebar-link${isActive ? " is-active" : ""}`
-        }
-        onClick={onNavigate}
-      >
-        <div className="dm-sidebar-avatar">
-          {isDirect ? (
-            <MemberAvatar
-              member={{
-                id: otherMember?.profile.id ?? conversation.id,
-                name: title,
-                initials: initials ?? "?",
-                tone: "slate",
-                avatar,
-              }}
-            />
-          ) : (
-            <div className="dm-sidebar-group-avatar">
-              <Users size={16} aria-hidden="true" />
-            </div>
-          )}
+  const identity = <>
+    <div className="dm-sidebar-avatar">
+      {isDirect ? (
+        <MemberAvatar member={{
+          id: otherMember?.profile.id ?? conversation.id,
+          name: title,
+          initials: initials ?? "?",
+          tone: "slate",
+          avatar,
+        }} />
+      ) : (
+        <div className="dm-sidebar-group-avatar">
+          <Users size={16} aria-hidden="true" />
         </div>
-
-        <div className="dm-sidebar-meta">
-          <span className="dm-sidebar-name">{title}</span>
-          {lastSnippet && (
-            <span className="dm-sidebar-preview">{lastSnippet}</span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          className="dm-close-button"
-          onClick={onHide}
-          title="Close conversation"
-          aria-label={`Close conversation with ${title}`}
-        >
-          <X size={14} aria-hidden="true" />
-        </button>
-      </NavLink>
-  );
+      )}
+    </div>
+    <div className="dm-sidebar-meta">
+      <span className="dm-sidebar-name">{title}</span>
+      {lastSnippet && <span className="dm-sidebar-preview">{lastSnippet}</span>}
+    </div>
+  </>;
+  const link = <div className="dm-sidebar-row">
+    {active && otherMember ? <UserProfilePopover profile={otherMember.profile} side="right">
+      <button type="button" className="dm-sidebar-link is-active" aria-label={`View profile for ${title}`}>{identity}</button>
+    </UserProfilePopover> : <NavLink
+      to={`/app/messages/${conversation.id}`}
+      className={({ isActive }) => `dm-sidebar-link${isActive ? " is-active" : ""}`}
+      onClick={onNavigate}
+    >{identity}</NavLink>}
+    <button
+      type="button"
+      className="dm-close-button"
+      onClick={onHide}
+      title="Close conversation"
+      aria-label={`Close conversation with ${title}`}
+    >
+      <X size={14} aria-hidden="true" />
+    </button>
+  </div>;
   return <li className="dm-sidebar-item">{otherMember ?
     <DmUserMenu profile={otherMember.profile} conversationId={conversation.id} onCloseConversation={onCloseConversation}>{link}</DmUserMenu> : link
   }</li>;

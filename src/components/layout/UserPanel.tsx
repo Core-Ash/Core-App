@@ -8,6 +8,8 @@ import { useCurrentUser } from "@/features/community/api/hooks";
 import { useOptionalSettingsModal } from "@/features/settings/settings-context";
 import type { AuthUser } from "@/lib/auth-client";
 import { displayName, publicIdentityLabel } from "@/lib/display-name";
+import { MemberIdentity } from "@/features/community/members/MemberIdentity";
+import type { PublicProfile } from "@/lib/api/types";
 
 export function UserPanel({ onNavigate }: { onNavigate?: () => void }) {
   const { session } = useAuth();
@@ -27,6 +29,7 @@ function BackendUserPanel({ onNavigate }: { onNavigate?: () => void }) {
   const user = profile.isSuccess ? profile.data : undefined;
   return (
     <UserPanelView
+      profile={user}
       user={{
         name: displayName(user),
         email: "",
@@ -39,21 +42,23 @@ function BackendUserPanel({ onNavigate }: { onNavigate?: () => void }) {
 
 function UserPanelView({
   user,
+  profile,
   onNavigate,
 }: {
   user: Pick<AuthUser, "name" | "email" | "image">;
+  profile?: PublicProfile;
   onNavigate?: () => void;
 }) {
   const settingsModal = useOptionalSettingsModal();
   return (
     <section className="user-panel" aria-label="Signed-in account">
       <div className="user-panel-profile">
-        <span className="member-avatar">
+        {profile ? <MemberIdentity profile={profile} username={false} /> : <><span className="member-avatar">
           <UserAvatar user={user} className="profile-avatar" />
         </span>
         <div className="user-panel-name">
           <p title={user.name}>{user.name || "Core member"}</p>
-        </div>
+        </div></>}
         <div className="user-controls">
           <Tooltip content="Microphone unavailable · voice is not connected">
             <button

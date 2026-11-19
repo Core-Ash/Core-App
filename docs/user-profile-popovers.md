@@ -1,0 +1,15 @@
+# Shared user profile popovers
+
+`src/features/profiles/UserProfilePopover.tsx` renders one shared card for member directories, channel and DM author avatars/names, DM headers, group participants, friend identities, the account panel, and the existing DM context menu. `MemberIdentity` supplies the standard avatar/name trigger. Grouped messages expose an avatar on hover or keyboard focus. Message text remains selectable and has no profile handler.
+
+The active direct conversation's sidebar name and avatar also open the profile. Other conversation rows retain navigation into that conversation. The close-conversation button is a separate sibling control so it never activates a profile or navigation link.
+
+Profile interaction tests run under React Strict Mode, matching `src/main.tsx`. Navigation dismissal compares the current route key with the key recorded when the card opened. It must not close the card from effect cleanup: Strict Mode replays cleanup on mount, which would dismiss every newly opened profile in development. Browser QA also supports a Vite development server on port 5187 and records whether it tested development mode.
+
+The card uses Radix Popover portals, collision padding, flipping, and available-height constraints. Desktop member cards prefer the left; message avatars prefer the right. Below 768px, placement prefers the bottom and flips above when needed. Outside clicks and Escape dismiss it, navigation closes it, and opening another trigger replaces it. Escape returns focus to the trigger. The DM context menu supplies its original link as the return-focus target.
+
+Identity data comes from existing Rust responses and their React Query caches. Member directories pass community roles and join dates directly. Message profiles retrieve additional membership details only while open through the existing searchable members API; queries are scoped by community and username, and results must match the target ID. DM cards receive no community context. Friend actions retain the existing relationship queries and authenticated mutations; self profiles omit these actions. Clicking another user's name inside the card retains the existing direct-conversation action. Friends retain a dedicated conversation icon while avatar/name clicks open profiles.
+
+The public profile contract has no banner, bio, presence, activity, badges, or mutual-community fields. These sections are omitted; the banner uses Core's theme gradient. No backend, database, authentication, or deployment changes are needed.
+
+Validation includes the normal typecheck, lint, tests, and production build, plus `src/test/profile-popovers.browser.mjs`. Browser QA uses intercepted fixtures only and writes screenshots/report under `.artifacts/profile-popovers/`. It needs an isolated Chrome debugger at port 9368 and an HTTP preview at port 5187 built with public `VITE_AUTH_URL=/api/auth` and `VITE_API_URL=/api/v1`; use a separate build output directory to avoid changing local environment files. Tests and browser fixtures do not establish live service integration.

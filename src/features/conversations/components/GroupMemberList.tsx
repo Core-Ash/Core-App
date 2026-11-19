@@ -1,9 +1,8 @@
 import { Crown, UserMinus } from "lucide-react";
-import { MemberAvatar } from "@/features/community/components/MemberAvatar";
+import { MemberIdentity } from "@/features/community/members/MemberIdentity";
 import { useRemoveConversationMember } from "@/features/conversations/api";
 import { apiErrorMessage } from "@/lib/api/errors";
 import type { ConversationParticipant } from "@/lib/api/types";
-import { fullUsername } from "@/lib/display-name";
 
 interface GroupMemberListProps {
   conversationId: string;
@@ -46,34 +45,12 @@ export function GroupMemberList({
           return (
             <li key={member.id} className="group-member-item">
               <div className="group-member-info">
-                <MemberAvatar
-                  member={{
-                    id: member.profile.id,
-                    name: member.profile.display_name,
-                    initials: member.profile.display_name.charAt(0).toUpperCase(),
-                    tone: "slate",
-                    avatar: member.profile.avatar_url ?? undefined,
-                  }}
-                />
-                <div className="group-member-names">
-                  <div className="flex items-center gap-1.5">
-                    <span className="group-member-display-name">
-                      {member.profile.display_name}
-                    </span>
-                    {isMemberOwner && (
-                      <span
-                        className="group-owner-badge"
-                        title="Group Owner"
-                        aria-label="Group Owner"
-                      >
-                        <Crown size={12} aria-hidden="true" />
-                      </span>
-                    )}
-                  </div>
-                  <span className="group-member-username">
-                    {fullUsername(member.profile)}
+                <MemberIdentity profile={member.profile} />
+                {isMemberOwner && (
+                  <span className="group-owner-badge" title="Group Owner" aria-label="Group Owner">
+                    <Crown size={12} aria-hidden="true" />
                   </span>
-                </div>
+                )}
               </div>
 
               {isOwner && !isThisUser && (

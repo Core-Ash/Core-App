@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import * as Dialog from "@radix-ui/react-dialog";
 import { Copy, UserRound, X } from "lucide-react";
-import { MemberProfileCard } from "@/features/community/members/MemberIdentity";
+import { UserProfilePopover } from "@/features/profiles/UserProfilePopover";
 import { RelationshipActions } from "@/features/friends/RelationshipActions";
 import { fullUsername } from "@/lib/display-name";
 import type { PublicProfile } from "@/lib/api/types";
@@ -65,7 +64,8 @@ export function DmUserMenu({ profile, conversationId, onCloseConversation, child
     catch { setNotice("Couldn't copy. Please try again."); }
   }
 
-  return <Dialog.Root open={profileOpen} onOpenChange={setProfileOpen} modal={false}>
+  return <>
+    <UserProfilePopover profile={profile} open={profileOpen} onOpenChange={setProfileOpen} anchorOnly returnFocus={trigger}>
     <div ref={anchor} className="dm-user-menu-trigger" onContextMenu={(event) => {
       event.preventDefault(); event.stopPropagation();
       trigger.current = event.target instanceof Element ? event.target.closest<HTMLElement>("a, button") : null;
@@ -77,6 +77,7 @@ export function DmUserMenu({ profile, conversationId, onCloseConversation, child
       const rect = event.currentTarget.getBoundingClientRect();
       setNotice(""); setPosition({ x: rect.left + 20, y: rect.bottom });
     }}>{children}</div>
+    </UserProfilePopover>
     {position && createPortal(<div ref={menu} role="menu" aria-label={`User menu for ${profile.display_name}`} className="dm-user-menu" onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
       if (event.key === "Escape" || event.key === "Tab") { event.preventDefault(); event.stopPropagation(); dismiss(); return; }
       if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
@@ -99,6 +100,5 @@ export function DmUserMenu({ profile, conversationId, onCloseConversation, child
       <button role="menuitem" onClick={() => void copy(conversationId)}><Copy size={16} aria-hidden="true" />Copy Conversation ID</button>
       {notice && <p role="alert">{notice}</p>}
     </div>, document.body)}
-    <Dialog.Portal><MemberProfileCard anchor={anchor} profile={profile} returnFocus={trigger} /></Dialog.Portal>
-  </Dialog.Root>;
+  </>;
 }

@@ -240,7 +240,7 @@ describe("Rust-backed community workspace", () => {
     const { request, messages } = setup();
     const id = "99999999-9999-4999-8999-999999999999";
     messages[0] = { ...messageFixture, author_id: id, author: { id, display_name: "Visiting Gamer", username: "visiting_gamer", avatar_url: null } };
-    fireEvent.click(await screen.findByRole("button", { name: "View profile for Visiting Gamer" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "View profile for Visiting Gamer" }))[0]!);
     const card = screen.getByRole("dialog", { name: "Visiting Gamer" });
     expect(within(card).getByText("@visiting_gamer")).toBeInTheDocument();
     expect(within(card).queryByText(id)).not.toBeInTheDocument();

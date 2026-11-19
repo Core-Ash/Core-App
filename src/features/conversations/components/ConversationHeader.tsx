@@ -3,7 +3,7 @@ import { Check, Edit2, LogOut, Search, UserPlus, Users, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { MemberAvatar } from "@/features/community/components/MemberAvatar";
+import { MemberIdentity } from "@/features/community/members/MemberIdentity";
 import {
   useLeaveConversation,
   useUpdateConversation,
@@ -11,7 +11,6 @@ import {
 import { CreateGroupDmDialog } from "@/features/conversations/components/CreateGroupDmDialog";
 import { apiErrorMessage } from "@/lib/api/errors";
 import type { ConversationDetail } from "@/lib/api/types";
-import { fullUsername } from "@/lib/display-name";
 
 interface ConversationHeaderProps {
   conversation: ConversationDetail;
@@ -81,23 +80,7 @@ export function ConversationHeader({
         <div className="conversation-header-info">
           {isDirect && otherMember ? (
             <div className="conversation-header-user">
-              <MemberAvatar
-                member={{
-                  id: otherMember.profile.id,
-                  name: otherMember.profile.display_name,
-                  initials: otherMember.profile.display_name.charAt(0).toUpperCase(),
-                  tone: "slate",
-                  avatar: otherMember.profile.avatar_url ?? undefined,
-                }}
-              />
-              <div className="min-w-0">
-                <span className="conversation-header-title">
-                  {otherMember.profile.display_name}
-                </span>
-                <span className="conversation-header-subtitle">
-                  {fullUsername(otherMember.profile)}
-                </span>
-              </div>
+              <MemberIdentity profile={otherMember.profile} />
             </div>
           ) : (
             <div className="conversation-header-group">

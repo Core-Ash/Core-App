@@ -1025,13 +1025,12 @@
 .member-row > .member-identity { width: 100%; }
 .member-row > .member-identity[data-state="open"] { background: var(--surface-hover); color: var(--foreground); }
 .member-profile-dialog {
-  position: fixed;
+  position: relative;
   z-index: 60;
-  width: 304px;
+  width: 320px;
   max-width: calc(100vw - 24px);
-  max-height: calc(100dvh - 24px);
+  max-height: var(--radix-popover-content-available-height);
   overflow: auto;
-  visibility: hidden;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-secondary);
@@ -1039,13 +1038,13 @@
   outline: none;
 }
 .member-profile-banner {
-  height: 80px;
-  background: linear-gradient(120deg, var(--primary-subtle), var(--background));
+  height: 96px;
+  background: radial-gradient(ellipse at top right, var(--primary), transparent 75%), linear-gradient(120deg, var(--primary-subtle), var(--background));
   border-bottom: 1px solid var(--core-divider);
 }
 .member-profile-dialog > .member-profile-avatar {
   position: absolute;
-  top: 40px;
+  top: 52px;
   left: 16px;
   width: 80px;
   height: 80px;
@@ -1055,6 +1054,17 @@
 }
 .member-profile-avatar [data-slot="avatar-fallback"] { font-size: inherit; }
 .member-profile-body { min-width: 0; padding: 48px 16px 16px; }
+.member-profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.message-profile-trigger { display: block; border-radius: 50%; cursor: pointer; }
+.message-profile-trigger:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.message-avatar-column { position: relative; }
+.grouped-profile-trigger { position: absolute; top: 0; left: 8px; opacity: 0; }
+.grouped-profile-trigger [data-slot="avatar"] { width: 20px; height: 20px; }
+.message-grouped:hover .grouped-profile-trigger,
+.grouped-profile-trigger:focus-visible,
+.grouped-profile-trigger[data-state="open"] { opacity: 1; }
+.message-grouped:hover .grouped-timestamp,
+.message-avatar-column:focus-within .grouped-timestamp { visibility: hidden; }
 .member-profile-name { font-size: 20px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .member-profile-handle { margin-top: 4px; color: var(--muted-foreground); font-size: 12px; overflow-wrap: anywhere; }
 .member-profile-section { margin-top: 20px; }
@@ -1067,6 +1077,7 @@
 .member-profile-joined dt { color: var(--muted-foreground); }
 .member-profile-joined dd { margin-top: 4px; }
 .member-profile-close { top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; background: #0004; }
+.user-panel-profile > .member-identity { flex: 1; overflow: hidden; font-size: 13px; }
 .member-details {
   min-width: 0;
 }
