@@ -67,12 +67,16 @@ describe("direct conversation navigation", () => {
     expect(await screen.findByText("Conversation opened")).toBeInTheDocument();
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/conversations/direct"))).toHaveLength(1);
   });
-  it.each([false, true])("opens a friend row with existing=%s and isolates its menu", async (existing) => {
+  it.each([false, true])("opens a friend's conversation through their profile with existing=%s and isolates its menu", async (existing) => {
     const { fetcher } = setup(<FriendsPage />, { existing });
-    const button = await screen.findByRole("button", { name: "Open conversation with Dragon Slayer" });
+    const profile = await screen.findByRole("button", { name: "View profile for Dragon Slayer" });
     expect(screen.queryByRole("button", { name: "Message Dragon Slayer" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("More options for Dragon#0024"));
+    fireEvent.keyDown(screen.getByLabelText("More options for Dragon#0024"), { key: "ArrowDown" });
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/conversations/direct"))).toHaveLength(0);
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    fireEvent.click(profile);
+    const button = screen.getByRole("button", { name: "Open conversation with Dragon Slayer" });
     fireEvent.click(button); fireEvent.click(button);
     expect(await screen.findByText("Conversation opened")).toBeInTheDocument();
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/conversations/direct"))).toHaveLength(existing ? 0 : 1);
@@ -80,6 +84,7 @@ describe("direct conversation navigation", () => {
   });
   it.each([400, 401, 403, 404, 409, 500])("shows inline errors for HTTP %s without navigating", async (status) => {
     setup(<FriendsPage />, { status });
+    fireEvent.click(await screen.findByRole("button", { name: "View profile for Dragon Slayer" }));
     fireEvent.click(await screen.findByRole("button", { name: "Open conversation with Dragon Slayer" }));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByText("Conversation opened")).not.toBeInTheDocument();

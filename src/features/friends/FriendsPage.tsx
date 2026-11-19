@@ -1,5 +1,5 @@
 import { useState, type SubmitEvent } from "react";
-import { Menu, Search, Users, UserPlus, MessageCircle } from "lucide-react";
+import { Menu, Search, Users, UserPlus } from "lucide-react";
 import { useOutletContext, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,8 @@ import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
 import { MemberIdentity } from "@/features/community/members/MemberIdentity";
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
 import { useCurrentUser } from "@/features/community/api/hooks";
-import { useOpenConversation } from "@/features/conversations/use-open-conversation";
 import { useFriendAction, useFriendCounts, useFriendList, type FriendRequest, type ListKind } from "@/features/friends/api";
-import { RelationshipActions } from "@/features/friends/RelationshipActions";
+import { UserActionsMenu } from "@/features/friends/UserActionsMenu";
 import { apiErrorMessage, ApiError } from "@/lib/api/errors";
 import { fullUsername, validUserTag } from "@/lib/display-name";
 import type { PublicProfile } from "@/lib/api/types";
@@ -80,6 +79,7 @@ function AddFriend() {
 
 function FriendList({ kind, onAdd }: { kind: ListKind; onAdd: () => void }) {
   const [search, setSearch] = useState("");
+  const [menuId, setMenuId] = useState<string | null>(null);
   const [params] = useSearchParams();
   const query = useFriendList(kind);
   const counts = useFriendCounts();
@@ -102,7 +102,7 @@ function FriendList({ kind, onAdd }: { kind: ListKind; onAdd: () => void }) {
     {kind === "requests" && unique.length > 0 ? <>
       <RequestSection title="Incoming Friend Requests" total={counts.data?.incoming} requests={requests.filter((request) => request.incoming)} />
       <RequestSection title="Outgoing Friend Requests" total={counts.data?.outgoing} requests={requests.filter((request) => !request.incoming)} />
-    </> : <ul className="friends-list">{(matching as PublicProfile[]).map((profile) => <FriendRow key={profile.id} profile={profile} blocked={kind === "blocked"} />)}</ul>}
+    </> : <ul className="friends-list">{(matching as PublicProfile[]).map((profile) => <FriendRow key={profile.id} profile={profile} blocked={kind === "blocked"} menuOpen={menuId === profile.id} onMenuChange={(open) => setMenuId((current) => open ? profile.id : current === profile.id ? null : current)} />)}</ul>}
     {search.trim() && query.hasNextPage && <p className="friends-search-note">Searching loaded friends. Load more to include the rest.</p>}
     {query.hasNextPage && <Button variant="outline" className="mt-4" disabled={query.isFetching} onClick={() => void query.fetchNextPage()}>{query.isFetching ? "Loading…" : "Load more"}</Button>}
   </section>;
@@ -119,16 +119,13 @@ function RequestRow({ request }: { request: FriendRequest }) {
     {mutation.error && <p role="alert" className="text-xs text-destructive">{apiErrorMessage(mutation.error)}</p>}
   </div></li>;
 }
-function FriendRow({ profile, blocked }: { profile: PublicProfile; blocked: boolean }) {
+function FriendRow({ profile, blocked, menuOpen, onMenuChange }: { profile: PublicProfile; blocked: boolean; menuOpen: boolean; onMenuChange: (open: boolean) => void }) {
   const mutation = useFriendAction();
-  const conversation = useOpenConversation();
-  const [open, setOpen] = useState(false);
 
 
   return (
     <li className={`friend-row${blocked ? "" : " friend-row-clickable"}`}>
       <MemberIdentity profile={profile} />
-      {conversation.error && <p role="alert" className="friend-open-error text-xs text-destructive">{apiErrorMessage(conversation.error)}</p>}
       {blocked ? (
         <div>
           <Button
@@ -143,28 +140,7 @@ function FriendRow({ profile, blocked }: { profile: PublicProfile; blocked: bool
         </div>
       ) : (
         <div className="friend-row-actions">
-          <details
-            className="friend-options"
-            onToggle={(event) => setOpen(event.currentTarget.open)}
-          >
-            <summary
-              aria-label={`More options for ${fullUsername(profile)}`}
-              title="More options"
-            >
-              •••
-            </summary>
-            {open && (
-              <div>
-                <MemberIdentity
-                  profile={profile}
-                  avatar={false}
-                  username={false}
-                  label="View Profile"
-                />
-                <RelationshipActions profile={profile} />
-              </div>
-            )}
-          </details>
+          <UserActionsMenu profile={profile} open={menuOpen} onOpenChange={onMenuChange} />
         </div>
       )}
     </li>

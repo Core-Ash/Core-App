@@ -78,7 +78,7 @@ export function DmUserMenu({ profile, conversationId, onCloseConversation, child
       setNotice(""); setPosition({ x: rect.left + 20, y: rect.bottom });
     }}>{children}</div>
     </UserProfilePopover>
-    {position && createPortal(<div ref={menu} role="menu" aria-label={`User menu for ${profile.display_name}`} className="dm-user-menu" onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
+    {position && createPortal(<div ref={menu} role="menu" aria-label={`User menu for ${profile.display_name}`} className="user-actions-menu dm-user-menu" onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
       if (event.key === "Escape" || event.key === "Tab") { event.preventDefault(); event.stopPropagation(); dismiss(); return; }
       if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
       event.preventDefault();

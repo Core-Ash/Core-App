@@ -57,11 +57,9 @@
 .friend-row-detail time { margin-left:6px; color:var(--text-muted); }
 .friend-row-detail time::before { content:"· "; }
 .friend-row-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.friend-options { position:relative; }
-.friend-options summary { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; list-style:none; background:var(--surface-secondary); color:var(--muted-foreground); cursor:pointer; user-select:none; transition:background-color 120ms, color 120ms; }
-.friend-options summary::-webkit-details-marker { display:none; }
-.friend-options summary:hover, .friend-options[open] summary { background:var(--background); color:var(--foreground); }
-.friend-options > div { position:absolute; right:0; top:calc(100% + 6px); width:240px; max-width:calc(100vw - 100px); padding:12px; background:var(--surface-secondary); border:1px solid var(--border); box-shadow:0 8px 30px #0006; border-radius:8px; z-index:10; }
+.friend-options-trigger { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border:1px solid transparent; border-radius:50%; background:var(--surface-secondary); color:var(--muted-foreground); cursor:pointer; transition:background-color 150ms, color 150ms, border-color 150ms; }
+.friend-options-trigger:hover, .friend-options-trigger[data-state="open"] { background:var(--surface-hover); color:var(--foreground); border-color:color-mix(in srgb, var(--primary) 25%, var(--border)); }
+.friend-options-trigger:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
 .friends-request-section { margin-top:16px; }
 .friends-request-section:first-of-type { margin-top:4px; }
 .friends-request-section h3 { margin-bottom:8px; padding:0 4px; }
@@ -536,25 +534,46 @@
 .friend-open-error { flex-basis:100%; }
 
 .dm-user-menu-trigger { min-width:0; }
-.dm-user-menu {
-  position:fixed; z-index:100; width:224px; max-width:calc(100vw - 16px);
-  max-height:calc(100dvh - 16px); overflow-y:auto; padding:6px;
-  border:1px solid var(--border); border-radius:8px;
-  background:var(--background); color:var(--foreground);
-  box-shadow:0 8px 28px #0008; font-size:13px;
+.user-actions-menu {
+  position:relative; z-index:100; width:264px; max-width:calc(100vw - 24px);
+  max-height:var(--radix-dropdown-menu-content-available-height, calc(100dvh - 24px));
+  display:flex; flex-direction:column; gap:6px; overflow-y:auto; padding:8px;
+  border:1px solid color-mix(in srgb, var(--primary) 28%, var(--border)); border-radius:13px;
+  background:var(--surface-secondary); color:var(--foreground);
+  box-shadow:0 16px 40px #0007, 0 0 24px color-mix(in srgb, var(--primary) 8%, transparent);
+  font-size:13px; outline:none; transform-origin:var(--radix-dropdown-menu-content-transform-origin);
 }
-.dm-user-menu button[role="menuitem"] {
-  display:flex; align-items:center; justify-content:flex-start; gap:10px;
-  width:100%; min-height:34px; height:auto; padding:8px 10px;
-  border:0; border-radius:4px; background:transparent; color:var(--foreground);
-  font:inherit; text-align:left; cursor:pointer; white-space:normal;
+.user-actions-menu [role="menuitem"] {
+  display:flex; align-items:center; justify-content:flex-start; gap:12px;
+  width:100%; min-height:44px; height:auto; padding:10px 12px;
+  border:1px solid transparent; border-radius:8px; background:transparent; color:var(--foreground);
+  font:inherit; font-weight:500; line-height:20px; text-align:left; cursor:pointer; white-space:normal;
+  outline:none; box-shadow:none; transition:background-color 150ms, border-color 150ms, color 150ms;
 }
-.dm-user-menu button[role="menuitem"]:hover,
-.dm-user-menu button[role="menuitem"]:focus-visible { background:var(--primary); color:var(--primary-foreground); outline:none; }
-.dm-user-menu button[role="menuitem"]:disabled { opacity:.5; cursor:wait; }
-.dm-user-menu button[role="menuitem"][data-destructive="true"] { color:var(--destructive); }
-.dm-user-menu [role="separator"] { height:1px; margin:5px 4px; background:var(--border); }
-.dm-user-menu-relationships { display:flex; flex-direction:column; gap:2px; }
-.dm-user-menu p { padding:4px 10px; font-size:12px; color:var(--muted-foreground); }
-.dm-user-menu button[role="menuitem"][data-destructive="true"]:hover,
-.dm-user-menu button[role="menuitem"][data-destructive="true"]:focus-visible { background:var(--destructive); color:var(--primary-foreground); }
+.user-actions-menu [role="menuitem"] > svg { flex-shrink:0; width:18px; height:18px; color:var(--muted-foreground); }
+.user-actions-menu [role="menuitem"]:hover,
+.user-actions-menu [role="menuitem"]:focus-visible,
+.user-actions-menu [role="menuitem"][data-highlighted] { background:var(--surface-hover); }
+.user-actions-menu [role="menuitem"]:focus-visible { box-shadow:inset 0 0 0 2px var(--ring); }
+.user-actions-menu [role="menuitem"][data-tone="remove"] {
+  border-color:color-mix(in srgb, var(--primary) 25%, transparent);
+  background:color-mix(in srgb, var(--primary) 9%, transparent);
+}
+.user-actions-menu [role="menuitem"][data-tone="remove"] > svg { color:var(--primary); }
+.user-actions-menu [role="menuitem"][data-tone="remove"]:is(:hover, :focus-visible, [data-highlighted]) {
+  background:color-mix(in srgb, var(--primary) 17%, transparent);
+  border-color:color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.user-actions-menu [role="menuitem"][data-tone="danger"],
+.user-actions-menu [role="menuitem"][data-tone="danger"] > svg { color:var(--primary); }
+.user-actions-menu [role="menuitem"][data-tone="danger"]:is(:hover, :focus-visible, [data-highlighted]) { background:color-mix(in srgb, var(--primary) 12%, transparent); }
+.user-actions-menu [role="menuitem"]:disabled,
+.user-actions-menu [role="menuitem"][data-disabled] { opacity:.45; cursor:wait; pointer-events:none; }
+.user-action-list { display:flex; flex-direction:column; gap:6px; }
+.user-actions-menu p { padding:4px 12px; font-size:12px; }
+.user-actions-menu p:empty { display:none; }
+.user-actions-menu [role="separator"] { height:1px; margin:2px 4px; background:var(--border); }
+.dm-user-menu { position:fixed; }
+@media (prefers-reduced-motion:reduce) {
+  .friend-options-trigger, .user-actions-menu [role="menuitem"] { transition:none; }
+}

@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useAppData } from "@/app/app-data-context";
 import { parseList, parseProfile, parsePublicProfile, record, timestamp, uuid } from "@/lib/api/contracts";
 import { ApiError } from "@/lib/api/errors";
@@ -75,7 +75,35 @@ export function useFriendAction() {
         case "unblock": await api.delete(`/users/${input.id}/block`); break;
       }
     },
-    onSuccess: () => queries.invalidateQueries({ queryKey: ["relationships"] }),
+    onSuccess: async (_, input) => {
+      if (input.action === "block" || input.action === "unblock") {
+        // A pre-block fetch must not put an old friendship back into the cache.
+        await queries.cancelQueries({ queryKey: ["relationships"] });
+        const friends = queries.getQueryData<InfiniteData<FriendPage<PublicProfile>>>(["relationships", "friends"]);
+        const requests = queries.getQueryData<InfiniteData<FriendPage<FriendRequest>>>(["relationships", "requests"]);
+        const blocked = queries.getQueryData<InfiniteData<FriendPage<PublicProfile>>>(["relationships", "blocked"]);
+        const profile = friends?.pages.flatMap((page) => page.items).find((item) => item.id === input.id)
+          ?? requests?.pages.flatMap((page) => page.items).find((item) => item.profile.id === input.id)?.profile
+          ?? blocked?.pages.flatMap((page) => page.items).find((item) => item.id === input.id);
+        queries.setQueryData<Relationship>(["relationships", "user", input.id], { state: input.action === "block" ? "blocked" : "none", request_id: null });
+        if (input.action === "block") {
+          queries.setQueriesData<InfiniteData<FriendPage<PublicProfile>>>({ queryKey: ["relationships", "friends"] }, (previous) => previous && ({
+            ...previous, pages: previous.pages.map((page) => ({ ...page, items: page.items.filter((item) => item.id !== input.id) })),
+          }));
+          queries.setQueriesData<InfiniteData<FriendPage<FriendRequest>>>({ queryKey: ["relationships", "requests"] }, (previous) => previous && ({
+            ...previous, pages: previous.pages.map((page) => ({ ...page, items: page.items.filter((item) => item.profile.id !== input.id) })),
+          }));
+        }
+        queries.setQueriesData<InfiniteData<FriendPage<PublicProfile>>>({ queryKey: ["relationships", "blocked"] }, (previous) => {
+          if (!previous) return previous;
+          const pages = previous.pages.map((page) => ({ ...page, items: page.items.filter((item) => item.id !== input.id) }));
+          if (input.action === "block" && profile && pages[0]) pages[0] = { ...pages[0], items: [profile, ...pages[0].items] };
+          return { ...previous, pages };
+        });
+      }
+      // Refresh cached inactive tabs as well as counts and open profile actions.
+      await queries.invalidateQueries({ queryKey: ["relationships"], refetchType: "all" });
+    },
     onError: () => queries.invalidateQueries({ queryKey: ["relationships"] }),
   });
 }

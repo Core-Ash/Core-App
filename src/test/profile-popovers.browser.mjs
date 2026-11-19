@@ -10,7 +10,8 @@ import { sessionFixture } from "./auth-fixture.ts";
 const { fetch, WebSocket } = globalThis;
 const base = "http://127.0.0.1:5187";
 const debug = "http://127.0.0.1:9368";
-const artifacts = new URL("../../.artifacts/profile-popovers/", import.meta.url);
+const friendsMenu = process.argv.includes("--friends-menu");
+const artifacts = new URL(friendsMenu ? "../../.artifacts/friends-menu/" : "../../.artifacts/profile-popovers/", import.meta.url);
 await mkdir(artifacts, { recursive: true });
 const tab = await (await fetch(`${debug}/json/new?about:blank`, { method: "PUT" })).json();
 const socket = new WebSocket(tab.webSocketDebuggerUrl);
@@ -75,6 +76,9 @@ async function screenshot(name) {
 }
 const me = { ...profileFixture, username: "Ash", discriminator: "6321", display_name: "Ash" };
 const friend = { ...me, id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", username: "Dragon", discriminator: "0024", display_name: "Dragon Slayer" };
+const secondFriend = { ...friend, id: "ffffffff-ffff-4fff-8fff-ffffffffffff", username: "Player", discriminator: "1024", display_name: "Player One" };
+let longFriendList = false;
+const extraFriends = Array.from({length:22},(_,index)=>({...friend,id:`99999999-9999-4999-8999-${String(index).padStart(12,"0")}`,display_name:`Squad member ${index+1}`,username:`Player${index+1}`}));
 const conv = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", type: "direct", name: null, icon_url: null, created_by: me.id, created_at: messageFixture.created_at, updated_at: messageFixture.created_at, last_message_at: messageFixture.created_at, role: "member", hidden: false, last_message: null, members: [me, friend].map((profile) => ({id:profile.id,profile,role:"member",joined_at:messageFixture.created_at})) };
 const group = { ...conv, id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", type: "group", name: "Squad chat" };
 const messages = [{...messageFixture,author_id:friend.id,author:friend}, {...messageFixture,id:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",client_nonce:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",author_id:me.id,author:me}];
@@ -98,8 +102,8 @@ handlers.set("Fetch.requestPaused", async ({requestId,request}) => {
   else if(path===`/api/v1/conversations/${conv.id}`) data=conv;
   else if(path===`/api/v1/conversations/${group.id}`) data=group;
   else if(path.endsWith("/relationship")) data={state:"friends",request_id:null};
-  else if(path.endsWith("/friends/summary")) data={friends:1,incoming:0,outgoing:0,blocked:0};
-  else if(path.endsWith("/friends")) data={items:[friend],next_cursor:null};
+  else if(path.endsWith("/friends/summary")) data={friends:longFriendList?24:2,incoming:0,outgoing:0,blocked:0};
+  else if(path.endsWith("/friends")) data={items:[friend,secondFriend,...(longFriendList?extraFriends:[])],next_cursor:null};
   else {errors.push(`Unknown fixture route: ${path}`);data={};}
   await call("Fetch.fulfillRequest", {requestId,responseCode:200,responseHeaders:[{name:"Content-Type",value:"application/json"}],body:Buffer.from(JSON.stringify(data)).toString("base64")});
 });
@@ -107,6 +111,57 @@ try {
   await call("Page.enable"); await call("Runtime.enable"); await call("Fetch.enable",{patterns:[{urlPattern:"*"}]});
   await call("Browser.grantPermissions",{origin:base,permissions:["clipboardReadWrite","clipboardSanitizedWrite"]});
   await call("Emulation.setDeviceMetricsOverride",{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+  if (friendsMenu) {
+    await call("Page.navigate",{url:`${base}/app/friends`});
+    const trigger = '[aria-label="More options for Dragon#0024"]';
+    const secondTrigger = '[aria-label="More options for Player#1024"]';
+    const fits = "(() => {const r=document.querySelector('.user-actions-menu')?.getBoundingClientRect();return r&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;})()";
+    await click(trigger);
+    await until("document.querySelectorAll('.user-actions-menu [role=menuitem]').length===3");
+    await until(fits);
+    assert.equal(await evaluate("document.querySelector('.user-actions-menu').dataset.side"), "bottom");
+    assert.equal(await evaluate("document.querySelector('.user-actions-menu').dataset.align"), "end");
+    assert.equal(await evaluate("document.querySelector('.user-actions-menu').getBoundingClientRect().width"), 264);
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('.user-actions-menu [role=menuitem]')).map(el=>el.getBoundingClientRect().height)"), [44,44,44]);
+    assert.equal(await evaluate("!!document.querySelector('.user-actions-menu').closest('.friends-list')"), false);
+    await screenshot("desktop-menu"); checks.push("portal, right alignment, icons, equal targets");
+    const hover = await evaluate("(() => {const r=document.querySelector('.user-actions-menu [data-tone=remove]').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()");
+    await call("Input.dispatchMouseEvent",{type:"mouseMoved",...hover});
+    await screenshot("remove-hover");
+    await escape();await until("!document.querySelector('.user-actions-menu')");
+    await click(secondTrigger);
+    await until("document.querySelector('.user-actions-menu')?.getAttribute('aria-label')==='User actions for Player One'");
+    await click(trigger);
+    await until("document.querySelectorAll('.user-actions-menu').length===1 && document.querySelector('.user-actions-menu').getAttribute('aria-label')==='User actions for Dragon Slayer'");
+    checks.push("one menu at a time");
+    await click('.friends-header h1');await until("!document.querySelector('.user-actions-menu')");checks.push("outside dismissal");
+    await click(trigger);
+    await click('.user-actions-menu [role=menuitem]');
+    await checkCard("View Profile opens selected identity");
+    assert.equal(await evaluate("document.querySelector('.member-profile-name').textContent"),friend.display_name);
+    assert.equal(await evaluate("location.pathname"),"/app/friends");
+    await escape();await until("document.activeElement?.getAttribute('aria-label')==='More options for Dragon#0024'");
+    await click(trigger);await escape();await until("!document.querySelector('.user-actions-menu')");checks.push("Escape and focus restoration");
+    for (const [width,height] of [[390,844],[320,568],[800,600]]) {
+      await call("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:false});
+      await click(trigger);await until(fits);checks.push(`menu viewport ${width}x${height}`);await screenshot(`menu-${width}`);
+      await call("Emulation.setDeviceMetricsOverride",{width:width+20,height:height-50,deviceScaleFactor:1,mobile:false});
+      await until(fits);assert.equal(await evaluate("!!document.querySelector('.user-actions-menu')"),true);checks.push(`resize ${width}`);
+      await escape();await until("!document.querySelector('.user-actions-menu')");
+    }
+    longFriendList = true;
+    await call("Page.reload");
+    await until("document.querySelectorAll('.friend-row').length===24");
+    const scrolledTrigger = '.friend-row:nth-child(16) .friend-options-trigger';
+    await evaluate("document.querySelector('.friend-row:nth-child(16)').scrollIntoView({block:'end'})");
+    await click(scrolledTrigger);await until(fits);
+    assert.equal(await evaluate("document.querySelector('.user-actions-menu').dataset.side"),"top");
+    const previousTop = await evaluate("document.querySelector('.user-actions-menu').getBoundingClientRect().top");
+    await evaluate("document.querySelector('.friends-content').scrollTop+=40");
+    await until(`document.querySelector('.user-actions-menu')?.getBoundingClientRect().top<${previousTop-20}`);
+    await until(fits);checks.push("bottom-edge flip and scroll anchoring");await screenshot("scrolled-menu");
+    await escape();await until("!document.querySelector('.user-actions-menu')");
+  } else {
   await call("Page.navigate",{url:`${base}/app`});
   await until("!!document.querySelector('.message-body')");
   const before=await evaluate("JSON.stringify(document.querySelector('.message-list-container').getBoundingClientRect().toJSON())");
@@ -133,6 +188,7 @@ try {
   for(const [width,height] of [[390,844],[320,568],[800,600]]) {
     await call("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:false});
     await click('.message-profile-trigger');await checkCard(`viewport ${width}x${height}`);await screenshot(`profile-${width}`);await escape();
+  }
   }
   assert.deepEqual(errors,[]);
   const development = await evaluate("!!document.querySelector('script[src^=\"/src/main.tsx\"]')");
