@@ -264,9 +264,12 @@ export function LiveCommunityPage() {
   // Server settings remain available even without visible channels.
   if (view !== "channel")
     return (
-      <WorkspaceState title={community.name}>
-        <ServerSettings community={community} profile={profile.data} channelId={channel?.id} view={view} />
-      </WorkspaceState>
+      <ServerSettings
+        community={community}
+        profile={profile.data}
+        channelId={channel?.id}
+        view={view}
+      />
     );
   if (channels.isPending)
     return (

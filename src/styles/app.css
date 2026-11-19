@@ -2845,3 +2845,196 @@ html[data-motion="reduce"] *::after {
 .create-community-switch { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem; }
 .create-community-switch p { font-size: 0.8125rem; color: var(--muted-foreground); margin: 0; }
 @media (max-width: 380px) { .add-server-body { padding: 20px; } .add-server-choice { padding: 12px; gap: 10px; } .add-server-choice-icon { width: 36px; height: 36px; } .add-server-footer { padding: 16px; } }
+
+/* Discord-Style Server Settings */
+.server-settings-viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.server-settings-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.server-settings-sidebar-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  flex: 1 0 240px;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  min-width: 240px;
+  height: 100%;
+}
+
+.server-settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 48px 12px 60px 16px;
+}
+
+.server-settings-sidebar-header {
+  padding: 0 8px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.server-settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.server-settings-nav-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  background: transparent;
+  text-align: left;
+  transition: all 120ms ease;
+  cursor: pointer;
+  border: none;
+}
+
+.server-settings-nav-item:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
+.server-settings-nav-item.is-active {
+  background: rgba(240, 68, 80, 0.15);
+  color: #f04450;
+  font-weight: 600;
+}
+
+.server-settings-nav-item.is-destructive {
+  color: #f87171;
+}
+
+.server-settings-nav-item.is-destructive:hover {
+  background: rgba(248, 113, 113, 0.12);
+  color: #ef4444;
+}
+
+.server-settings-main-wrapper {
+  display: flex;
+  justify-content: flex-start;
+  flex: 1 1 800px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--background);
+  position: relative;
+}
+
+.server-settings-main {
+  position: relative;
+  width: 100%;
+  max-width: 920px;
+  min-height: 100%;
+  padding: 48px 48px 90px;
+}
+
+.server-settings-close-anchor {
+  position: fixed;
+  top: 36px;
+  right: 48px;
+  z-index: 55;
+}
+
+.server-settings-close-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  transition: color 120ms ease;
+}
+
+.server-settings-close-btn:hover {
+  color: var(--foreground);
+}
+
+.server-settings-close-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  transition: transform 120ms ease;
+}
+
+.server-settings-close-btn:hover .server-settings-close-circle {
+  transform: scale(1.05);
+}
+
+.server-settings-close-text {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.server-settings-content {
+  max-width: 960px;
+}
+
+.server-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 48px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .server-profile-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.server-settings-unsaved-bar {
+  position: fixed;
+  bottom: 24px;
+  left: calc(240px + (100% - 240px) / 2);
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 12px 20px;
+  background: #111214;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  animation: slide-up 180ms ease-out;
+  min-width: 440px;
+  max-width: calc(100vw - 300px);
+}
+
