@@ -4,6 +4,7 @@ import { MemberAvatar } from "@/features/community/components/MemberAvatar";
 import { MemberIdentity } from "@/features/community/members/MemberIdentity";
 import { CircleAlert } from "lucide-react";
 import { UserProfilePopover } from "@/features/profiles/UserProfilePopover";
+import { UserContextMenu } from "@/features/profiles/UserContextMenu";
 
 const messageTime = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
@@ -37,13 +38,21 @@ export function ChatMessage({
           <><time dateTime={message.createdAt} title={timestamp} aria-label={timestamp} className="grouped-timestamp">
             {messageTime.format(new Date(message.createdAt))}
           </time>
-          {message.author.profile && <UserProfilePopover profile={message.author.profile} communityId={communityId} side="right">
-            <button type="button" className="message-profile-trigger grouped-profile-trigger" aria-label={`View profile for ${message.author.name}`}><MemberAvatar member={message.author} /></button>
-          </UserProfilePopover>}</>
+          {message.author.profile && (
+            <UserContextMenu profile={message.author.profile}>
+              <UserProfilePopover profile={message.author.profile} communityId={communityId} side="right">
+                <button type="button" className="message-profile-trigger grouped-profile-trigger" aria-label={`View profile for ${message.author.name}`}><MemberAvatar member={message.author} /></button>
+              </UserProfilePopover>
+            </UserContextMenu>
+          )}</>
         ) : (
-          message.author.profile ? <UserProfilePopover profile={message.author.profile} communityId={communityId} side="right">
-            <button type="button" className="message-profile-trigger" aria-label={`View profile for ${message.author.name}`}><MemberAvatar member={message.author} /></button>
-          </UserProfilePopover> : <MemberAvatar member={message.author} />
+          message.author.profile ? (
+            <UserContextMenu profile={message.author.profile}>
+              <UserProfilePopover profile={message.author.profile} communityId={communityId} side="right">
+                <button type="button" className="message-profile-trigger" aria-label={`View profile for ${message.author.name}`}><MemberAvatar member={message.author} /></button>
+              </UserProfilePopover>
+            </UserContextMenu>
+          ) : <MemberAvatar member={message.author} />
         )}
       </div>
       <div className="message-content">
