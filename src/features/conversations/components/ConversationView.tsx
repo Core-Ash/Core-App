@@ -9,9 +9,11 @@ import type { ChatMessageData } from "@/features/community/types";
 import {
   useConversation,
   useConversationMessages,
+  useConversationNotices,
   useSendConversationMessage,
 } from "@/features/conversations/api";
 import { ConversationHeader } from "@/features/conversations/components/ConversationHeader";
+import { CoreBotNotice } from "@/features/conversations/components/CoreBotNotice";
 import { GroupMemberList } from "@/features/conversations/components/GroupMemberList";
 import { displayName } from "@/lib/display-name";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -25,6 +27,7 @@ export function ConversationView({
   const conversationQuery = useConversation(conversationId);
   const history = useConversationMessages(conversationId);
   const send = useSendConversationMessage(conversationId);
+  const { notices, dismiss: dismissNotice } = useConversationNotices(conversationId);
 
   const wide = useMediaQuery("(min-width: 1200px)");
   const [membersVisible, setMembersVisible] = useState(true);
@@ -188,6 +191,15 @@ export function ConversationView({
                     </Button>
                   </div>
                 )
+              }
+              footer={
+                notices.map((notice) => (
+                  <CoreBotNotice
+                    key={notice.id}
+                    notice={notice}
+                    onDismiss={() => dismissNotice(notice.id)}
+                  />
+                ))
               }
             />
             <MessageComposer channelName={targetName} onSend={send.send} />

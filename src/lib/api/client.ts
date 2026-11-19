@@ -58,7 +58,6 @@ export function createApiClient({
       });
       signal.throwIfAborted();
       if (!response.ok) {
-        // Discard error bodies: neither raw service messages nor diagnostics reach the UI.
         if (response.status === 401) {
           const state = await onUnauthorized();
           signal.throwIfAborted();
@@ -71,9 +70,23 @@ export function createApiClient({
             401,
           );
         }
+        let code: string | null = null;
+        try {
+          const text = await response.text();
+          if (text) {
+            const parsed = JSON.parse(text) as { code?: unknown };
+            if (typeof parsed?.code === "string") {
+              code = parsed.code;
+            }
+          }
+        } catch {
+          // Ignore parse errors on error bodies; safe fallback code applies
+        }
+        signal.throwIfAborted();
         throw responseError(
           response.status,
           response.headers.get("Retry-After"),
+          code,
         );
       }
       if (response.status === 204)

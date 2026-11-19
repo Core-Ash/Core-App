@@ -732,6 +732,94 @@
 .message-delivery-error { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 3px; color: var(--link); font-size: 11px; line-height: 18px; }
 .message-delivery-error > svg { flex-shrink: 0; }
 .message-delivery-error > button { border-radius: 3px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Core Bot system delivery notice */
+.core-bot-notice {
+  background: rgba(240, 68, 80, 0.05);
+  border-left: 3px solid #f04450;
+  border-radius: var(--row-radius);
+  padding: 8px 12px;
+  margin-top: 10px;
+}
+.core-bot-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #1e191d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(240, 68, 80, 0.3);
+}
+.core-bot-brand {
+  gap: 0;
+}
+.core-bot-brand svg {
+  width: 24px;
+  height: 24px;
+}
+.core-bot-name {
+  color: #f04450;
+  font-weight: 600;
+}
+.core-bot-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  height: 15px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  border-radius: 3px;
+  background: var(--primary);
+  color: #fff;
+  vertical-align: middle;
+}
+.core-bot-body {
+  margin-top: 4px;
+}
+.core-bot-title {
+  color: #f04450;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 20px;
+}
+.core-bot-explanation {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 18px;
+  margin-top: 2px;
+}
+.core-bot-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.core-bot-disclaimer {
+  opacity: 0.8;
+}
+.core-bot-separator {
+  opacity: 0.5;
+}
+.core-bot-dismiss {
+  color: var(--link);
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity 0.15s ease;
+}
+.core-bot-dismiss:hover {
+  opacity: 0.8;
+}
 .message-grouped {
   min-height: 22px;
   margin-top: 0;

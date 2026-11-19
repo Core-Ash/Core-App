@@ -230,4 +230,75 @@ describe("DM user context menu", () => {
     await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
     expect(fetcher).toHaveBeenCalledWith(`https://core.test/users/${friend.id}/block`, expect.objectContaining({ method: "POST", credentials: "include" }));
   });
+  it("renders a Core Bot notice and removes pending send when DM send returns DIRECT_MESSAGE_NOT_DELIVERED", async () => {
+    const fetcher = vi.fn(async (url: string, options?: RequestInit) => {
+      const path = new URL(url).pathname;
+      if (path === `/conversations/${id}/messages` && options?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            code: "DIRECT_MESSAGE_NOT_DELIVERED",
+            error: "Your message could not be delivered.",
+          }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (path === `/conversations/${id}/messages`) return Response.json({ items: [], next_cursor: null });
+      if (path === `/conversations/${id}`) return Response.json({ ...raw, role: "member" });
+      if (path === "/conversations") return Response.json({ items: [summary] });
+      if (path === "/bootstrap") return Response.json({ profile: profileFixture, communities: { items: [] } });
+      if (path === "/profile") return Response.json(profileFixture);
+      if (path === "/friends/summary") return Response.json({ friends: 0, incoming: 0, outgoing: 0, blocked: 1 });
+      if (path === "/friends") return Response.json({ items: [], next_cursor: null });
+      return new Response(null, { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const api = createApiClient({
+      baseUrl: "https://core.test",
+      sessionSignal: () => new AbortController().signal,
+      onUnauthorized: async () => "active",
+    });
+    const queries = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    queries.setQueryData(["profile"], profileFixture);
+    queries.setQueryData(["conversations"], [summary]);
+
+    render(
+      <QueryClientProvider client={queries}>
+        <AppDataContext.Provider
+          value={{
+            api,
+            ready: true,
+            configured: true,
+            configurationError: null,
+            clearPrivateData: vi.fn(),
+          }}
+        >
+          <MemoryRouter initialEntries={[`/app/messages/${id}`]}>
+            <Routes>
+              <Route path="/app/messages/:conversationId" element={<MessagesPage />} />
+            </Routes>
+          </MemoryRouter>
+        </AppDataContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    const input = await screen.findByRole("textbox", { name: "Message #Dragon Slayer" });
+    fireEvent.change(input, { target: { value: "Hello friend" } });
+    fireEvent.submit(input.closest("form")!);
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Core Bot")).toBeInTheDocument();
+    expect(screen.getByText("Your message could not be delivered.")).toBeInTheDocument();
+    expect(screen.getByText("Dismiss message")).toBeInTheDocument();
+
+    // Verify pending message was discarded, not showing retry
+    expect(screen.queryByText("Retry")).not.toBeInTheDocument();
+
+    // Dismiss notice
+    fireEvent.click(screen.getByText("Dismiss message"));
+    await waitFor(() => {
+      expect(screen.queryByText("Your message could not be delivered.")).not.toBeInTheDocument();
+    });
+  });
 });

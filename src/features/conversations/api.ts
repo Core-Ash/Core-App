@@ -11,6 +11,7 @@ export const conversationQueryKeys = {
   conversation: (id?: string) => ["conversations", id] as const,
   members: (id?: string) => ["conversation-members", id] as const,
   messages: (id?: string) => ["conversation-messages", id] as const,
+  notices: (id?: string) => ["conversation-bot-notices", id] as const,
 };
 
 export interface LocalConversationMessage {
@@ -128,6 +129,25 @@ export function useSendConversationMessage(conversationId: string) {
       });
     },
     onError: (error, input) => {
+      if (
+        error instanceof ApiError &&
+        (error.code === "DIRECT_MESSAGE_NOT_DELIVERED" ||
+          (error.status === 403 &&
+            error.message.includes("could not be delivered")))
+      ) {
+        // Remove pending message from outbox and spawn sender-only Core Bot notice
+        update(input.client_nonce, () => null);
+        const noticeKey = conversationQueryKeys.notices(conversationId);
+        queries.setQueryData<{ id: string; createdAt: string }[]>(
+          noticeKey,
+          (previous = []) => {
+            const now = new Date().toISOString();
+            return [...previous, { id: input.client_nonce, createdAt: now }];
+          },
+        );
+        return;
+      }
+
       update(input.client_nonce, (entry) => ({
         ...entry,
         status: "failed",
@@ -181,6 +201,28 @@ export function useSendConversationMessage(conversationId: string) {
         error: undefined,
       }));
       mutation.mutate({ body: entry.message.body!, client_nonce: nonce });
+    },
+  };
+}
+
+export function useConversationNotices(conversationId?: string) {
+  const queries = useQueryClient();
+  const key = conversationQueryKeys.notices(conversationId);
+  const notices = useQuery({
+    queryKey: key,
+    queryFn: () => queries.getQueryData<{ id: string; createdAt: string }[]>(key) ?? [],
+    initialData: [],
+    enabled: Boolean(conversationId),
+    gcTime: Infinity,
+  });
+
+  return {
+    notices: notices.data,
+    dismiss: (id: string) => {
+      queries.setQueryData<{ id: string; createdAt: string }[]>(
+        key,
+        (previous = []) => previous.filter((notice) => notice.id !== id),
+      );
     },
   };
 }

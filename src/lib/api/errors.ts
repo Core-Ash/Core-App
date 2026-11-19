@@ -42,6 +42,7 @@ export class ApiError extends Error {
     public readonly kind: ApiErrorKind,
     public readonly status: number | null = null,
     public readonly retryAfter: number | null = null,
+    public readonly code: string | null = null,
   ) {
     super(messages[kind]);
     this.name = "ApiError";
@@ -51,6 +52,7 @@ export class ApiError extends Error {
 export function responseError(
   status: number,
   retryAfter: string | null,
+  code: string | null = null,
 ): ApiError {
   const seconds =
     retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
@@ -68,7 +70,7 @@ export function responseError(
               : [400, 413, 415, 422].includes(status)
                 ? "validation"
                 : "unavailable";
-  return new ApiError(kind, status, seconds);
+  return new ApiError(kind, status, seconds, code);
 }
 
 export function apiErrorMessage(error: unknown): string {

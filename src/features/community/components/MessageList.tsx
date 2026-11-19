@@ -10,12 +10,14 @@ export function MessageList({
   searching,
   historyControls,
   communityId,
+  footer,
 }: {
   messages: readonly ChatMessageData[];
   channel: { name: string };
   searching: boolean;
   historyControls?: ReactNode;
   communityId?: string;
+  footer?: ReactNode;
 }) {
   const scrollArea = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
@@ -66,7 +68,7 @@ export function MessageList({
             {messages.length === 1 ? "message" : "messages"}
           </p>
         )}
-        {messages.length === 0 ? (
+        {messages.length === 0 && !footer ? (
           <EmptyState
             icon={searching ? Search : MessageSquare}
             title={
@@ -103,6 +105,7 @@ export function MessageList({
                   />
                 );
               })}
+              {footer}
             </ol>
           </>
         )}
