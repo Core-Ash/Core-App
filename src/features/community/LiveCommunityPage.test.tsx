@@ -303,7 +303,7 @@ describe("Rust-backed community workspace", () => {
         : original(input, options),
     );
     expect(
-      await screen.findByText("Loading message historyâ€¦"),
+      await screen.findByRole("status", { name: "Loading message history…" }),
     ).toBeInTheDocument();
     await act(async () => {
       finish(Response.json({ items: [], next_cursor: null }));

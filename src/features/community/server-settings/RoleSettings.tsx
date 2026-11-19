@@ -29,6 +29,7 @@ import {
 } from "./api";
 import { useQuery } from "@tanstack/react-query";
 import { useAppData } from "@/app/app-data-context";
+import { RoleListSkeleton } from "@/components/common/skeleton/Skeletons";
 import type { ServerMember } from "@/lib/api/types";
 import type { ServerRoleData, ServerSettingsData } from "./types";
 import { cn } from "@/lib/utils";
@@ -256,7 +257,9 @@ export function RoleSettings({
         </div>
 
         <div className="divide-y divide-border/60">
-          {filteredRoles.length === 0 ? (
+          {rolesQuery.isPending ? (
+            <RoleListSkeleton rows={4} />
+          ) : filteredRoles.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
               {search.trim() ? "No roles match your search." : "No custom roles created yet."}
             </div>

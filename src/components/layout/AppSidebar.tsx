@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Users, X } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router";
 import { ApiNotice } from "@/components/common/ApiNotice";
+import { ConversationListSkeleton } from "@/components/common/skeleton/Skeletons";
 import { ConversationSearchDialog } from "@/features/conversations/components/ConversationSearchDialog";
 import { UserPanel } from "@/components/layout/UserPanel";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -95,7 +96,7 @@ function PersonalSidebar({ onNavigate }: { onNavigate?: () => void }) {
         </div>
 
         {conversationsQuery.isPending && (
-          <p className="personal-dm-empty">Loading conversations…</p>
+          <ConversationListSkeleton />
         )}
 
         {!conversationsQuery.isPending && conversations.length === 0 && (

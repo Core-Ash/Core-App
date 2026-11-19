@@ -10,6 +10,7 @@ import {
   useBanMember,
 } from "./api";
 import { MemberRoleSelector } from "./MemberRoleSelector";
+import { MemberTableSkeleton } from "@/components/common/skeleton/Skeletons";
 import type { ServerMember } from "@/lib/api/types";
 import type { ServerSettingsData } from "./types";
 
@@ -89,17 +90,20 @@ export function MemberSettings({
 
       {/* Members Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-border/80 bg-neutral-900/60 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              <th className="py-3 px-4">Member</th>
-              <th className="py-3 px-4">Roles</th>
-              <th className="py-3 px-4">Joined</th>
-              {canManage && <th className="py-3 px-4 text-right">Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/40 text-sm">
-            {members.map((member) => {
+        {membersQuery.isPending ? (
+          <MemberTableSkeleton rows={5} />
+        ) : (
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border/80 bg-neutral-900/60 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <th className="py-3 px-4">Member</th>
+                <th className="py-3 px-4">Roles</th>
+                <th className="py-3 px-4">Joined</th>
+                {canManage && <th className="py-3 px-4 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40 text-sm">
+              {members.map((member) => {
               const isOwner = member.id === settings.owner_id;
               const joined = new Date(member.joined_at);
               const formattedDate = !isNaN(joined.getTime())
@@ -236,6 +240,7 @@ export function MemberSettings({
             )}
           </tbody>
         </table>
+        )}
       </div>
 
       {/* Ban Dialog */}

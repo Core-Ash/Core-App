@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApiNotice } from "@/components/common/ApiNotice";
+import { ChatMessageSkeleton } from "@/components/common/skeleton/Skeletons";
 import { useCurrentUser } from "@/features/community/api/hooks";
 import { MessageComposer } from "@/features/community/components/MessageComposer";
 import { MessageList } from "@/features/community/components/MessageList";
@@ -153,9 +154,7 @@ export function ConversationView({
 
       <div className="chat-column">
         {history.isPending && !send.entries.length ? (
-          <div className="flex-1 flex items-center justify-center p-8 text-muted-foreground">
-            <p>Loading message history…</p>
-          </div>
+          <ChatMessageSkeleton />
         ) : history.error &&
           !history.data &&
           !send.entries.length ? (

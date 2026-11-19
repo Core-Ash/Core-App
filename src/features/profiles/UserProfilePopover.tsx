@@ -10,6 +10,7 @@ import { CopyUsername } from "@/features/friends/CopyUsername";
 import { RelationshipActions } from "@/features/friends/RelationshipActions";
 import { useServerPermissions } from "@/features/community/server-settings/api";
 import { MemberRoleSelector } from "@/features/community/server-settings/MemberRoleSelector";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { MemberRole, PublicProfile } from "@/lib/api/types";
 import { displayName, fullUsername, publicUsername } from "@/lib/display-name";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -118,6 +119,17 @@ function ProfileActions({ profile }: { profile: PublicProfile }) {
 function LoadedCommunityDetails({ communityId, profile }: { communityId: string; profile: PublicProfile }) {
   // Fetch only while open; React Query scopes these results by community/search.
   const members = useMembers(communityId, undefined, profile.username);
+  if (members.isPending) {
+    return (
+      <div className="space-y-2 mt-3 pt-3 border-t border-border/40" aria-label="Loading member roles">
+        <Skeleton variant="text" width={48} height={12} className="bg-white/[0.06]" />
+        <div className="flex gap-1.5">
+          <Skeleton variant="rounded" width={56} height={20} className="rounded bg-white/[0.06]" />
+          <Skeleton variant="rounded" width={68} height={20} className="rounded bg-white/[0.06]" />
+        </div>
+      </div>
+    );
+  }
   const member = !members.isError && members.data?.pages.flatMap((page) => page.items).find((item) => item.id === profile.id);
   return member ? (
     <CommunityDetails

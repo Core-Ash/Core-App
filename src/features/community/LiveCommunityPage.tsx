@@ -4,6 +4,7 @@ import { Compass, Hash, Menu, X } from "lucide-react";
 import { useOutletContext } from "react-router";
 import { useAppData } from "@/app/app-data-context";
 import { ApiNotice } from "@/components/common/ApiNotice";
+import { ChatMessageSkeleton } from "@/components/common/skeleton/Skeletons";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -132,7 +133,7 @@ function LiveConversation({
       />
       <div className="chat-column">
             {history.isPending && !send.entries.length ? (
-              <ApiNotice loading="Loading message historyâ€¦" />
+              <ChatMessageSkeleton />
             ) : history.error && ((!history.data && !send.entries.length) || (history.error instanceof ApiError && ["unauthorized", "forbidden", "session_transport", "auth_unavailable"].includes(history.error.kind))) ? (
               <ApiNotice
                 error={history.error}

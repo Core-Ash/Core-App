@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
 import { useMembers } from "@/features/community/api/hooks";
 import { MemberIdentity } from "@/features/community/members/MemberIdentity";
+import { MemberSidebarSkeleton } from "@/components/common/skeleton/Skeletons";
 
 export function MemberDirectory({ communityId, channelId }: { communityId: string; channelId?: string }) {
   const query = useMembers(communityId, channelId, "");
@@ -14,10 +15,7 @@ export function MemberDirectory({ communityId, channelId }: { communityId: strin
       <div className="member-sidebar-scroll">
         <h2 className="member-list-heading">Members{total !== undefined && !query.isError ? ` — ${total}` : ""}</h2>
         {query.isError ? <ApiNotice compact error={query.error} onRetry={() => { void query.refetch(); }} />
-          : query.isPending ? <div role="status" aria-label="Loading members" className="space-y-2">
-            <span className="sr-only">Loading members…</span>
-            {[0,1,2,3].map((value) => <div key={value} className="h-10 animate-pulse rounded-md bg-muted motion-reduce:animate-none" aria-hidden="true" />)}
-          </div> : members.length ? <>
+          : query.isPending ? <MemberSidebarSkeleton count={6} /> : members.length ? <>
             <ul className="member-list" aria-label="Members">{members.map((member) => <li className="member-row" key={member.id}>
               <MemberIdentity profile={member} communityId={communityId} roles={member.roles} joinedAt={member.joined_at} username={false} />
             </li>)}</ul>

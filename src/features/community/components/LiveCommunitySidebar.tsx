@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from "react";
 import { CalendarDays, Hash, Plus, Volume2 } from "lucide-react";
 import { Link } from "react-router";
 import { ApiNotice } from "@/components/common/ApiNotice";
+import { ChannelSidebarSkeleton } from "@/components/common/skeleton/Skeletons";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CreateChannelDialog } from "@/features/community/components/CreateResourceDialog";
 import { ChannelCategory as ChannelCategorySection } from "@/features/community/components/ChannelCategory";
@@ -267,7 +268,7 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
 
         {community && (
           <>
-            {channels.isPending && <ApiNotice loading="Loading channels…" />}
+            {channels.isPending && <ChannelSidebarSkeleton />}
             {channels.error && (
               <ApiNotice
                 compact

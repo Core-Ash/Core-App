@@ -4,6 +4,7 @@ import { useOutletContext, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiNotice } from "@/components/common/ApiNotice";
+import { FriendListSkeleton } from "@/components/common/skeleton/Skeletons";
 import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
 import { MemberIdentity } from "@/features/community/members/MemberIdentity";
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
@@ -91,7 +92,7 @@ function FriendList({ kind, onAdd }: { kind: ListKind; onAdd: () => void }) {
     return `${profile.display_name} ${fullUsername(profile)}`.toLowerCase().includes(search.trim().toLowerCase());
   });
   const label = kind === "friends" ? "All friends" : kind === "blocked" ? "Blocked users" : "Pending requests";
-  if (query.isPending) return <ApiNotice loading={`Loading ${label.toLowerCase()}…`} />;
+  if (query.isPending) return <FriendListSkeleton showSearch={kind === "friends"} />;
   if (query.isError && !query.data) return <ApiNotice error={query.error} onRetry={() => void query.refetch()} />;
   const requests = kind === "requests" ? unique as FriendRequest[] : [];
   return <section className="friends-list-section" aria-label={label}>
