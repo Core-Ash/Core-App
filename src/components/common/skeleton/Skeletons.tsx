@@ -1,5 +1,4 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
 export function FriendListSkeleton({ count = 6, showSearch = true }: { count?: number; showSearch?: boolean }) {
   return (

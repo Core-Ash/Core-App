@@ -59,4 +59,12 @@ describe("persisted message composer", () => {
     expect(screen.getByRole("button", { name: "Image uploads unavailable" })).toBeDisabled();
     expect(send).not.toHaveBeenCalled();
   });
+  it("renders disabled read-only bar when user lacks send permissions", () => {
+    const send = vi.fn();
+    render(<MessageComposer channelName="dragon-hunt" canSendMessages={false} onSend={send} />);
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send message" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Messaging disabled" })).toBeInTheDocument();
+    expect(screen.getByText("You do not have permission to send messages in #dragon-hunt.")).toBeInTheDocument();
+  });
 });

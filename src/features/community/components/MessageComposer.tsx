@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from "react";
-import { Image, Plus, SendHorizontal, Smile } from "lucide-react";
+import { Image, Lock, Plus, SendHorizontal, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmojiPicker } from "@/components/ui/emoji-picker";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -7,11 +7,15 @@ import { apiErrorMessage } from "@/lib/api/errors";
 
 interface MessageComposerProps {
   channelName: string;
+  canSendMessages?: boolean;
+  disabledReason?: string;
   onSend: (body: string) => void;
 }
 
 export function MessageComposer({
   channelName,
+  canSendMessages = true,
+  disabledReason,
   onSend,
 }: MessageComposerProps) {
   const [draft, setDraft] = useState("");
@@ -22,7 +26,7 @@ export function MessageComposer({
   const maximum = 4000;
   const ready = draft.trim().length > 0;
   function send() {
-    if (!ready || locked.current) return;
+    if (!ready || locked.current || !canSendMessages) return;
     if (Array.from(draft.trim()).length > maximum || draft.includes("\0")) {
       setError(
         `Enter a message with 1–${maximum} characters and no unsupported control characters.`,
@@ -54,6 +58,23 @@ export function MessageComposer({
       void send();
     }
   }
+  if (!canSendMessages) {
+    return (
+      <div className="composer-area">
+        <div
+          className="message-composer message-composer-disabled"
+          role="region"
+          aria-label="Messaging disabled"
+        >
+          <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+          <span className="text-sm text-muted-foreground select-none">
+            {disabledReason ?? `You do not have permission to send messages in #${channelName}.`}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="composer-area">
       <form

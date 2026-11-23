@@ -17,7 +17,7 @@ function provider(children: ReactNode) {
 }
 function setup(children: ReactNode = <ChannelSettings community={communityFixture} channel={channelFixture} />) {
   const request = vi.fn<(url: string, options?: RequestInit) => Promise<Response>>(async (url) => Response.json(url.endsWith("/members?search=&limit=50") ? { ...memberPageFixture, channel_id: null } : channelAccessFixture));
-  vi.stubGlobal("fetch", request);
+  vi.stubGlobal("fetch", (url: string, options?: RequestInit) => url.includes("/permission-resources/") ? Promise.resolve(Response.json({ version: "fixture", resource: { name: "general" }, entries: [], roles: [], members: [] })) : request(url, options));
   return { request, ...render(provider(children)) };
 }
 async function openViewer() {

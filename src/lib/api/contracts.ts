@@ -115,6 +115,7 @@ export function parseChannel(value: unknown): Channel {
     category_id: data.category_id ? uuid(data.category_id) : null,
     kind: data.kind === "voice" ? "voice" : "text",
     is_muted: Boolean(data.is_muted),
+    can_send_messages: typeof data.can_send_messages === "boolean" ? data.can_send_messages : true,
   };
 }
 export function parseMessage(value: unknown): Message {
@@ -177,7 +178,7 @@ function accessRole(value: unknown): AccessRole {
 function accessSource(value: unknown): AccessSource {
   const data = record(value);
   const kind = string(data.kind);
-  if (!["owner", "member_allow", "member_deny", "role_allow", "role_deny", "inherited", "no_grant"].includes(kind))
+  if (!["owner", "administrator", "member_allow", "member_deny", "role_allow", "role_deny", "inherited", "no_grant"].includes(kind))
     throw new ApiError("invalid_response");
   if (["role_allow", "role_deny", "inherited"].includes(kind))
     return { kind: kind as AccessSource["kind"], role_id: uuid(data.role_id), role_name: string(data.role_name) };

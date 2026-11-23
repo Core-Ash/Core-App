@@ -164,7 +164,11 @@ function LiveConversation({
                     </div>
                   }
                 />
-                <MessageComposer channelName={channel.name} onSend={send.send} />
+                <MessageComposer
+                  channelName={channel.name}
+                  canSendMessages={channel.can_send_messages !== false}
+                  onSend={send.send}
+                />
               </>
             )}
       </div>

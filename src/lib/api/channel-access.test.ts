@@ -7,12 +7,15 @@ import { channelAccessFixture, channelFixture, communityFixture } from "@/test/a
 
 afterEach(() => vi.unstubAllGlobals());
 describe("channel access boundary", () => {
+  it("accepts Administrator bypass explanations", () => {
+    expect(parseChannelAccess({...channelAccessFixture, items:[{...channelAccessFixture.items[0], sources:[{kind:"administrator"}]}]}).items[0]?.sources[0]?.kind).toBe("administrator");
+  });
   it("rejects malformed member data, permission sources, colors, counts, and cursors", () => {
     const corruptions = [
       { total_allowed: -1 }, { total_denied: "3" }, { filtered_total: null },
       { next_cursor: "not-uuid" }, { channel: { id: channelFixture.id } },
       { roles: [{ ...channelAccessFixture.roles[0], color: "url(https://untrusted.test)" }] },
-      { items: [{ ...channelAccessFixture.items[0], sources: [{ kind: "administrator" }] }] },
+      { items: [{ ...channelAccessFixture.items[0], sources: [{ kind: "unsupported_source" }] }] },
       { items: [{ ...channelAccessFixture.items[0], sources: [{ kind: "role_allow" }] }] },
       { items: [{ ...channelAccessFixture.items[0], sources: [] }] },
       { items: [{ ...channelAccessFixture.items[0], allowed: "true" }] },

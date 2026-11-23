@@ -61,7 +61,7 @@ describe("member directories", () => {
   it("shows loading and empty states", async () => {
     let finish!: (response: Response) => void;
     setup(undefined, () => new Promise<Response>((resolve) => { finish = resolve; }));
-    expect(screen.getByRole("status", { name: "Loading members" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /^Loading members/ })).toBeInTheDocument();
     await act(async () => { finish(Response.json({ ...memberPageFixture, items: [], total: 0 })); });
     expect(await screen.findByRole("heading", { name: "No members to show" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Members — 0" })).toBeInTheDocument();

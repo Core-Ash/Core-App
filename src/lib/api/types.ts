@@ -47,6 +47,7 @@ export interface Channel {
   category_id?: string | null;
   kind?: "text" | "voice";
   is_muted?: boolean;
+  can_send_messages?: boolean;
 }
 export interface Message {
   id: string;
@@ -67,7 +68,7 @@ export interface MessagePage {
   next_cursor: MessageCursor | null;
 }
 
-export type AccessSourceKind = "owner" | "member_allow" | "member_deny" | "role_allow" | "role_deny" | "inherited" | "no_grant";
+export type AccessSourceKind = "owner" | "administrator" | "member_allow" | "member_deny" | "role_allow" | "role_deny" | "inherited" | "no_grant";
 export interface AccessSource {
   kind: AccessSourceKind;
   role_id?: string;

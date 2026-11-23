@@ -1,3 +1,4 @@
+import { PermissionsEditor } from "./PermissionsEditor";
 import { useEffect, useId, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ArrowLeft, Eye, Folder, LockKeyhole, RefreshCw, Settings, Shield, X } from "lucide-react";
@@ -14,6 +15,7 @@ import type { AccessSource, Channel, Community } from "@/lib/api/types";
 function sourceLabel(source: AccessSource): string {
   switch (source.kind) {
     case "owner": return "Community owner";
+    case "administrator": return "Administrator bypass";
     case "member_allow": return "Explicit member allow";
     case "member_deny": return "Explicit member denial";
     case "role_allow": return `Channel allow through ${source.role_name}`;
@@ -72,7 +74,7 @@ export function ChannelSettings({ community, channel, open: controlledOpen, onOp
                 <ChannelOverviewForm key={channel.id} community={community} channel={channel} />
               ) : view === "permissions" ? (
                 <>
-                  <h2 className="text-lg font-semibold">Permissions</h2>
+                  <PermissionsEditor communityId={community.id} resourceId={channel.id} />
                   <p className="my-3 text-sm text-muted-foreground">
                     See who can view this channel and how access is granted.
                     Community owners and members with channel management permission can inspect access.
@@ -80,7 +82,7 @@ export function ChannelSettings({ community, channel, open: controlledOpen, onOp
                   <Button variant="outline" onClick={() => setView("access")}>
                     <Eye aria-hidden="true" /> View Channel Access
                   </Button>
-                  <p className="mt-4 text-sm text-muted-foreground">Permission editing is unavailable here.</p>
+
                 </>
               ) : (
                 <>
@@ -220,7 +222,7 @@ export function ChannelAccess({ communityId, channelId }: { communityId: string;
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Owners always have access. Any explicit denial overrides other grants for members.
+        Owners always have access. Member overrides take precedence over role overrides; role allows override other role denials.
         Inherited access comes from a community role.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -282,7 +284,7 @@ export function ChannelAccess({ communityId, channelId }: { communityId: string;
               {query.isFetchingNextPage ? "Loading members…" : "Load more members"}
             </Button>}
           </section>
-          <p className="text-xs text-muted-foreground">Access refreshes every 30 seconds while open. Categories and administrator bypass are unavailable.</p>
+          <p className="text-xs text-muted-foreground">Access refreshes every 30 seconds while open. Owner and Administrator access bypass ordinary channel overrides.</p>
         </>
       )}
     </div>

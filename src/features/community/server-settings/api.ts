@@ -131,6 +131,7 @@ export function useUpdateServerRole(communityId: string) {
       mentionable?: boolean;
     }) => api.patch(`/communities/${communityId}/roles/${roleId}`, data),
     onSuccess: () => {
+      for (const key of [["channels",communityId],["channel-access",communityId],["permission-overwrites",communityId],["server-permissions",communityId],["server-settings",communityId],["categories",communityId]]) void queryClient.invalidateQueries({queryKey:key});
       void queryClient.invalidateQueries({
         queryKey: serverSettingsKeys.roles(communityId),
       });

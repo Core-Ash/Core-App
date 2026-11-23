@@ -1,3 +1,4 @@
+import { PermissionsEditor } from "@/features/community/access/PermissionsEditor";
 import { useState, useRef, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { FolderPlus, Lock, X } from "lucide-react";
@@ -28,7 +29,7 @@ export function CreateCategoryDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="standard-dialog max-w-md w-full bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border">
+        <Dialog.Content className="standard-dialog w-full max-w-4xl bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border">
           {open && (
             <CreateCategoryDialogContent
               communityId={communityId}
@@ -233,14 +234,14 @@ export function EditCategoryDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="standard-dialog max-w-md w-full bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border">
+        <Dialog.Content className="standard-dialog w-full max-w-4xl bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border">
           {open && (
-            <EditCategoryDialogContent
+            <div><EditCategoryDialogContent
               key={category.id}
               communityId={communityId}
               category={category}
               onClose={() => onOpenChange(false)}
-            />
+            /><PermissionsEditor communityId={communityId} resourceId={category.id} kind="categories" /></div>
           )}
         </Dialog.Content>
       </Dialog.Portal>
@@ -258,13 +259,9 @@ function EditCategoryDialogContent({
   onClose: () => void;
 }) {
   const [name, setName] = useState(category.name);
-  const [isPrivate, setIsPrivate] = useState(category.is_private);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const updateMutation = useUpdateCategory(communityId);
-  const rolesQuery = useServerRoles(communityId);
-  const roles = rolesQuery.data?.items ?? [];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -279,19 +276,11 @@ function EditCategoryDialogContent({
       await updateMutation.mutateAsync({
         categoryId: category.id,
         name: trimmed,
-        is_private: isPrivate,
-        roles: isPrivate ? selectedRoles : undefined,
       });
       onClose();
     } catch (err) {
       setError(apiErrorMessage(err) || "Failed to update category");
     }
-  }
-
-  function toggleRole(roleId: string) {
-    setSelectedRoles((prev) =>
-      prev.includes(roleId) ? prev.filter((r) => r !== roleId) : [...prev, roleId],
-    );
   }
 
   return (
@@ -334,55 +323,6 @@ function EditCategoryDialogContent({
           />
         </div>
 
-        <div className="rounded-lg border border-border p-3.5 bg-background/50 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-1.5 font-semibold text-sm text-foreground">
-                <Lock className="size-3.5 text-muted-foreground" />
-                <span>Private Category</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Only selected roles and members will be able to view this category.
-              </p>
-            </div>
-            <Switch
-              checked={isPrivate}
-              onCheckedChange={setIsPrivate}
-              disabled={updateMutation.isPending}
-            />
-          </div>
-
-          {isPrivate && roles.length > 0 && (
-            <div className="pt-2 border-t border-border space-y-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Role Access Overrides
-              </span>
-              <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                {roles.map((role) => (
-                  <label
-                    key={role.id}
-                    className="flex items-center justify-between p-1.5 rounded hover:bg-surface-hover cursor-pointer text-xs"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="size-2.5 rounded-full"
-                        style={{ backgroundColor: role.color || "#94a3b8" }}
-                      />
-                      <span className="font-medium text-foreground">{role.name}</span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={selectedRoles.includes(role.id)}
-                      onChange={() => toggleRole(role.id)}
-                      className="size-4 rounded border-border accent-primary"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
         {error && (
           <p role="alert" className="text-xs text-destructive font-medium">
             {error}
@@ -402,7 +342,7 @@ function EditCategoryDialogContent({
             type="submit"
             disabled={updateMutation.isPending || !name.trim()}
           >
-            {updateMutation.isPending ? "Saving..." : "Save Changes"}
+            {updateMutation.isPending ? "Saving..." : "Save Category Name"}
           </Button>
         </div>
       </form>

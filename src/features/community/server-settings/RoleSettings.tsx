@@ -33,6 +33,7 @@ import { RoleListSkeleton } from "@/components/common/skeleton/Skeletons";
 import type { ServerMember } from "@/lib/api/types";
 import type { ServerRoleData, ServerSettingsData } from "./types";
 import { cn } from "@/lib/utils";
+import { apiErrorMessage } from "@/lib/api/errors";
 
 const DISCORD_PALETTE = [
   "#1abc9c", "#2ecc71", "#3498db", "#9b59b6", "#e91e63", "#f1c40f",
@@ -115,8 +116,8 @@ export function RoleSettings({
   const [dragOverRoleId, setDragOverRoleId] = useState<string | null>(null);
 
   const items = rolesQuery.data?.items ?? [];
-  const defaultRole = items.find((r) => r.is_default || r.name === "@everyone");
-  const customRoles = items.filter((r) => !r.is_default && r.name !== "@everyone");
+  const defaultRole = items.find((r) => r.is_default);
+  const customRoles = items.filter((r) => !r.is_default);
 
   const filteredRoles = useMemo(() => {
     if (!search.trim()) return customRoles;
@@ -421,7 +422,7 @@ function RoleEditorView({
 }) {
   const updateRole = useUpdateServerRole(communityId);
 
-  const [activeTab, setActiveTab] = useState<"display" | "permissions" | "links" | "members">("display");
+  const [activeTab, setActiveTab] = useState<"display" | "permissions" | "links" | "members">(selectedRole.is_default ? "permissions" : "display");
 
   // Draft changes
   const [draftName, setDraftName] = useState(selectedRole.name);
@@ -437,6 +438,7 @@ function RoleEditorView({
   const handleRoleSwitch = (target: ServerRoleData) => {
     if (target.id === selectedRole.id) return;
     onSelectRole(target);
+    setActiveTab(target.is_default ? "permissions" : "display");
     setDraftName(target.name);
     setDraftColor(target.color || "#99aab5");
     setDraftHoist(Boolean(target.hoist));
@@ -461,9 +463,9 @@ function RoleEditorView({
       await updateRole.mutateAsync({
         roleId: selectedRole.id,
         name: selectedRole.is_default ? undefined : draftName.trim(),
-        color: selectedRole.is_default ? null : draftColor,
-        hoist: draftHoist,
-        mentionable: draftMentionable,
+        color: selectedRole.is_default ? undefined : draftColor,
+        hoist: selectedRole.is_default ? undefined : draftHoist,
+        mentionable: selectedRole.is_default ? undefined : draftMentionable,
         permissions: draftPerms,
       });
       setHasChanges(false);
@@ -472,7 +474,7 @@ function RoleEditorView({
     }
   };
 
-  const isDefaultRole = Boolean(selectedRole.is_default || selectedRole.name === "@everyone");
+  const isDefaultRole = Boolean(selectedRole.is_default);
 
   return (
     <div className="flex h-full min-h-[600px] border border-border rounded-xl overflow-hidden bg-background">
@@ -536,7 +538,7 @@ function RoleEditorView({
           </h2>
 
           <div className="flex items-center gap-6 mt-4 border-b border-transparent">
-            {(["display", "permissions", "links", "members"] as const).map((tab) => (
+            {(["display", "permissions", "links", "members"] as const).filter(tab => !isDefaultRole || tab === "permissions").map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -770,7 +772,8 @@ function RoleEditorView({
                                 </div>
                               </div>
                               <Switch
-                                disabled={!canManage}
+                                disabled={!canManage || updateRole.isPending || (isDefaultRole && perm.key === "administrator")}
+                                aria-label={perm.label}
                                 checked={enabled}
                                 onCheckedChange={(checked) => {
                                   if (perm.dangerous && checked) {
@@ -819,6 +822,7 @@ function RoleEditorView({
         </div>
 
         {/* Unsaved Changes Floating Bar */}
+        {updateRole.isError && <p role="alert" className="px-6 py-3 text-sm text-destructive">{apiErrorMessage(updateRole.error)} Your draft is preserved.</p>}
         {hasChanges && (
           <div className="sticky bottom-4 left-6 right-6 mx-6 p-3 rounded-xl border border-border bg-popover/95 backdrop-blur-md shadow-2xl flex items-center justify-between z-40 animate-in slide-in-from-bottom-2">
             <span className="text-sm font-medium text-foreground">
