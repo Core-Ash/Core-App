@@ -3038,3 +3038,68 @@ html[data-motion="reduce"] *::after {
   max-width: calc(100vw - 300px);
 }
 
+/* Shared surfaces and rows for channel menus and their portalled submenus. */
+.core-context-menu {
+  z-index: 70;
+  width: 268px;
+  max-width: calc(100vw - 16px);
+  max-height: min(var(--radix-dropdown-menu-content-available-height, 100dvh), calc(100dvh - 16px));
+  overflow-y: auto;
+  padding: 7px;
+  border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-secondary) 96%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 36px #0005, 0 2px 8px #0003;
+  color: var(--muted-foreground);
+  outline: none;
+}
+.core-context-submenu { z-index: 80; width: 248px; }
+.core-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  color: color-mix(in srgb, var(--foreground) 82%, var(--muted-foreground));
+  cursor: pointer;
+  outline: none;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+.core-context-menu-item > svg, .core-context-menu-check svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  transition: color 140ms ease-out;
+}
+.core-context-menu-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.core-context-menu-item > .core-context-menu-chevron { margin-left: auto; width: 15px; height: 15px; }
+.core-context-menu-check { display: inline-flex; width: 17px; flex-shrink: 0; }
+.core-context-menu-item:not([data-disabled]):is(:hover, :focus-visible, [data-highlighted], [data-state="open"]) {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+.core-context-menu-item:not([data-disabled]):is(:hover, :focus-visible, [data-highlighted], [data-state="open"]) > svg { color: inherit; }
+.core-context-menu-item:focus-visible { box-shadow: inset 0 0 0 1px var(--ring); }
+.core-context-menu-item[data-tone="danger"] { color: var(--destructive); background: color-mix(in srgb, var(--destructive) 5%, transparent); }
+.core-context-menu-item[data-tone="danger"] > svg { color: inherit; }
+.core-context-menu-item[data-tone="danger"]:not([data-disabled]):is(:hover, :focus-visible, [data-highlighted]) {
+  background: color-mix(in srgb, var(--destructive) 17%, transparent);
+  color: color-mix(in srgb, var(--destructive) 80%, white);
+}
+.core-context-menu-item[data-disabled] { pointer-events: none; opacity: 0.45; cursor: default; }
+.core-context-menu-separator { height: 1px; margin: 6px 5px; background: color-mix(in srgb, var(--foreground) 8%, transparent); }
+.core-context-menu-error { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 11px; line-height: 16px; color: var(--destructive); }
+.core-context-menu-error p { flex: 1; margin: 0; }
+.core-context-menu-error button { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 4px; color: var(--foreground); }
+.core-context-menu-error button:hover { background: var(--surface-hover); }
+.core-context-menu-error button svg { width: 12px; height: 12px; }
+.core-context-menu-status { padding: 4px 12px; font-size: 11px; }
+@media (prefers-reduced-motion: reduce) {
+  .core-context-menu-item, .core-context-menu-item > svg { transition: none; }
+}

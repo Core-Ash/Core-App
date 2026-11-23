@@ -1,3 +1,4 @@
+import type { Channel } from "@/lib/api/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppData } from "@/app/app-data-context";
 import { endpoints } from "@/lib/api/endpoints";
@@ -146,7 +147,17 @@ export function useSetChannelMute(channelId?: string, communityId?: string) {
       if (!ready || !channelId) throw new ApiError("unauthorized");
       return endpoints.setChannelMute(api, channelId, isMuted);
     },
-    onSuccess: () => {
+    onMutate: async (isMuted) => {
+      const key = queryKeys.channels(communityId);
+      await queries.cancelQueries({ queryKey: key });
+      const previous = queries.getQueryData<Channel[]>(key);
+      queries.setQueryData<Channel[]>(key, (items) => items?.map((item) => item.id === channelId ? { ...item, is_muted: isMuted } : item));
+      return { previous };
+    },
+    onError: (_error, _value, context) => {
+      if (context?.previous) queries.setQueryData(queryKeys.channels(communityId), context.previous);
+    },
+    onSettled: () => {
       if (communityId) {
         void queries.invalidateQueries({ queryKey: queryKeys.channels(communityId) });
       }

@@ -60,6 +60,7 @@ export function useChannels(communityId?: string) {
   return useQuery({
     queryKey: queryKeys.channels(communityId),
     queryFn: ({ signal }) => endpoints.channels(api, communityId!, signal),
+    refetchInterval: 15000,
     enabled: ready && Boolean(communityId),
   });
 }

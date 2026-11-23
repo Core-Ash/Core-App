@@ -23,8 +23,10 @@ function sourceLabel(source: AccessSource): string {
   }
 }
 
-export function ChannelSettings({ community, channel }: { community: Community; channel: Channel }) {
-  const [open, setOpen] = useState(false);
+export function ChannelSettings({ community, channel, open: controlledOpen, onOpenChange }: { community: Community; channel: Channel; open?: boolean; onOpenChange?: (open: boolean) => void }) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = (value: boolean) => { setLocalOpen(value); onOpenChange?.(value); };
   const [view, setView] = useState<"overview" | "permissions" | "access">("permissions");
 
   return (
@@ -32,13 +34,13 @@ export function ChannelSettings({ community, channel }: { community: Community; 
       setOpen(value);
       if (!value) setView("permissions");
     }}>
-      <Tooltip content="Channel settings">
+      {controlledOpen === undefined && <Tooltip content="Channel settings">
         <Dialog.Trigger asChild>
           <button className="icon-button" aria-label="Channel settings">
             <Settings size={23} aria-hidden="true" />
           </button>
         </Dialog.Trigger>
-      </Tooltip>
+      </Tooltip>}
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
         <Dialog.Content className="standard-dialog channel-settings-dialog">

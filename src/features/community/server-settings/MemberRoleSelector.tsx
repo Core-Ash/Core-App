@@ -117,7 +117,7 @@ export function MemberRoleSelector({
           sideOffset={6}
           collisionPadding={12}
           onClick={(e) => e.stopPropagation()}
-          className="z-50 w-64 rounded-lg border border-border bg-[#18191c] p-2 shadow-2xl animate-in fade-in-0 zoom-in-95"
+          className="z-[70] w-64 rounded-lg border border-border bg-[#18191c] p-2 shadow-2xl animate-in fade-in-0 zoom-in-95"
         >
           {/* Search Header */}
           <div className="relative mb-2">

@@ -1,3 +1,5 @@
+import { ChannelContextMenu } from "./ChannelContextMenu";
+import { ChannelSettings } from "@/features/community/access/ChannelSettings";
 import { useState, useRef, useMemo } from "react";
 import { CalendarDays, Hash, Plus, Volume2 } from "lucide-react";
 import { Link } from "react-router";
@@ -56,6 +58,9 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
   const setPreferences = useSetCommunityPreferences(community?.id);
   const setCategoryCollapse = useSetCategoryCollapse(undefined, community?.id);
   const setCategoryMute = useSetCategoryMute(undefined, community?.id);
+
+  const [channelMenu, setChannelMenu] = useState<{ channel: Channel; position: ContextMenuPosition; trigger: HTMLElement } | null>(null);
+  const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
 
   // Dialog states
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
@@ -229,6 +234,17 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
       <div
         className="sidebar-scroll relative"
         onContextMenu={(e) => {
+          const link = (e.target as HTMLElement).closest<HTMLAnchorElement>(".channel-link");
+          if (link) {
+            const id = new URL(link.href).searchParams.get("channel");
+            const selected = channelItems.find((item) => item.id === id);
+            if (selected) {
+              e.preventDefault(); e.stopPropagation();
+              setCategoryMenu(null); setSidebarMenuPos(null);
+              setChannelMenu({ channel: selected, position: { x: e.clientX, y: e.clientY }, trigger: link });
+            }
+            return;
+          }
           // If right-clicked on an interactive element, do not open the empty space menu
           if (
             (e.target as HTMLElement).closest(
@@ -238,6 +254,7 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
             return;
           }
           e.preventDefault();
+          setChannelMenu(null);
           setCategoryMenu(null);
           setSidebarMenuPos({ x: e.clientX, y: e.clientY });
         }}
@@ -347,6 +364,7 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
                         onClick={onNavigate}
                         className={cn(
                           "sidebar-link channel-link",
+                          item.is_muted && "opacity-50",
                           view === "channel" &&
                             channel?.id === item.id &&
                             "is-active",
@@ -413,6 +431,7 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
                     onContextMenu={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      setChannelMenu(null);
                       setSidebarMenuPos(null);
                       setCategoryMenu({
                         category: cat,
@@ -491,6 +510,7 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
                             onClick={onNavigate}
                             className={cn(
                               "sidebar-link channel-link",
+                          item.is_muted && "opacity-50",
                               view === "channel" &&
                                 channel?.id === item.id &&
                                 "is-active",
@@ -529,6 +549,7 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
                         onClick={onNavigate}
                         className={cn(
                           "sidebar-link channel-link",
+                          item.is_muted && "opacity-50",
                           view === "channel" &&
                             channel?.id === item.id &&
                             "is-active",
@@ -552,6 +573,12 @@ export function LiveCommunitySidebar({ onNavigate }: { onNavigate?: () => void }
         )}
       </div>
 
+      {community && channelMenu && channelItems.some((item) => item.id === channelMenu.channel.id) && <ChannelContextMenu key={`${community.id}:${channelMenu.channel.id}`} communityId={community.id}
+        channel={channelItems.find((item) => item.id === channelMenu.channel.id) ?? channelMenu.channel}
+        position={channelMenu.position} returnFocus={channelMenu.trigger} canManage={canManage}
+        onDismiss={() => setChannelMenu(null)} onEdit={() => setEditingChannel(channelMenu.channel)}
+        onCreate={() => { setTargetCategoryId(channelMenu.channel.category_id ?? undefined); setTargetKind(channelMenu.channel.kind === "voice" ? "voice" : "text"); setCreateChannelOpen(true); }} />}
+      {community && editingChannel && <ChannelSettings key={editingChannel.id} community={community} channel={editingChannel} open onOpenChange={(open) => { if (!open) setEditingChannel(null); }} />}
       {/* Floating Context Menus */}
       {sidebarMenuPos && (
         <SidebarContextMenu
