@@ -213,7 +213,13 @@ function parseMember(value: unknown): ServerMember {
     ...parsePublicProfile(value), community_id: uuid(data.community_id), joined_at: timestamp(data.joined_at),
     roles: data.roles.map((value) => {
       const role = record(value);
-      return { id: uuid(role.id), name: string(role.name), color: color(role.color), position: count(role.position) };
+      return {
+        id: uuid(role.id),
+        name: string(role.name),
+        color: color(role.color),
+        position: count(role.position),
+        hoist: typeof role.hoist === "boolean" ? role.hoist : false,
+      };
     }),
   };
 }

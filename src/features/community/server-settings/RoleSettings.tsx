@@ -685,7 +685,7 @@ function RoleEditorView({
                       Display role members separately from online members
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Hoist this role into its own header section in the server members list.
+                      Show members with this role in a separate group in the server member list.
                     </div>
                   </div>
                   <Switch

@@ -112,4 +112,63 @@ describe("member directories", () => {
     expect(screen.queryByLabelText("Member reference")).not.toBeInTheDocument();
     expect(request.mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
   });
+  it("groups members by highest hoisted role in hierarchy order", async () => {
+    const adminRole = { id: "11111111-1111-4111-8111-111111111111", name: "Administrator", color: "#e74c3c", position: 10, hoist: true };
+    const modRole = { id: "22222222-2222-4222-8222-222222222222", name: "Moderator", color: "#3498db", position: 5, hoist: true };
+    const memberRole = { id: "33333333-3333-4333-8333-333333333333", name: "Member", color: null, position: 1, hoist: false };
+
+    const member1 = {
+      ...profileFixture,
+      id: "44444444-4444-4444-8444-444444444441",
+      display_name: "Ash",
+      username: "ash",
+      community_id: communityFixture.id,
+      joined_at: "2026-11-16T10:00:00Z",
+      roles: [adminRole, modRole, memberRole],
+    };
+    const member2 = {
+      ...profileFixture,
+      id: "44444444-4444-4444-8444-444444444442",
+      display_name: "Peter",
+      username: "peter",
+      community_id: communityFixture.id,
+      joined_at: "2026-11-16T10:00:00Z",
+      roles: [modRole, memberRole],
+    };
+    const member3 = {
+      ...profileFixture,
+      id: "44444444-4444-4444-8444-444444444443",
+      display_name: "Regular User",
+      username: "regular",
+      community_id: communityFixture.id,
+      joined_at: "2026-11-16T10:00:00Z",
+      roles: [memberRole],
+    };
+
+    setup(
+      <MemberDirectory communityId={communityFixture.id} channelId={channelFixture.id} />,
+      async () => Response.json({
+        ...memberPageFixture,
+        total: 3,
+        items: [member1, member2, member3],
+      })
+    );
+
+    // Verify headings and counts
+    expect(await screen.findByRole("heading", { name: "Administrator — 1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Moderator — 1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Online — 1" })).toBeInTheDocument();
+
+    // Verify member1 only appears under Administrator (highest hoisted role)
+    const adminSection = screen.getByRole("list", { name: "Administrator" });
+    expect(within(adminSection).getByText("Ash")).toBeInTheDocument();
+
+    // Verify member2 only appears under Moderator
+    const modSection = screen.getByRole("list", { name: "Moderator" });
+    expect(within(modSection).getByText("Peter")).toBeInTheDocument();
+
+    // Verify member3 appears under Online
+    const onlineSection = screen.getByRole("list", { name: "Online" });
+    expect(within(onlineSection).getByText("Regular User")).toBeInTheDocument();
+  });
 });

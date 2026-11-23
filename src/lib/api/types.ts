@@ -13,6 +13,7 @@ export interface MemberRole {
   name: string;
   color: string | null;
   position: number;
+  hoist?: boolean;
 }
 export interface ServerMember extends PublicProfile {
   community_id: string;
