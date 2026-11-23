@@ -1,40 +1,40 @@
+import { useEffect, useRef } from "react";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { useAppData } from "@/app/app-data-context";
-import { Button } from "@/components/ui/button";
 import {
   useCreateProfile,
   useCurrentUser,
 } from "@/features/community/api/hooks";
-import { ApiError, apiErrorMessage } from "@/lib/api/errors";
+import { ApiError } from "@/lib/api/errors";
 
 export function ApplicationProfileState() {
   const { configurationError } = useAppData();
   const profile = useCurrentUser();
   const onboarding = useCreateProfile();
+  const triggered = useRef(false);
+
+  const isConflict =
+    profile.error instanceof ApiError && profile.error.status === 409;
+
+  useEffect(() => {
+    if (isConflict && !triggered.current && !onboarding.isPending) {
+      triggered.current = true;
+      onboarding.mutate();
+    }
+  }, [isConflict, onboarding]);
+
   if (configurationError) return <ApiNotice error={new ApiError("configuration")} />;
-  if (profile.isPending)
+  if (profile.isPending || isConflict || onboarding.isPending)
     return <ApiNotice loading="Loading your application profile…" />;
-  if (profile.error instanceof ApiError && profile.error.status === 409)
+  if (onboarding.error)
     return (
-      <section className="p-6" aria-label="Application profile setup">
-        <h2 className="text-xl font-semibold">Set up your Core profile</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Create your application profile from your verified sign-in. Your
-          communities and conversations will be linked to this profile.
-        </p>
-        <Button
-          className="mt-4"
-          disabled={onboarding.isPending}
-          onClick={() => onboarding.mutate()}
-        >
-          {onboarding.isPending ? "Setting up…" : "Set up profile"}
-        </Button>
-        {onboarding.error && (
-          <p role="alert" className="mt-3 text-sm text-destructive">
-            {apiErrorMessage(onboarding.error)}
-          </p>
-        )}
-      </section>
+      <ApiNotice
+        error={onboarding.error}
+        onRetry={() => {
+          triggered.current = false;
+          onboarding.mutate();
+        }}
+      />
     );
   return profile.error ? (
     <ApiNotice

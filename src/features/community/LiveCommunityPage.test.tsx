@@ -315,11 +315,8 @@ describe("Rust-backed community workspace", () => {
       screen.getByRole("textbox", { name: "Message #general" }),
     ).toBeInTheDocument();
   });
-  it("requires an explicit onboarding POST before fetching application resources", async () => {
+  it("automatically performs onboarding before fetching application resources", async () => {
     const { request } = setup({ noProfile: true });
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Set up profile" }),
-    );
     await screen.findByText(messageFixture.body!);
     const calls = request.mock.calls;
     const writes = calls.filter(

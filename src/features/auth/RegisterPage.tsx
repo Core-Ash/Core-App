@@ -206,7 +206,7 @@ export function RegisterPage() {
         >
           <div className="space-y-2">
             <label htmlFor="signup-username" className="text-sm font-medium">Username</label>
-            <Input ref={usernameRef} id="signup-username" name="username" autoComplete="username" maxLength={32} required placeholder="Ash" value={values.username} onChange={(event) => update("username", event.target.value)} disabled={busy} aria-invalid={Boolean(errors.username)} aria-describedby="signup-username-help" />
+            <Input ref={usernameRef} id="signup-username" name="username" autoComplete="username" maxLength={32} required placeholder="Username" value={values.username} onChange={(event) => update("username", event.target.value)} disabled={busy} aria-invalid={Boolean(errors.username)} aria-describedby="signup-username-help" />
             <p id="signup-username-help" className="text-xs text-muted-foreground">2–32 letters, numbers or underscores. We’ll assign your unique four-digit user tag.</p>
             {errors.username && <p role="alert" className="text-xs text-destructive">{errors.username}</p>}
           </div>
