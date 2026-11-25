@@ -123,17 +123,19 @@ export function ServerSettingsLayout({
 }) {
   const [section, setSection] = useState<ServerSettingsSection>(initialSection);
   const [draft, setDraft] = useState<UpdateServerSettingsInput>({});
+  const [roleDraftDirty, setRoleDraftDirty] = useState(false);
   const [discardPrompt, setDiscardPrompt] = useState<ServerSettingsSection | "close" | null>(null);
 
   const settingsQuery = useServerSettings(community.id);
   const updateSettings = useUpdateServerSettings(community.id);
 
-  const hasUnsavedChanges = Object.keys(draft).length > 0;
+  const hasUnsavedChanges = Object.keys(draft).length > 0 || roleDraftDirty;
 
   // ESC key listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (e.defaultPrevented || document.querySelector('[role="dialog"][data-state="open"]')) return;
         if (hasUnsavedChanges) {
           setDiscardPrompt("close");
         } else {
@@ -307,19 +309,19 @@ export function ServerSettingsLayout({
               <BoostPerksSettings settings={currentSettings} />
             )}
             {section === "emojis" && (
-              <EmojiSettings settings={currentSettings} canManage={canManage} />
+              <EmojiSettings settings={currentSettings} canManage={Boolean(currentSettings.permissions.manage_emojis)} />
             )}
             {section === "stickers" && (
-              <StickerSettings settings={currentSettings} canManage={canManage} />
+              <StickerSettings settings={currentSettings} canManage={Boolean(currentSettings.permissions.manage_emojis)} />
             )}
             {section === "soundboard" && (
-              <SoundboardSettings settings={currentSettings} canManage={canManage} />
+              <SoundboardSettings settings={currentSettings} canManage={Boolean(currentSettings.permissions.manage_emojis)} />
             )}
             {section === "members" && (
-              <MemberSettings settings={currentSettings} canManage={canManage} />
+              <MemberSettings settings={currentSettings} canManage={Boolean(currentSettings.permissions.manage_roles || currentSettings.permissions.manage_members || currentSettings.permissions.manage_bans)} currentUserId={profile.id} />
             )}
             {section === "roles" && (
-              <RoleSettings settings={currentSettings} canManage={canManage} />
+              <RoleSettings settings={currentSettings} canManage={isOwner || Boolean(settingsQuery.data?.permissions.manage_roles)} onDirtyChange={setRoleDraftDirty} />
             )}
             {section === "invites" && (
               <InviteSettings settings={currentSettings} canManage={canManage} />
@@ -350,7 +352,7 @@ export function ServerSettingsLayout({
               <AuditLogSettings settings={currentSettings} />
             )}
             {section === "bans" && (
-              <BanSettings settings={currentSettings} canManage={canManage} />
+              <BanSettings settings={currentSettings} canManage={Boolean(currentSettings.permissions.manage_bans)} />
             )}
             {section === "automod" && (
               <AutoModSettings settings={currentSettings} canManage={canManage} />
@@ -379,7 +381,7 @@ export function ServerSettingsLayout({
     </div>
 
       {/* Floating Bottom Unsaved Changes Bar */}
-      {hasUnsavedChanges && (
+      {Object.keys(draft).length > 0 && (
         <div className="server-settings-unsaved-bar" role="alert" aria-live="polite">
           <span className="text-sm font-medium text-white">
             Careful — you have unsaved changes!
@@ -432,6 +434,7 @@ export function ServerSettingsLayout({
                 size="sm"
                 onClick={() => {
                   const target = discardPrompt;
+                  setRoleDraftDirty(false);
                   setDraft({});
                   setDiscardPrompt(null);
                   if (target === "close") {

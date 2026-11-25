@@ -230,8 +230,13 @@ export function EditCategoryDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const [permissionDirty, setPermissionDirty] = useState(false);
+  const changeOpen = (next: boolean) => {
+    if (!next && permissionDirty && !window.confirm("Discard unsaved permission changes?")) return;
+    onOpenChange(next);
+  };
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
         <Dialog.Content className="standard-dialog w-full max-w-4xl bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border">
@@ -240,8 +245,8 @@ export function EditCategoryDialog({
               key={category.id}
               communityId={communityId}
               category={category}
-              onClose={() => onOpenChange(false)}
-            /><PermissionsEditor communityId={communityId} resourceId={category.id} kind="categories" /></div>
+              onClose={() => changeOpen(false)}
+            /><PermissionsEditor communityId={communityId} resourceId={category.id} kind="categories" onDirtyChange={setPermissionDirty} /></div>
           )}
         </Dialog.Content>
       </Dialog.Portal>

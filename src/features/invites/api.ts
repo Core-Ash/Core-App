@@ -43,26 +43,26 @@ function parseStatus(value: unknown) {
 // Public preview never sends cookies or depends on the private session transport.
 const publicApi = createApiClient({ baseUrl: apiConfiguration.url, credentials: "omit", sessionSignal: () => new AbortController().signal, onUnauthorized: async () => "expired" });
 export const inviteKeys = {
-  permissions: (id: string) => ["invite-permissions", id] as const,
+  permissions: (id: string, channelId?: string) => channelId ? ["invite-permissions", id, channelId] as const : ["invite-permissions", id] as const,
   list: (id: string) => ["invites", id] as const,
-  link: (id: string) => ["invite-link", id] as const,
+  link: (id: string, channelId?: string) => channelId ? ["invite-link", id, channelId] as const : ["invite-link", id] as const,
 };
 export function useInvitePreview(code: string) {
   return useQuery({ queryKey: ["invite-preview", code], queryFn: ({ signal }) => publicApi.get(`/invites/${code}`, { signal }).then(parsePreview), enabled: validInviteCode(code), staleTime: 0, gcTime: 0, retry: false, refetchOnMount: "always", refetchOnWindowFocus: true });
 }
-export function useInvitePermissions(id: string) {
+export function useInvitePermissions(id: string, channelId?: string) {
   const { api, ready } = useAppData();
-  return useQuery({ queryKey: inviteKeys.permissions(id), enabled: ready && Boolean(id), staleTime: 10_000, refetchOnWindowFocus: true, refetchInterval: 30_000, queryFn: async ({ signal }) => {
-    const data = object(await api.get(`/communities/${id}/invite-permissions`, { signal }));
+  return useQuery({ queryKey: inviteKeys.permissions(id, channelId), enabled: ready && Boolean(id), staleTime: 10_000, refetchOnWindowFocus: true, refetchInterval: 30_000, queryFn: async ({ signal }) => {
+    const data = object(await api.get(`/communities/${id}/invite-permissions`, { signal, query: channelId ? { channel_id: channelId } : undefined }));
     return { create: boolean(data.create), manage: boolean(data.manage), manage_channels: boolean(data.manage_channels), owner: boolean(data.owner) };
   } });
 }
-export function useCreateInvite(id: string) {
+export function useCreateInvite(id: string, channelId?: string) {
   const { api, ready } = useAppData(); const queries = useQueryClient();
   return useMutation({ mutationFn: async (settings: InviteSettings) => {
     if (!ready) throw new ApiError("unauthorized");
-    return parseCreatedInvite(await api.post(`/communities/${id}/invites`, { ...settings }));
-  }, onSuccess: (invite) => { queries.setQueryData(inviteKeys.link(id), invite); void queries.invalidateQueries({ queryKey: inviteKeys.list(id) }); } });
+    return parseCreatedInvite(await api.post(`/communities/${id}/invites`, { ...settings, ...(channelId ? { channel_id: channelId } : {}) }));
+  }, onSuccess: (invite) => { queries.setQueryData(inviteKeys.link(id, channelId), invite); void queries.invalidateQueries({ queryKey: inviteKeys.list(id) }); } });
 }
 export function useInviteStatus(code: string) {
   const { api, ready } = useAppData();

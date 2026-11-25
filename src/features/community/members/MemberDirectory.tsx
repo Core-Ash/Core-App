@@ -95,6 +95,7 @@ export function MemberDirectory({ communityId, channelId }: { communityId: strin
                         <li className="member-row" key={member.id}>
                           <MemberIdentity
                             profile={member}
+                            label={member.nickname ?? undefined}
                             communityId={communityId}
                             roles={member.roles}
                             joinedAt={member.joined_at}

@@ -21,6 +21,7 @@ export type ServerSettingsSection =
   | "delete";
 
 export interface ServerSettingsPermissions {
+  effective_permissions?: string[];
   owner: boolean;
   administrator?: boolean;
   manage_community: boolean;
@@ -74,6 +75,7 @@ export interface UpdateServerSettingsInput {
 }
 
 export interface ServerRoleData {
+  manageable?: boolean;
   id: string;
   name: string;
   color: string | null;

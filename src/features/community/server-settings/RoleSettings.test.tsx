@@ -10,6 +10,25 @@ vi.mock("./api",()=>({
 }));
 function setup(){render(<QueryClientProvider client={new QueryClient()}><RoleSettings settings={{id:"server"} as ServerSettingsData} canManage /></QueryClientProvider>);fireEvent.click(screen.getByRole("button",{name:/Default Permissions/}));}
 describe("default permissions",()=>{
+ it("preserves drafts across group searches and shows unavailable features honestly",()=>{
+  setup();fireEvent.click(screen.getByRole("switch",{name:"Send Messages"}));
+  const search=screen.getByRole("textbox",{name:"Search permissions"});
+  fireEvent.change(search,{target:{value:"Voice Channel Permissions"}});
+  expect(screen.getByRole("switch",{name:"Connect"})).toBeDisabled();
+  expect(screen.queryByRole("switch",{name:"Send Messages"})).not.toBeInTheDocument();
+  fireEvent.change(search,{target:{value:"no such permission"}});
+  expect(screen.getByRole("status")).toHaveTextContent("No permissions match");
+  fireEvent.change(search,{target:{value:""}});
+  expect(screen.getByRole("switch",{name:"Send Messages"})).toHaveAttribute("aria-checked","true");
+ });
+ it("confirms clearing permissions without saving or removing the role",()=>{
+  setup();const view=screen.getByRole("switch",{name:"View Channels"});fireEvent.click(screen.getByRole("button",{name:"Clear Permissions"}));
+  expect(view).toHaveAttribute("aria-checked","true");
+  fireEvent.click(screen.getAllByRole("button",{name:"Clear Permissions"}).at(-1)!);
+  expect(screen.getByRole("switch",{name:"View Channels"})).toHaveAttribute("aria-checked","false");
+  fireEvent.click(screen.getByRole("button",{name:"Reset"}));
+  expect(screen.getByRole("switch",{name:"View Channels"})).toHaveAttribute("aria-checked","true");
+ });
  it("opens permissions and excludes assignment and display tabs",()=>{
   setup();expect(screen.getByRole("switch",{name:"Administrator"})).toBeDisabled();
   expect(screen.queryByRole("button",{name:/Manage Members/})).not.toBeInTheDocument();

@@ -1,0 +1,859 @@
+[
+  {
+    "key": "channels.view",
+    "flag": "VIEW_CHANNEL",
+    "label": "View Channels",
+    "desc": "View channels you have access to, including their content.",
+    "group": "General Server Permissions",
+    "resources": [
+      "text",
+      "voice",
+      "category"
+    ],
+    "status": "enforced",
+    "overwrite": true,
+    "dependencies": [],
+    "dangerous": false,
+    "channelLabel": "View Channel",
+    "channelDesc": "Allows members to view this channel.",
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "channels.manage",
+    "flag": "MANAGE_CHANNELS",
+    "label": "Manage Channels",
+    "desc": "Create, edit, reorder, and delete channels and categories.",
+    "group": "General Server Permissions",
+    "resources": [
+      "text",
+      "voice",
+      "category"
+    ],
+    "status": "enforced",
+    "overwrite": true,
+    "dependencies": [],
+    "dangerous": false,
+    "channelLabel": "Manage Channel",
+    "channelDesc": "Allows members to edit or delete this channel.",
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "roles.manage",
+    "flag": "MANAGE_ROLES",
+    "label": "Manage Roles",
+    "desc": "Manage roles below your highest role and configure channel permissions.",
+    "group": "General Server Permissions",
+    "resources": [
+      "text",
+      "voice",
+      "category"
+    ],
+    "status": "enforced",
+    "overwrite": true,
+    "dependencies": [],
+    "dangerous": false,
+    "channelLabel": "Manage Permissions",
+    "channelDesc": "Allows members to edit permission overrides for this channel.",
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "expressions.create",
+    "flag": "CREATE_GUILD_EXPRESSIONS",
+    "label": "Create Expressions",
+    "desc": "Add custom server emojis, stickers, and soundboard sounds.",
+    "group": "General Server Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false,
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "emojis.manage",
+    "flag": "MANAGE_GUILD_EXPRESSIONS",
+    "label": "Manage Expressions",
+    "desc": "Edit or remove custom server emojis, stickers, and soundboard sounds.",
+    "group": "General Server Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false,
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "audit.view",
+    "flag": "VIEW_AUDIT_LOG",
+    "label": "View Audit Log",
+    "desc": "View the record of administrative actions on this server.",
+    "group": "General Server Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false,
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "webhooks.manage",
+    "flag": "MANAGE_WEBHOOKS",
+    "label": "Manage Webhooks",
+    "desc": "Create, edit, and delete channel webhooks.",
+    "group": "General Server Permissions",
+    "resources": [
+      "text",
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [],
+    "dangerous": false,
+    "channelLabel": "Manage Webhooks",
+    "channelDesc": "Allows members to create, edit, and delete webhooks in this channel.",
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "community.manage",
+    "flag": "MANAGE_GUILD",
+    "label": "Manage Server",
+    "desc": "Change the server name, description, images, and supported settings.",
+    "group": "General Server Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false,
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "insights.view",
+    "flag": "VIEW_GUILD_INSIGHTS",
+    "label": "View Server Insights",
+    "desc": "View server activity insights when analytics are available.",
+    "group": "General Server Permissions",
+    "resources": [],
+    "status": "unsupported",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false,
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "monetization.view",
+    "flag": "VIEW_CREATOR_MONETIZATION_ANALYTICS",
+    "label": "View Monetization Analytics",
+    "desc": "View creator monetization analytics when supported.",
+    "group": "General Server Permissions",
+    "resources": [],
+    "status": "unsupported",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false,
+    "channelGroup": "General Channel Permissions"
+  },
+  {
+    "key": "invites.create",
+    "flag": "CREATE_INSTANT_INVITE",
+    "label": "Create Invites",
+    "desc": "Create invitation links to this server.",
+    "group": "Membership Permissions",
+    "resources": [
+      "text",
+      "voice",
+      "category"
+    ],
+    "status": "enforced",
+    "overwrite": true,
+    "dependencies": [],
+    "dangerous": false,
+    "channelLabel": "Create Invite",
+    "channelDesc": "Allows members to create invitations to this server through this channel."
+  },
+  {
+    "key": "invites.manage",
+    "flag": "CORE_MANAGE_INVITES",
+    "label": "Manage Invites",
+    "desc": "View and revoke existing server invitation links.",
+    "group": "Membership Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "nicknames.change",
+    "flag": "CHANGE_NICKNAME",
+    "label": "Change Nickname",
+    "desc": "Change your server nickname without changing your global profile.",
+    "group": "Membership Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "nicknames.manage",
+    "flag": "MANAGE_NICKNAMES",
+    "label": "Manage Nicknames",
+    "desc": "Change other members' server nicknames, subject to hierarchy.",
+    "group": "Membership Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "members.manage",
+    "flag": "KICK_MEMBERS",
+    "label": "Kick Members",
+    "desc": "Remove members below your highest role; they may rejoin with an invite.",
+    "group": "Membership Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "bans.manage",
+    "flag": "BAN_MEMBERS",
+    "label": "Ban Members",
+    "desc": "Ban eligible members and manage bans, subject to hierarchy.",
+    "group": "Membership Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "members.moderate",
+    "flag": "MODERATE_MEMBERS",
+    "label": "Moderate Members",
+    "desc": "Temporarily restrict eligible members with an expiring timeout.",
+    "group": "Membership Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "messages.send",
+    "flag": "SEND_MESSAGES",
+    "label": "Send Messages",
+    "desc": "Send messages in text channels.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "enforced",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "threads.send",
+    "flag": "SEND_MESSAGES_IN_THREADS",
+    "label": "Send Messages in Threads",
+    "desc": "Send messages in supported threads and forum posts.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "threads.create_public",
+    "flag": "CREATE_PUBLIC_THREADS",
+    "label": "Create Public Threads",
+    "desc": "Create threads visible to everyone with channel access.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "threads.create_private",
+    "flag": "CREATE_PRIVATE_THREADS",
+    "label": "Create Private Threads",
+    "desc": "Create threads restricted to invited members.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.embed_links",
+    "flag": "EMBED_LINKS",
+    "label": "Embed Links",
+    "desc": "Show rich previews for links; ordinary text links remain available.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "messages.send"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.attach_files",
+    "flag": "ATTACH_FILES",
+    "label": "Attach Files",
+    "desc": "Upload files and attach media to messages.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "messages.send"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.add_reactions",
+    "flag": "ADD_REACTIONS",
+    "label": "Add Reactions",
+    "desc": "Add new reactions; existing reactions may still be used.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "expressions.external_emojis",
+    "flag": "USE_EXTERNAL_EMOJIS",
+    "label": "Use External Emojis",
+    "desc": "Use authorized emojis from other servers.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "expressions.external_stickers",
+    "flag": "USE_EXTERNAL_STICKERS",
+    "label": "Use External Stickers",
+    "desc": "Use authorized stickers from other servers.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.mention_everyone",
+    "flag": "MENTION_EVERYONE",
+    "label": "Mention Everyone",
+    "desc": "Notify @everyone, @here, and restricted roles.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "messages.send"
+    ],
+    "dangerous": false,
+    "channelLabel": "Mention @everyone, @here, and All Roles",
+    "channelDesc": "Notify everyone, online members, and otherwise restricted roles where supported."
+  },
+  {
+    "key": "messages.moderate",
+    "flag": "MANAGE_MESSAGES",
+    "label": "Manage Messages",
+    "desc": "Moderate messages from other members when message moderation is available.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "foundation",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.pin",
+    "flag": "PIN_MESSAGES",
+    "label": "Pin Messages",
+    "desc": "Pin or unpin messages independently of message moderation.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.bypass_slowmode",
+    "flag": "BYPASS_SLOWMODE",
+    "label": "Bypass Slowmode",
+    "desc": "Bypass channel slowmode while retaining API abuse protection.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "threads.manage",
+    "flag": "MANAGE_THREADS",
+    "label": "Manage Threads",
+    "desc": "Rename, archive, lock, or delete supported threads.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.read_history",
+    "flag": "READ_MESSAGE_HISTORY",
+    "label": "Read Message History",
+    "desc": "Read previously sent channel messages.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "enforced",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.tts",
+    "flag": "SEND_TTS_MESSAGES",
+    "label": "Send Text-to-Speech Messages",
+    "desc": "Send messages using supported text-to-speech playback.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "messages.send"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.voice",
+    "flag": "SEND_VOICE_MESSAGES",
+    "label": "Send Voice Messages",
+    "desc": "Send recorded audio messages.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "messages.send",
+      "messages.attach_files"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "messages.polls",
+    "flag": "SEND_POLLS",
+    "label": "Create Polls",
+    "desc": "Create polls in supported channels.",
+    "group": "Text Channel Permissions",
+    "resources": [
+      "text",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "messages.send"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.connect",
+    "flag": "CONNECT",
+    "label": "Connect",
+    "desc": "Join voice channels and listen to participants.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.speak",
+    "flag": "SPEAK",
+    "label": "Speak",
+    "desc": "Transmit microphone audio in voice channels.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.stream",
+    "flag": "STREAM",
+    "label": "Video",
+    "desc": "Share camera video, a screen, or a game.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.soundboard",
+    "flag": "USE_SOUNDBOARD",
+    "label": "Use Soundboard",
+    "desc": "Play server soundboard sounds in voice channels.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.external_sounds",
+    "flag": "USE_EXTERNAL_SOUNDS",
+    "label": "Use External Sounds",
+    "desc": "Play authorized soundboard sounds from other servers.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.activity",
+    "flag": "USE_VAD",
+    "label": "Use Voice Activity",
+    "desc": "Transmit using voice detection instead of push-to-talk.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.priority",
+    "flag": "PRIORITY_SPEAKER",
+    "label": "Priority Speaker",
+    "desc": "Make priority speakers easier to hear in supported audio sessions.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.mute",
+    "flag": "MUTE_MEMBERS",
+    "label": "Mute Members",
+    "desc": "Server-mute eligible voice participants.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.deafen",
+    "flag": "DEAFEN_MEMBERS",
+    "label": "Deafen Members",
+    "desc": "Server-deafen eligible voice participants.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.move",
+    "flag": "MOVE_MEMBERS",
+    "label": "Move Members",
+    "desc": "Move or disconnect eligible voice participants.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.status",
+    "flag": "SET_VOICE_CHANNEL_STATUS",
+    "label": "Set Voice Channel Status",
+    "desc": "Set the status of a supported voice channel.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "voice.request_to_speak",
+    "flag": "REQUEST_TO_SPEAK",
+    "label": "Request to Speak",
+    "desc": "Request speaking access in stage-like channels.",
+    "group": "Voice Channel Permissions",
+    "resources": [
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [
+      "channels.view",
+      "voice.connect"
+    ],
+    "dangerous": false
+  },
+  {
+    "key": "applications.commands",
+    "flag": "USE_APPLICATION_COMMANDS",
+    "label": "Use Application Commands",
+    "desc": "Use supported slash commands and context-menu commands.",
+    "group": "Application Permissions",
+    "resources": [
+      "text",
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "applications.activities",
+    "flag": "USE_EMBEDDED_ACTIVITIES",
+    "label": "Use Activities",
+    "desc": "Participate in supported embedded activities.",
+    "group": "Application Permissions",
+    "resources": [
+      "text",
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "applications.external",
+    "flag": "USE_EXTERNAL_APPS",
+    "label": "Use External Apps",
+    "desc": "Use supported user-installed application interactions.",
+    "group": "Application Permissions",
+    "resources": [
+      "text",
+      "voice",
+      "category"
+    ],
+    "status": "unsupported",
+    "overwrite": true,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "events.create",
+    "flag": "CREATE_EVENTS",
+    "label": "Create Events",
+    "desc": "Create server events.",
+    "group": "Event Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "events.manage",
+    "flag": "MANAGE_EVENTS",
+    "label": "Manage Events",
+    "desc": "Edit or cancel server events created by other members.",
+    "group": "Event Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": false
+  },
+  {
+    "key": "administrator",
+    "flag": "ADMINISTRATOR",
+    "label": "Administrator",
+    "desc": "Members with this permission have access to all server permissions and can bypass channel-specific permission restrictions. Grant this permission carefully.",
+    "group": "Advanced Permissions",
+    "resources": [],
+    "status": "enforced",
+    "overwrite": false,
+    "dependencies": [],
+    "dangerous": true
+  }
+]

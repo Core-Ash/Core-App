@@ -1,0 +1,15 @@
+from pathlib import Path
+root=Path(__file__).resolve().parents[1]
+p=root/"src/features/invites/api.ts";s=p.read_text(encoding="utf-8")
+s=s.replace('queryKey: inviteKeys.permissions(id),','queryKey: inviteKeys.permissions(id, channelId),')
+s=s.replace('export function useCreateInvite(id: string)', 'export function useCreateInvite(id: string, channelId?: string)')
+s=s.replace('`/communities/${id}/invites`, { ...settings }','`/communities/${id}/invites`, { ...settings, ...(channelId ? { channel_id: channelId } : {}) }')
+s=s.replace('queries.setQueryData(inviteKeys.link(id), invite)', 'queries.setQueryData(inviteKeys.link(id, channelId), invite)')
+p.write_text(s,encoding="utf-8")
+p=root/"src/features/invites/InviteDialog.tsx";s=p.read_text(encoding="utf-8")
+s=s.replace('function InviteContents({ community }: { community: Community })','function InviteContents({ community, channelId }: { community: Community; channelId?: string })')
+s=s.replace('useCreateInvite(community.id)', 'useCreateInvite(community.id, channelId)').replace('inviteKeys.link(community.id)', 'inviteKeys.link(community.id, channelId)')
+s=s.replace('open, onOpenChange, returnFocusRef }:', 'open, onOpenChange, returnFocusRef, channelId }:')
+s=s.replace('community: Community; children?: ReactElement; open?: boolean;', 'community: Community; children?: ReactElement; open?: boolean; channelId?: string;')
+s=s.replace('<InviteContents key={community.id} community={community} />','<InviteContents key={`${community.id}:${channelId ?? "server"}`} community={community} channelId={channelId} />')
+p.write_text(s,encoding="utf-8")

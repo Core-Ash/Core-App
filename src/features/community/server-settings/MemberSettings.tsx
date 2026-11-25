@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MemberPermissionActions } from "./MemberPermissionActions";
 import { Users, Search, UserX, Ban, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +18,11 @@ import type { ServerSettingsData } from "./types";
 export function MemberSettings({
   settings,
   canManage,
+  currentUserId,
 }: {
   settings: ServerSettingsData;
   canManage: boolean;
+  currentUserId: string;
 }) {
   const { api, ready } = useAppData();
   const [search, setSearch] = useState("");
@@ -99,7 +102,7 @@ export function MemberSettings({
                 <th className="py-3 px-4">Member</th>
                 <th className="py-3 px-4">Roles</th>
                 <th className="py-3 px-4">Joined</th>
-                {canManage && <th className="py-3 px-4 text-right">Actions</th>}
+                {(canManage || Boolean(settings.permissions.effective_permissions?.length)) && <th className="py-3 px-4 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40 text-sm">
@@ -131,7 +134,7 @@ export function MemberSettings({
                       />
                       <div>
                         <div className="font-semibold text-foreground flex items-center gap-1.5">
-                          <span>{member.display_name}</span>
+                          <span>{member.nickname || member.display_name}</span>
                           {isOwner && (
                             <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
                               Owner
@@ -198,8 +201,9 @@ export function MemberSettings({
                   </td>
 
                   {/* Actions */}
-                  {canManage && (
+                  {(canManage || Boolean(settings.permissions.effective_permissions?.length)) && (
                     <td className="py-3 px-4 text-right">
+                      <MemberPermissionActions settings={settings} member={member} currentUserId={currentUserId} />
                       {!isOwner ? (
                         <div className="flex items-center justify-end gap-1">
                           <Button
@@ -208,6 +212,7 @@ export function MemberSettings({
                             size="sm"
                             className="text-muted-foreground hover:text-foreground"
                             onClick={() => handleKick(member)}
+                            disabled={!settings.permissions.manage_members}
                             title="Kick member"
                           >
                             <UserX className="size-4" />
@@ -218,6 +223,7 @@ export function MemberSettings({
                             size="sm"
                             className="text-destructive hover:bg-destructive/10"
                             onClick={() => setBanningUser(member)}
+                            disabled={!settings.permissions.manage_bans}
                             title="Ban member"
                           >
                             <Ban className="size-4" />

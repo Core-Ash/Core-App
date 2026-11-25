@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { PERMISSION_GROUPS, matchesPermission, permissionAvailability } from "@/features/community/permissions/registry";
 import {
   Plus,
   Pencil,
@@ -41,65 +42,14 @@ const DISCORD_PALETTE = [
   "#206694", "#71368a", "#ad1457", "#c27c0e", "#a84300", "#992d22",
 ];
 
-interface PermissionDef {
-  key: string;
-  label: string;
-  desc: string;
-  dangerous?: boolean;
-}
-
-interface PermissionGroupDef {
-  category: string;
-  permissions: PermissionDef[];
-}
-
-const PERMISSION_GROUPS: PermissionGroupDef[] = [
-  {
-    category: "General Server Permissions",
-    permissions: [
-      { key: "channels.view", label: "View Channels", desc: "Allows members to view channels by default (excluding private channels)." },
-      { key: "channels.manage", label: "Manage Channels", desc: "Allows members to create, edit, or delete channels and categories." },
-      { key: "roles.manage", label: "Manage Roles", desc: "Allows members to create new roles and edit or delete roles below their highest role." },
-      { key: "emojis.manage", label: "Manage Expressions", desc: "Allows members to add or delete custom emojis, stickers, and soundboard sounds." },
-      { key: "audit.view", label: "View Audit Log", desc: "Allows members to view the audit log of administrative actions taken on the server." },
-      { key: "community.manage", label: "Manage Server", desc: "Allows members to change the server's name, description, and settings." },
-    ],
-  },
-  {
-    category: "Membership Permissions",
-    permissions: [
-      { key: "invites.create", label: "Create Invites", desc: "Allows members to create instant invite links to this server." },
-      { key: "invites.manage", label: "Manage Invites", desc: "Allows members to view and revoke existing server invites." },
-      { key: "members.manage", label: "Kick Members", desc: "Allows members to remove other members below their highest role from the server." },
-      { key: "bans.manage", label: "Ban Members", desc: "Allows members to ban other members below their highest role from the server." },
-    ],
-  },
-  {
-    category: "Text Channel Permissions",
-    permissions: [
-      { key: "messages.send", label: "Send Messages", desc: "Allows members to send messages in text channels." },
-      { key: "messages.moderate", label: "Manage Messages", desc: "Allows members to delete messages sent by other members or pin messages." },
-    ],
-  },
-  {
-    category: "Advanced Permissions",
-    permissions: [
-      {
-        key: "administrator",
-        label: "Administrator",
-        desc: "Members with this permission have access to all server permissions and can bypass channel-specific permission restrictions (including viewing private channels). Granting this permission is dangerous.",
-        dangerous: true,
-      },
-    ],
-  },
-];
-
 export function RoleSettings({
   settings,
   canManage,
+  onDirtyChange,
 }: {
   settings: ServerSettingsData;
   canManage: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const rolesQuery = useServerRoles(settings.id);
   const createRole = useCreateServerRole(settings.id);
@@ -150,7 +100,7 @@ export function RoleSettings({
       return;
     }
 
-    const currentOrder = [...customRoles];
+    const currentOrder = customRoles.filter(role => role.manageable !== false);
     const sourceIdx = currentOrder.findIndex((r) => r.id === draggedRoleId);
     const targetIdx = currentOrder.findIndex((r) => r.id === dragOverRoleId);
 
@@ -159,7 +109,7 @@ export function RoleSettings({
       if (moving) {
         currentOrder.splice(targetIdx, 0, moving);
         const orderIds = currentOrder.map((r) => r.id);
-        void reorderRoles.mutateAsync(orderIds);
+        try { await reorderRoles.mutateAsync(orderIds); } catch { /* Mutation error is shown below. */ }
       }
     }
 
@@ -176,7 +126,8 @@ export function RoleSettings({
           communityId={settings.id}
           roles={items}
           selectedRole={roleToEdit}
-          canManage={canManage}
+          canManage={canManage && roleToEdit.manageable !== false}
+          onDirtyChange={onDirtyChange}
           onSelectRole={(r) => setEditingRoleId(r.id)}
           onBack={() => setEditingRoleId(null)}
           onCreateRole={handleCreateRole}
@@ -249,6 +200,7 @@ export function RoleSettings({
       <div className="text-xs text-muted-foreground leading-relaxed">
         Members use the color of the highest role they have on this list. Drag roles to reorder their hierarchy.
       </div>
+      {reorderRoles.isError && <p role="alert" className="text-sm text-destructive">{apiErrorMessage(reorderRoles.error)}</p>}
 
       {/* Roles List Table */}
       <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
@@ -268,11 +220,11 @@ export function RoleSettings({
             filteredRoles.map((role) => (
               <div
                 key={role.id}
-                draggable={canManage}
+                draggable={canManage && role.manageable !== false}
                 onDragStart={() => setDraggedRoleId(role.id)}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  if (canManage && draggedRoleId !== role.id) {
+                  if (canManage && role.manageable !== false && draggedRoleId !== role.id) {
                     setDragOverRoleId(role.id);
                   }
                 }}
@@ -411,6 +363,7 @@ function RoleEditorView({
   onSelectRole,
   onBack,
   onCreateRole,
+  onDirtyChange,
 }: {
   communityId: string;
   roles: ServerRoleData[];
@@ -419,6 +372,7 @@ function RoleEditorView({
   onSelectRole: (role: ServerRoleData) => void;
   onBack: () => void;
   onCreateRole: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const updateRole = useUpdateServerRole(communityId);
 
@@ -433,10 +387,27 @@ function RoleEditorView({
   const [permSearch, setPermSearch] = useState("");
   const [adminConfirmOpen, setAdminConfirmOpen] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [discardAction, setDiscardAction] = useState<(() => void) | null>(null);
+  useEffect(() => { onDirtyChange?.(hasChanges); }, [hasChanges, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+  useEffect(() => {
+    if (!hasChanges) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasChanges]);
+  const requestLeave = (action: () => void) => {
+    if (hasChanges) setDiscardAction(() => action);
+    else action();
+  };
 
   // Sync draft when selectedRole changes
   const handleRoleSwitch = (target: ServerRoleData) => {
     if (target.id === selectedRole.id) return;
+    requestLeave(() => switchRole(target));
+  };
+  const switchRole = (target: ServerRoleData) => {
     onSelectRole(target);
     setActiveTab(target.is_default ? "permissions" : "display");
     setDraftName(target.name);
@@ -479,13 +450,13 @@ function RoleEditorView({
   return (
     <div className="flex h-full min-h-[600px] border border-border rounded-xl overflow-hidden bg-background">
       {/* Middle Column: Role List Sidebar */}
-      <div className="w-60 border-r border-border bg-card/30 flex flex-col shrink-0">
+      <div className="w-32 sm:w-60 border-r border-border bg-card/30 flex flex-col shrink-0">
         <div className="p-3 border-b border-border flex items-center justify-between">
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={onBack}
+            onClick={() => requestLeave(onBack)}
             className="gap-1.5 text-xs font-semibold"
           >
             <ArrowLeft size={14} /> Back
@@ -728,35 +699,38 @@ function RoleEditorView({
                 <Input
                   value={permSearch}
                   onChange={(e) => setPermSearch(e.target.value)}
+                  aria-label="Search permissions"
                   placeholder="Search permissions"
                   className="pl-9 h-10 bg-background"
                 />
               </div>
 
-              <div className="space-y-6">
+              <div className="flex justify-end">
+                <Button variant="ghost" disabled={!canManage || updateRole.isPending || draftPerms.length === 0} onClick={() => setClearConfirmOpen(true)}>Clear Permissions</Button>
+              </div>
+              {!PERMISSION_GROUPS.some(g => g.permissions.some(p => matchesPermission(p, permSearch))) && <p role="status" className="py-8 text-sm text-muted-foreground">No permissions match your search. Try a name, description, or group.</p>}
+              <div className="space-y-10">
                 {PERMISSION_GROUPS.map((group) => {
                   const filtered = group.permissions.filter((p) => {
-                    if (!permSearch.trim()) return true;
-                    const q = permSearch.toLowerCase();
-                    return p.label.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q);
+                    return matchesPermission(p, permSearch);
                   });
 
                   if (filtered.length === 0) return null;
 
                   return (
                     <div key={group.category} className="space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      <h3 className="text-lg font-semibold text-foreground">
                         {group.category}
                       </h3>
 
-                      <div className="rounded-xl border border-border divide-y divide-border/60 bg-card/30">
+                      <div className="divide-y divide-border/60">
                         {filtered.map((perm) => {
                           const enabled = draftPerms.includes(perm.key);
                           return (
                             <div
                               key={perm.key}
                               className={cn(
-                                "flex items-start justify-between p-4 transition-colors",
+                                "flex items-start justify-between gap-4 py-5 transition-colors",
                                 perm.dangerous && "bg-destructive/5",
                               )}
                             >
@@ -770,9 +744,10 @@ function RoleEditorView({
                                 <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                                   {perm.desc}
                                 </div>
+                                {permissionAvailability(perm) && <p className="mt-1 text-xs text-muted-foreground">{permissionAvailability(perm)}</p>}
                               </div>
                               <Switch
-                                disabled={!canManage || updateRole.isPending || (isDefaultRole && perm.key === "administrator")}
+                                disabled={!canManage || updateRole.isPending || perm.status !== "enforced" || (isDefaultRole && perm.key === "administrator")}
                                 aria-label={perm.label}
                                 checked={enabled}
                                 onCheckedChange={(checked) => {
@@ -845,6 +820,19 @@ function RoleEditorView({
         )}
       </div>
 
+      <Dialog.Root open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <Dialog.Portal><Dialog.Overlay className="dialog-overlay" /><Dialog.Content className="standard-dialog">
+          <Dialog.Title>Clear role permissions?</Dialog.Title>
+          <Dialog.Description className="my-4 text-sm text-muted-foreground">Remove all explicitly granted permissions from this role. Members keep the role. Save Changes applies this draft.</Dialog.Description>
+          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setClearConfirmOpen(false)}>Cancel</Button><Button onClick={() => { setDraftPerms([]); markDirty(); setClearConfirmOpen(false); }}>Clear Permissions</Button></div>
+        </Dialog.Content></Dialog.Portal>
+      </Dialog.Root>
+      <Dialog.Root open={discardAction !== null} onOpenChange={open => { if (!open) setDiscardAction(null); }}>
+        <Dialog.Portal><Dialog.Overlay className="dialog-overlay" /><Dialog.Content className="standard-dialog">
+          <Dialog.Title>Discard unsaved changes?</Dialog.Title><Dialog.Description className="my-4">Your role changes have not been saved.</Dialog.Description>
+          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setDiscardAction(null)}>Keep Editing</Button><Button onClick={() => { discardAction?.(); setDiscardAction(null); }}>Discard Changes</Button></div>
+        </Dialog.Content></Dialog.Portal>
+      </Dialog.Root>
       {/* Dangerous Administrator Confirmation Dialog */}
       <Dialog.Root open={adminConfirmOpen} onOpenChange={setAdminConfirmOpen}>
         <Dialog.Portal>
@@ -852,11 +840,11 @@ function RoleEditorView({
           <Dialog.Content className="standard-dialog max-w-md w-full bg-popover text-popover-foreground p-6 rounded-xl shadow-2xl border border-border space-y-4">
             <div className="flex items-center gap-3 text-destructive font-bold text-lg">
               <AlertTriangle className="size-6 shrink-0" />
-              <span>Enable Administrator Permission?</span>
+              <Dialog.Title>Enable Administrator Permission?</Dialog.Title>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <Dialog.Description className="text-sm text-muted-foreground leading-relaxed">
               Members with this permission will have access to <strong>all server permissions</strong> and will be able to <strong>bypass all channel-specific restrictions</strong> (including viewing every private channel and category).
-            </p>
+            </Dialog.Description>
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
               <Button
                 type="button"
@@ -954,7 +942,7 @@ function RoleMembersManager({
         )}
       </div>
 
-      <div className="rounded-xl border border-border divide-y divide-border/60 bg-card/30">
+      <div className="divide-y divide-border/60">
         {filteredAssigned.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             No members are currently assigned to this role.

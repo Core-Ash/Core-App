@@ -1,7 +1,9 @@
 import { PermissionsEditor } from "./PermissionsEditor";
+import { ChannelInviteSettings } from "./ChannelInviteSettings";
+import { DeleteChannelSettings } from "./DeleteChannelSettings";
 import { useEffect, useId, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, Eye, Folder, LockKeyhole, RefreshCw, Settings, Shield, X } from "lucide-react";
+import { ArrowLeft, Eye, Folder, Link2, LockKeyhole, RefreshCw, Settings, Shield, Trash2, X } from "lucide-react";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { EmptyState } from "@/components/common/EmptyState";
 import { MemberIdentity } from "@/features/community/members/MemberIdentity";
@@ -27,12 +29,15 @@ function sourceLabel(source: AccessSource): string {
 
 export function ChannelSettings({ community, channel, open: controlledOpen, onOpenChange }: { community: Community; channel: Channel; open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const [localOpen, setLocalOpen] = useState(false);
+  const [permissionDirty, setPermissionDirty] = useState(false);
   const open = controlledOpen ?? localOpen;
   const setOpen = (value: boolean) => { setLocalOpen(value); onOpenChange?.(value); };
-  const [view, setView] = useState<"overview" | "permissions" | "access">("permissions");
+  const [view, setView] = useState<"overview" | "permissions" | "access" | "invites" | "delete">("permissions");
+  const changeView = (next: typeof view) => { if (next === view || !permissionDirty || window.confirm("Discard unsaved permission changes?")) setView(next); };
 
   return (
     <Dialog.Root open={open} onOpenChange={(value) => {
+      if (!value && permissionDirty && !window.confirm("Discard unsaved permission changes?")) return;
       setOpen(value);
       if (!value) setView("permissions");
     }}>
@@ -56,30 +61,33 @@ export function ChannelSettings({ community, channel, open: controlledOpen, onOp
             <nav aria-label="Channel settings sections" className="channel-settings-navigation">
               <Button
                 variant={view === "overview" ? "default" : "ghost"}
-                onClick={() => setView("overview")}
+                onClick={() => changeView("overview")}
                 aria-current={view === "overview" ? "page" : undefined}
               >
                 <Folder aria-hidden="true" /> Overview
               </Button>
               <Button
                 variant={view === "permissions" || view === "access" ? "default" : "ghost"}
-                onClick={() => setView("permissions")}
+                onClick={() => changeView("permissions")}
                 aria-current={view === "permissions" || view === "access" ? "page" : undefined}
               >
                 <Shield aria-hidden="true" /> Permissions
               </Button>
+              <Button variant={view === "invites" ? "default" : "ghost"} onClick={() => changeView("invites")} aria-current={view === "invites" ? "page" : undefined}><Link2 aria-hidden="true" />Invites</Button>
+              <div className="my-3 border-t border-border" />
+              <Button variant="ghost" className="text-destructive" onClick={() => changeView("delete")} aria-current={view === "delete" ? "page" : undefined}><Trash2 aria-hidden="true" />Delete Channel</Button>
             </nav>
-            <section className="channel-permissions-panel" aria-label={view === "overview" ? "Overview" : "Permissions"}>
-              {view === "overview" ? (
+            <section className="channel-permissions-panel" aria-label={view === "overview" ? "Overview" : view === "invites" ? "Invites" : view === "delete" ? "Delete Channel" : "Permissions"}>
+              {view === "invites" ? <ChannelInviteSettings community={community} channel={channel} /> : view === "delete" ? <DeleteChannelSettings community={community} channel={channel} onDeleted={() => setOpen(false)} /> : view === "overview" ? (
                 <ChannelOverviewForm key={channel.id} community={community} channel={channel} />
               ) : view === "permissions" ? (
                 <>
-                  <PermissionsEditor communityId={community.id} resourceId={channel.id} />
+                  <PermissionsEditor communityId={community.id} resourceId={channel.id} onDirtyChange={setPermissionDirty} />
                   <p className="my-3 text-sm text-muted-foreground">
                     See who can view this channel and how access is granted.
                     Community owners and members with channel management permission can inspect access.
                   </p>
-                  <Button variant="outline" onClick={() => setView("access")}>
+                  <Button variant="outline" onClick={() => changeView("access")}>
                     <Eye aria-hidden="true" /> View Channel Access
                   </Button>
 

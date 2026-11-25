@@ -1340,7 +1340,9 @@
   right: 13px;
 }
 .channel-settings-dialog {
-  width: min(940px, calc(100vw - 24px));
+  width: min(1180px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
 }
 .channel-settings-heading {
   padding: 24px 50px 20px 24px;
@@ -1348,12 +1350,16 @@
 }
 .channel-settings-body {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
+  grid-template-columns: 190px minmax(0, 1fr);
 }
 .channel-settings-navigation {
   padding: 20px 12px;
   border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  align-self: start;
 }
+.channel-settings-navigation > button { width: 100%; justify-content: flex-start; white-space: normal; }
 .channel-permissions-panel { padding: 24px; min-width: 0; }
 .access-role-select {
   width: 100%; min-height: 40px; padding: 8px 10px;
@@ -3103,7 +3109,7 @@ html[data-motion="reduce"] *::after {
 @media (prefers-reduced-motion: reduce) {
   .core-context-menu-item, .core-context-menu-item > svg { transition: none; }
 }
-.permission-editor { display: grid; gap: 14px; min-width: 0; }
+.permission-editor { min-width: 0; }
 .permission-editor h2, .permission-editor h3, .permission-editor p { margin-top: 0; }
 .permission-sync, .permission-private { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .permission-sync > span, .permission-private > div { flex: 1; }
@@ -3113,9 +3119,19 @@ html[data-motion="reduce"] *::after {
 .permission-switch > span { display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--foreground); transition: transform 140ms; }
 .permission-switch[aria-checked="true"] { background: var(--primary); }
 .permission-switch[aria-checked="true"] > span { transform: translateX(16px); }
-.permission-columns { display: grid; grid-template-columns: minmax(150px, 32%) minmax(0, 1fr); gap: 20px; }
-.permission-columns > aside { border-right: 1px solid var(--border); padding-right: 12px; min-width: 0; }
+.permission-columns { display: grid; grid-template-columns: minmax(150px, 24%) minmax(0, 1fr); gap: 28px; align-items: start; }
+.permission-columns > aside { padding-right: 4px; min-width: 0; position: sticky; top: 12px; }
 .permission-columns > section { min-width: 0; }
+.permission-advanced-heading { margin: 22px 0 18px; font-size: 16px; font-weight: 600; }
+.permission-selector-heading, .permission-editing-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted-foreground); }
+.permission-neutral-help { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.permission-search { position: sticky; top: 0; z-index: 2; background: var(--card); padding-bottom: 8px; }
+.permission-search > svg { position: absolute; left: 12px; top: 12px; color: var(--muted-foreground); }
+.permission-search input { padding-left: 36px; }
+.permission-revision-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+.permission-child-sync { padding: 12px 0; font-size: 12px; color: var(--muted-foreground); }
+.permission-child-sync summary { cursor: pointer; }
+.permission-child-sync li { margin-top: 6px; }
 .permission-columns > aside > button { width: 100%; white-space: normal; }
 .permission-targets { list-style: none; padding: 0; margin: 12px 0; max-height: 360px; overflow-y: auto; }
 .permission-targets li { display: flex; align-items: center; }
@@ -3127,21 +3143,26 @@ html[data-motion="reduce"] *::after {
 .permission-target-picker { z-index: 90; }
 .permission-picker-list { max-height: 280px; overflow-y: auto; }
 .permission-picker-list > button { width: 100%; text-align: left; }
-.permission-group { margin: 20px 0 10px; color: var(--muted-foreground); font-size: 11px; text-transform: uppercase; }
-.permission-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
-.permission-row > div:first-child { flex: 1; }
-.permission-row strong { font-size: 13px; font-weight: 500; }
-.permission-row p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.permission-group { margin: 28px 0 0; color: var(--foreground); font-size: 16px; font-weight: 600; }
+.permission-row { display: flex; align-items: flex-start; gap: 18px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.permission-row > div:first-child { flex: 1; min-width: 0; }
+.permission-row strong { font-size: 14px; font-weight: 500; }
+.permission-row p { margin: 5px 0 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.45; }
+.permission-row .permission-unavailable { font-size: 11px; }
 .permission-states { display: inline-flex; flex-shrink: 0; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.permission-row > .permission-states { margin-left: auto; }
 .permission-states button { display: flex; align-items: center; justify-content: center; width: 29px; height: 29px; color: var(--muted-foreground); border-right: 1px solid var(--border); }
 .permission-states button:last-child { border-right: none; }
+.permission-states button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.permission-states button:disabled { opacity: .4; cursor: not-allowed; }
+.permission-states button:not(:disabled):hover { background: var(--surface-hover); }
 .permission-states svg { width: 16px; height: 16px; }
 .permission-states [data-state="deny"] { color: var(--destructive); }
 .permission-states [data-state="allow"] { color: var(--online); }
 .permission-states [aria-pressed="true"] { background: var(--muted); }
 .permission-states [data-state="deny"][aria-pressed="true"] { background: color-mix(in srgb, var(--destructive) 23%, transparent); }
 .permission-states [data-state="allow"][aria-pressed="true"] { background: color-mix(in srgb, var(--online) 23%, transparent); }
-.permission-save { display: flex; align-items: center; gap: 8px; padding-top: 12px; }
+.permission-save { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 12px; background: var(--card); border-top: 1px solid var(--border); }
 .permission-save > span { flex: 1; }
 .permission-access-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .permission-access-list > span { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; background: var(--muted); font-size: 12px; }
@@ -3151,4 +3172,10 @@ html[data-motion="reduce"] *::after {
   cursor: not-allowed;
   padding: 12px 14px;
 }
-@media(max-width: 700px) { .permission-columns { grid-template-columns: minmax(0, 1fr); } .permission-columns > aside { border-right: none; padding-right: 0; } .permission-targets { max-height: 160px; } .permission-row { flex-wrap: wrap; } .permission-save { flex-wrap: wrap; } }
+@media(max-width: 700px) { .permission-columns { grid-template-columns: minmax(0, 1fr); gap: 8px; } .permission-columns > aside { position: static; padding-right: 0; } .permission-targets { max-height: 160px; } .permission-row { gap: 12px; } .permission-save { flex-wrap: wrap; } .channel-settings-navigation { position: static; } }
+@media(max-width: 390px) { .permission-row { flex-wrap: wrap; } .permission-row > div:first-child { flex-basis: 100%; } }
+@media(max-width: 640px) {
+  .channel-settings-navigation { display: flex; flex-wrap: wrap; gap: 4px; }
+  .channel-settings-navigation > button { flex: 1 1 42%; width: auto; font-size: 12px; }
+  .channel-settings-navigation > div { display: none; }
+}

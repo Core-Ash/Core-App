@@ -1,88 +1,154 @@
-﻿import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Popover from "@radix-ui/react-popover";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Lock, Plus, Slash, Trash2, X } from "lucide-react";
+import { Check, Lock, Plus, Search, Slash, Trash2, X } from "lucide-react";
 import { useAppData } from "@/app/app-data-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { queryKeys } from "@/features/community/api/hooks";
 import { categoryQueryKeys } from "@/features/community/categories/api";
+import { channelPermissions, matchesPermission, permissionAvailability } from "@/features/community/permissions/registry";
 import { ApiError, apiErrorMessage } from "@/lib/api/errors";
+import { parsePermissionSnapshot, permissionChanges, sameTarget, snapshotTargets, targetKey, type PermissionEntry, type PermissionSnapshot, type PermissionTarget } from "./permission-model";
 
-type Target = { kind: "role" | "member"; id: string };
-type Entry = Target & { permission: string; state: boolean | null };
-interface Snapshot { children?: {id:string;name:string;synced:boolean}[]; version: string; resource: { name: string; kind?: string; category_id?: string; category_name?: string; sync_with_category?: boolean; is_private?: boolean }; entries: Entry[]; roles: {id:string;name:string;color:string|null;is_default:boolean}[]; members:{id:string;name:string;username:string;avatar_url:string|null}[] }
-const permissions = [
-  ["General Channel Permissions", "channels.view", "View Channel", "View this channel and its message history."],
-  ["General Channel Permissions", "channels.manage", "Manage Channel", "Edit, duplicate, or delete this channel."],
-  ["General Channel Permissions", "roles.manage", "Manage Permissions", "Configure permission overrides, subject to role hierarchy."],
-  ["Text Channel Permissions", "messages.send", "Send Messages", "Send messages in this channel."],
-] as const;
-const same = (a:Target,b:Target) => a.kind===b.kind && a.id===b.id;
-export function PermissionsEditor({communityId,resourceId,kind="channels"}:{communityId:string;resourceId:string;kind?:"channels"|"categories"}) {
-  const {api,ready}=useAppData();
-  const key=["permission-overwrites",communityId,kind,resourceId];
-  const path=`/communities/${communityId}/permission-resources/${kind}/${resourceId}`;
-  const query=useQuery({queryKey:key,queryFn:async({signal})=>{ const data=await api.get<Snapshot>(path,{signal}); if(!data || typeof data.version!=="string" || !data.resource || !Array.isArray(data.roles) || !Array.isArray(data.members) || !Array.isArray(data.entries))throw new ApiError("invalid_response"); return data; },enabled:ready,retry:false,refetchOnWindowFocus:false});
-  if(query.isError)return <ApiNotice error={query.error} onRetry={()=>{void query.refetch();}} />;
-  if(!query.data)return <p role="status">Loading permission overrides...</p>;
-  return <Editor key={`${kind}:${resourceId}`} snapshot={query.data} communityId={communityId} resourceId={resourceId} kind={kind} path={path} />;
+interface Props { communityId: string; resourceId: string; kind?: "channels" | "categories"; onDirtyChange?: (dirty: boolean) => void }
+export function PermissionsEditor({ communityId, resourceId, kind = "channels", onDirtyChange }: Props) {
+  const { api, ready } = useAppData();
+  const path = `/communities/${communityId}/permission-resources/${kind}/${resourceId}`;
+  const query = useQuery({ queryKey: ["permission-overwrites", communityId, kind, resourceId], queryFn: async ({ signal }) => parsePermissionSnapshot(await api.get(path, { signal })), enabled: ready, retry: false, refetchOnWindowFocus: false });
+  if (query.isError) return <ApiNotice error={query.error} onRetry={() => { void query.refetch(); }} />;
+  if (!query.data) return <p role="status">Loading permission overrides...</p>;
+  return <Editor key={`${communityId}:${kind}:${resourceId}`} remote={query.data} communityId={communityId} resourceId={resourceId} kind={kind} path={path} onDirtyChange={onDirtyChange} />;
 }
-function Editor({snapshot,communityId,resourceId,kind,path}:{snapshot:Snapshot;communityId:string;resourceId:string;kind:string;path:string}) {
-  const {api}=useAppData(); const queries=useQueryClient();
-  const everyone=snapshot.roles.find(r=>r.is_default);
-  const [entries,setEntries]=useState(snapshot.entries);
-  const [targets,setTargets]=useState<Target[]>(()=>[...(everyone?[{kind:"role" as const,id:everyone.id}]:[]),...snapshot.entries.filter((e,i,all)=>!all.slice(0,i).some(t=>same(t,e)) && e.id!==everyone?.id).map(({kind,id})=>({kind,id}))]);
-  const [selected,setSelected]=useState<Target|undefined>(targets[0]);
-  const [search,setSearch]=useState(""); const [targetSearch,setTargetSearch]=useState("");
-  const [tab,setTab]=useState<"role"|"member">("role"); const [picker,setPicker]=useState(false); const [confirmSync,setConfirmSync]=useState(false);
-  const dirty=JSON.stringify(entries)!==JSON.stringify(snapshot.entries);
-  const mutation=useMutation({mutationFn:({sync=false}:{sync?:boolean})=>{
-    const changed:Entry[]=[];
-    for(const entry of [...snapshot.entries,...entries])if(!changed.some(e=>same(e,entry)&&e.permission===entry.permission))changed.push({...entry,state:entries.find(e=>same(e,entry)&&e.permission===entry.permission)?.state??null});
-    return api.put<Snapshot>(path,{version:snapshot.version,changes:sync?[]:changed.filter(e=>(snapshot.entries.find(old=>same(old,e)&&old.permission===e.permission)?.state??null)!==e.state).map(e=>({...e})),sync});
-  },onSuccess:(result)=>{
-    setEntries(result.entries);
-    queries.setQueryData(["permission-overwrites",communityId,kind,resourceId],result);
-    void queries.invalidateQueries({queryKey:["permission-overwrites",communityId]});
-    void queries.invalidateQueries({queryKey:queryKeys.channels(communityId)});
-    void queries.invalidateQueries({queryKey:queryKeys.channelAccess(communityId)});
-    void queries.invalidateQueries({queryKey:categoryQueryKeys.categories(communityId)});
-    setConfirmSync(false);
-  }});
-  function setState(target:Target,permission:string,state:boolean|null){setEntries(prev=>[...prev.filter(e=>!(same(e,target)&&e.permission===permission)),...(state===null?[]:[{...target,permission,state}])]);}
-  const label=(t:Target)=>t.kind==="role"?snapshot.roles.find(r=>r.id===t.id)?.name:snapshot.members.find(m=>m.id===t.id)?.name;
-  const dot=(t:Target)=>t.kind==="role"?<span className="permission-role-dot" style={{background:snapshot.roles.find(r=>r.id===t.id)?.color??"var(--muted-foreground)"}} />:snapshot.members.find(m=>m.id===t.id)?.avatar_url?<img className="permission-member-avatar" src={snapshot.members.find(m=>m.id===t.id)!.avatar_url!} alt="" />:<span className="permission-member-avatar" aria-hidden="true">{label(t)?.slice(0,1)}</span>;
-  const privateChannel=entries.some(e=>e.kind==="role"&&e.id===everyone?.id&&e.permission==="channels.view"&&e.state===false);
-  return <div className="permission-editor">
-    <h2 className="text-lg font-semibold">{kind==="categories"?"Category Permissions":"Channel Permissions"}</h2><p className="text-sm text-muted-foreground">Customize which roles and members can access this {kind==="categories"?"category":"channel"} and what actions they can perform.</p>
-    {kind==="channels"&&snapshot.resource.category_id&&<div className="permission-sync"><span>{snapshot.resource.sync_with_category&&!dirty?`Permissions synced with category: ${snapshot.resource.category_name ?? snapshot.resource.category_id}`:"Permissions not synced with category"}</span><Button variant="outline" disabled={mutation.isPending} onClick={()=>setConfirmSync(true)}>Sync permissions</Button></div>}
-    {kind==="categories"&&Boolean(snapshot.children?.length)&&<section aria-label="Child channel synchronization"><h3>Channel synchronization</h3><ul className="text-xs text-muted-foreground">{snapshot.children?.map(c=><li key={c.id}>#{c.name}: {c.synced?"Synced":"Independent overrides"}</li>)}</ul></section>}
-    <div className="permission-private"><Lock aria-hidden="true" /><div><strong>Private Channel</strong><p>Only selected roles and members can view it. Owners and Administrators retain access.</p></div><button type="button" role="switch" aria-label="Private Channel" aria-checked={privateChannel} disabled={!everyone||mutation.isPending} onClick={()=>{if(everyone)setState({kind:"role",id:everyone.id},"channels.view",privateChannel?null:false);}} className="permission-switch"><span /></button></div>
-    {privateChannel&&<section aria-label="Who can access this channel?"><h3>Who can access this channel?</h3><p className="text-xs text-muted-foreground">Explicit View Channel grants; effective access also depends on other roles and member overrides.</p><div className="permission-access-list">{entries.filter(e=>e.permission==="channels.view"&&e.state===true).map(e=><span key={`${e.kind}:${e.id}`}>{dot(e)}{label(e)}</span>)}</div></section>}
-    <h3 className="mt-5 text-xs font-semibold uppercase text-muted-foreground">Advanced Permissions</h3>
+
+function Editor({ remote, communityId, resourceId, kind, path, onDirtyChange }: Required<Pick<Props, "communityId" | "resourceId" | "kind">> & { remote: PermissionSnapshot; path: string; onDirtyChange?: Props["onDirtyChange"] }) {
+  const { api } = useAppData();
+  const queries = useQueryClient();
+  const id = useId();
+  // A draft edits one pinned server revision, even when another query refreshes.
+  const [base, setBase] = useState(remote);
+  const [entries, setEntries] = useState(base.entries);
+  const [targets, setTargets] = useState(() => snapshotTargets(base));
+  const [selected, setSelected] = useState<PermissionTarget | undefined>(targets[0]);
+  const [search, setSearch] = useState("");
+  const [targetSearch, setTargetSearch] = useState("");
+  const [pickerTab, setPickerTab] = useState<"role" | "member">("role");
+  const [picker, setPicker] = useState(false);
+  const [confirmation, setConfirmation] = useState<"sync" | "clear" | "reload" | null>(null);
+  const saving = useRef(false);
+  const everyone = base.roles.find(r => r.is_default);
+  const applicable = channelPermissions(kind === "categories" ? "category" : base.resource.kind ?? "text");
+  const filtered = applicable.filter(p => matchesPermission(p, search));
+  const dirty = permissionChanges(base.entries, entries).length > 0;
+  const remoteChanged = remote.version !== base.version;
+  const rolesAndMembers = [...base.roles.map(r => ({ ...r, kind: "role" as const, username: "", avatar_url: null })), ...base.members.map(m => ({ ...m, kind: "member" as const, color: null, is_default: false }))];
+  const targetData = (target: PermissionTarget) => rolesAndMembers.find(t => sameTarget(t, target));
+  const label = (target: PermissionTarget) => targetData(target)?.name ?? `Unknown ${target.kind}`;
+  const manageable = (target: PermissionTarget | undefined) => Boolean(target && targetData(target)?.manageable);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const mutation = useMutation({
+    mutationFn: async ({ revision, draft, sync }: { revision: PermissionSnapshot; draft: PermissionEntry[]; sync: boolean }) => parsePermissionSnapshot(await api.put(path, { version: revision.version, changes: sync ? [] : permissionChanges(revision.entries, draft), sync })),
+    onSuccess: result => {
+      setBase(result); setEntries(result.entries);
+      queries.setQueryData(["permission-overwrites", communityId, kind, resourceId], result);
+      for (const key of [["permission-overwrites", communityId], queryKeys.channels(communityId), queryKeys.channelAccess(communityId), categoryQueryKeys.categories(communityId), ["invite-permissions", communityId]]) void queries.invalidateQueries({ queryKey: key });
+      setConfirmation(null);
+    }, onError: error => {
+      if (error instanceof ApiError && ["conflict", "forbidden"].includes(error.kind)) void queries.invalidateQueries({ queryKey: ["permission-overwrites", communityId, kind, resourceId], exact: true });
+    }, onSettled: () => { saving.current = false; },
+  });
+  function save(sync = false) {
+    if (saving.current) return;
+    saving.current = true;
+    mutation.mutate({ revision: base, draft: entries, sync });
+  }
+  function setState(target: PermissionTarget, permission: string, state: boolean | null) {
+    if (saving.current || !manageable(target)) return;
+    setEntries(previous => [...previous.filter(e => !(sameTarget(e, target) && e.permission === permission)), ...(state === null ? [] : [{ ...target, permission, state }])]);
+  }
+  function restore(snapshot: PermissionSnapshot) {
+    if (saving.current) return;
+    setBase(snapshot); setEntries(snapshot.entries);
+    const restored = snapshotTargets(snapshot);
+    setTargets(restored);
+    if (!selected || !restored.some(t => sameTarget(t, selected))) setSelected(restored[0]);
+    setConfirmation(null); mutation.reset();
+  }
+  function avatar(target: PermissionTarget) {
+    const data = targetData(target);
+    return target.kind === "role" ? <span className="permission-role-dot" style={{ background: data?.color ?? "var(--muted-foreground)" }} />
+      : data?.avatar_url ? <img className="permission-member-avatar" src={data.avatar_url} alt="" referrerPolicy="no-referrer" />
+        : <span className="permission-member-avatar" aria-hidden="true">{label(target).slice(0, 1)}</span>;
+  }
+  const privateChannel = entries.some(e => e.kind === "role" && e.id === everyone?.id && e.permission === "channels.view" && e.state === false);
+  const candidates = rolesAndMembers.filter(t => t.kind === pickerTab && !t.is_default && `${t.name} ${t.username}`.toLowerCase().includes(targetSearch.trim().toLowerCase()));
+  const canClear = selected && entries.some(e => sameTarget(e, selected) && applicable.some(p => p.key === e.permission));
+
+  return <div className="permission-editor" aria-busy={mutation.isPending}>
+    <h2 className="text-lg font-semibold">{kind === "categories" ? "Category Permissions" : "Channel Permissions"}</h2>
+    <p className="mb-4 text-sm text-muted-foreground">Choose which roles and members can access this {kind === "categories" ? "category" : "channel"} and what they can do.</p>
+    {remoteChanged && <div className="permission-revision-notice" role="status">Permissions changed elsewhere. Your draft is preserved.<Button size="sm" variant="outline" disabled={mutation.isPending} onClick={() => dirty ? setConfirmation("reload") : restore(remote)}>Load latest permissions</Button></div>}
+    {kind === "channels" && base.resource.category_id && <div className="permission-sync"><span>{base.resource.sync_with_category && !dirty ? `Permissions synced with category: ${base.resource.category_name ?? "category"}` : "Permissions not synced with category"}</span><Button size="sm" variant="outline" disabled={mutation.isPending} onClick={() => setConfirmation("sync")}>Sync permissions</Button></div>}
+    {kind === "categories" && Boolean(base.children?.length) && <details className="permission-child-sync"><summary>Child channel synchronization</summary><ul>{base.children?.map(c => <li key={c.id}>#{c.name}: {c.synced ? "Synced" : "Independent overrides"}</li>)}</ul></details>}
+    <div className="permission-private"><Lock aria-hidden="true" /><div><strong>{kind === "categories" ? "Private Category" : "Private Channel"}</strong><p>Deny View Channel for @everyone. Owners and Administrators retain access.</p></div><button type="button" role="switch" aria-label={kind === "categories" ? "Private Category" : "Private Channel"} aria-checked={privateChannel} disabled={!everyone || !manageable({ kind: "role", id: everyone.id }) || mutation.isPending} onClick={() => { if (everyone) setState({ kind: "role", id: everyone.id }, "channels.view", privateChannel ? null : false); }} className="permission-switch"><span /></button></div>
+    {privateChannel && <section className="mb-5" aria-label="Who can access this channel?"><h3 className="text-sm font-medium">Who can access this channel?</h3><p className="mb-2 text-xs text-muted-foreground">Add a role or member, then allow View Channel. Other permissions keep their existing grants.</p><div className="permission-access-list">{entries.filter(e => e.permission === "channels.view" && e.state === true).map(e => <span key={targetKey(e)}>{avatar(e)}{label(e)}</span>)}</div></section>}
+    <h3 className="permission-advanced-heading">Advanced Permissions</h3>
     <div className="permission-columns"><aside aria-label="Roles and members">
-      <Popover.Root open={picker} onOpenChange={setPicker}><Popover.Trigger asChild><Button variant="outline"><Plus aria-hidden="true" />Add Roles or Members</Button></Popover.Trigger><Popover.Portal><Popover.Content className="core-context-menu permission-target-picker" side="right" collisionPadding={12}>
-        <Input aria-label="Search roles or members" value={targetSearch} onChange={e=>setTargetSearch(e.target.value)} placeholder="Search roles or members" />
-        <div className="flex gap-2 my-2" role="group" aria-label="Target type"><Button variant={tab==="role"?"default":"ghost"} onClick={()=>setTab("role")}>Roles</Button><Button variant={tab==="member"?"default":"ghost"} onClick={()=>setTab("member")}>Members</Button></div>
-        <div className="permission-picker-list">{(tab==="role"?snapshot.roles.filter(r=>!r.is_default).map(r=>({...r,username:""})):snapshot.members).filter(t=>`${t.name} ${t.username}`.toLowerCase().includes(targetSearch.toLowerCase())).map(t=>{
-          const target={kind:tab,id:t.id};const exists=targets.some(e=>same(e,target));
-          return <button type="button" className="core-context-menu-item" key={t.id} aria-pressed={exists} onClick={()=>{if(!exists)setTargets(prev=>[...prev,target]);setSelected(target);setPicker(false);}}>{dot(target)}<span>{t.name}{t.username&&<small className="block text-muted-foreground">@{t.username}</small>}</span>{exists&&<Check aria-hidden="true" />}</button>;
-        })}</div>
-      </Popover.Content></Popover.Portal></Popover.Root>
-      <ul className="permission-targets">{targets.map(t=><li key={`${t.kind}:${t.id}`}><button type="button" className="permission-target" aria-pressed={selected&&same(selected,t)} onClick={()=>setSelected(t)}>{dot(t)}<span>{label(t)}</span></button>{t.id!==everyone?.id&&<button type="button" className="icon-button" aria-label={`Remove overrides for ${label(t)}`} disabled={mutation.isPending} onClick={()=>{setEntries(prev=>prev.filter(e=>!same(e,t)));setTargets(prev=>prev.filter(e=>!same(e,t)));setSelected(targets[0]);}}><Trash2 size={14} /></button>}</li>)}</ul>
+      <div className="permission-selector-heading"><span>Roles / Members</span><Popover.Root open={picker} onOpenChange={setPicker}>
+        <Popover.Trigger asChild><button type="button" className="icon-button" aria-label="Add Roles or Members" disabled={mutation.isPending}><Plus size={17} aria-hidden="true" /></button></Popover.Trigger>
+        <Popover.Portal><Popover.Content className="core-context-menu permission-target-picker" side="right" collisionPadding={12} aria-label="Add roles or members">
+          <Input aria-label="Search roles or members" value={targetSearch} onChange={e => setTargetSearch(e.target.value)} placeholder="Search roles or members" />
+          <div className="my-2 flex gap-2" role="group" aria-label="Target type"><Button size="sm" variant={pickerTab === "role" ? "default" : "ghost"} onClick={() => setPickerTab("role")}>Roles</Button><Button size="sm" variant={pickerTab === "member" ? "default" : "ghost"} onClick={() => setPickerTab("member")}>Members</Button></div>
+          <div className="permission-picker-list">{candidates.length === 0 && <p className="p-3 text-sm text-muted-foreground">No matching {pickerTab === "role" ? "roles" : "members"}.</p>}{candidates.map(t => {
+            const exists = targets.some(target => sameTarget(target, t));
+            return <button type="button" className="core-context-menu-item" key={targetKey(t)} aria-pressed={exists} disabled={!t.manageable} title={!t.manageable ? "This target is protected by role hierarchy." : undefined} onClick={() => { if (!exists) setTargets(previous => [...previous, { kind: t.kind, id: t.id }]); setSelected({ kind: t.kind, id: t.id }); setPicker(false); }}>{avatar(t)}<span>{t.name}{t.username && <small className="block text-muted-foreground">@{t.username}</small>}</span>{exists && <Check aria-hidden="true" />}</button>;
+          })}</div>
+        </Popover.Content></Popover.Portal>
+      </Popover.Root></div>
+      <ul className="permission-targets">{targets.map(target => <li key={targetKey(target)}><button type="button" className="permission-target" aria-pressed={selected ? sameTarget(selected, target) : false} onClick={() => setSelected(target)}>{avatar(target)}<span>{label(target)}</span></button>{target.id !== everyone?.id && <button type="button" className="icon-button" aria-label={`Remove overrides for ${label(target)}`} disabled={!manageable(target) || mutation.isPending} onClick={() => { if (saving.current) return; setEntries(previous => previous.filter(e => !sameTarget(e, target))); const next = targets.filter(t => !sameTarget(t, target)); setTargets(next); if (selected && sameTarget(selected, target)) setSelected(next[0]); }}><Trash2 size={14} aria-hidden="true" /></button>}</li>)}</ul>
+      <p className="permission-neutral-help">Neutral (/) keeps the permissions already granted by roles. It does not mean category synchronization.</p>
     </aside><section aria-label="Permission overrides">
-      <Input aria-label="Search permissions" placeholder="Search permissions" value={search} onChange={e=>setSearch(e.target.value)} />
-      {selected&&<p className="my-3 text-sm">Editing {label(selected)}</p>}
-      {permissions.filter(p=>snapshot.resource.kind!=="voice"||p[0]!=="Text Channel Permissions").filter(p=>`${p[2]} ${p[3]}`.toLowerCase().includes(search.toLowerCase())).map((p,i,all)=><div key={p[1]}>
-        {(i===0||all[i-1]?.[0]!==p[0])&&<h4 className="permission-group">{p[0]}</h4>}
-        <div className="permission-row"><div><strong>{p[2]}</strong><p>{p[3]}</p></div><div className="permission-states" role="group" aria-label={p[2]}>{([false,null,true] as const).map((state,index)=>{const value=entries.find(e=>selected&&same(e,selected)&&e.permission===p[1])?.state??null;const text=["Deny","Neutral","Allow"][index]!;return <button key={text} type="button" data-state={text.toLowerCase()} aria-label={`${text} ${p[2]}`} title={state===null?"Neutral: inherit permissions":`${text} for this target`} aria-pressed={value===state} disabled={!selected||mutation.isPending} onClick={()=>{if(selected)setState(selected,p[1],state);}}>{index===0?<X />:index===1?<Slash />:<Check />}</button>;})}</div></div>
-      </div>)}
+      <div className="permission-search"><Search size={16} aria-hidden="true" /><Input aria-label="Search permissions" placeholder="Search permissions" value={search} onChange={e => setSearch(e.target.value)} /></div>
+      <div className="permission-editing-heading"><span>{selected ? `Editing ${label(selected)}` : "Select a role or member"}</span><Button size="sm" variant="ghost" disabled={!manageable(selected) || !canClear || mutation.isPending} onClick={() => setConfirmation("clear")}>Clear Permissions</Button></div>
+      {selected && !manageable(selected) && <p className="text-xs text-muted-foreground">This target is protected by role hierarchy. Its overrides are read-only.</p>}
+      {filtered.length === 0 && <p role="status" className="py-6 text-sm text-muted-foreground">No permissions match your search.</p>}
+      {filtered.map((permission, index) => {
+        const state = entries.find(e => selected && sameTarget(e, selected) && e.permission === permission.key)?.state ?? null;
+        const unavailable = permissionAvailability(permission);
+        const descriptionId = `${id}-${permission.key}`;
+        return <div key={permission.key}>
+          {(index === 0 || filtered[index - 1]?.group !== permission.group) && <h4 className="permission-group">{permission.group}</h4>}
+          <div className="permission-row"><div><strong>{permission.label}</strong><p id={descriptionId}>{permission.desc}</p>{unavailable && <p className="permission-unavailable">{unavailable}</p>}</div><div className="permission-states" role="group" aria-label={permission.label} aria-describedby={descriptionId}>
+            {([false, null, true] as const).map((value, i) => {
+              const name = ["Deny", "Neutral", "Allow"][i]!;
+              const deniedGrant = value === true && !base.grantable.includes(permission.key);
+              return <button key={name} type="button" data-state={name.toLowerCase()} aria-label={`${name} ${permission.label}`} title={deniedGrant ? "You cannot grant a permission you do not have." : value === null ? "Neutral: keep earlier permission grants" : `${name} for this target`} aria-pressed={state === value} disabled={!manageable(selected) || mutation.isPending || Boolean(unavailable) || deniedGrant} onClick={() => { if (selected) setState(selected, permission.key, value); }}>{i === 0 ? <X aria-hidden="true" /> : i === 1 ? <Slash aria-hidden="true" /> : <Check aria-hidden="true" />}</button>;
+            })}
+          </div></div>
+        </div>;
+      })}
     </section></div>
-    {mutation.isError&&<p role="alert" className="text-sm text-destructive">{apiErrorMessage(mutation.error)} Your draft is preserved. Reload if someone else changed permissions.</p>}
-    <div className="permission-save"><span className="text-sm text-muted-foreground">{dirty?"You have unsaved changes.":"Changes apply when saved."}</span><Button variant="ghost" disabled={!dirty||mutation.isPending} onClick={()=>setEntries(snapshot.entries)}>Reset</Button><Button disabled={!dirty||mutation.isPending} onClick={()=>mutation.mutate({})}>{mutation.isPending?"Saving...":"Save Changes"}</Button></div>
-    <Dialog.Root open={confirmSync} onOpenChange={setConfirmSync}><Dialog.Portal><Dialog.Overlay className="dialog-overlay" /><Dialog.Content className="standard-dialog"><Dialog.Title>Sync permissions with category?</Dialog.Title><Dialog.Description className="my-4">This replaces independent channel overrides with the category's permissions. Future category changes will apply to this channel.</Dialog.Description><div className="flex justify-end gap-2"><Button variant="outline" onClick={()=>setConfirmSync(false)}>Cancel</Button><Button disabled={mutation.isPending} onClick={()=>mutation.mutate({sync:true})}>Sync permissions</Button></div></Dialog.Content></Dialog.Portal></Dialog.Root>
+    {mutation.isError && <p role="alert" className="my-3 text-sm text-destructive">{apiErrorMessage(mutation.error)} Your draft is preserved. You can retry or load the latest permissions.</p>}
+    <div className="permission-save"><span className="text-sm text-muted-foreground" role="status">{dirty ? "You have unsaved changes." : mutation.isSuccess ? "Permissions saved." : "Changes apply when saved."}</span><Button variant="ghost" disabled={!dirty || mutation.isPending} onClick={() => restore(base)}>Reset</Button><Button disabled={!dirty || mutation.isPending} onClick={() => save()}>{mutation.isPending ? "Saving..." : "Save Changes"}</Button></div>
+    <Dialog.Root open={confirmation !== null} onOpenChange={open => { if (!open && !mutation.isPending) setConfirmation(null); }}><Dialog.Portal><Dialog.Overlay className="dialog-overlay" /><Dialog.Content className="standard-dialog">
+      <Dialog.Title>{confirmation === "sync" ? "Sync permissions with category?" : confirmation === "clear" ? "Clear target permissions?" : "Load latest permissions?"}</Dialog.Title>
+      <Dialog.Description className="my-4">{confirmation === "sync" ? "This replaces independent overrides and unsaved changes with the category's permissions. Future category changes will apply to this channel." : confirmation === "clear" ? "Reset this target's applicable overrides to Neutral. Other targets keep their settings. Save Changes applies this draft." : "Discard this draft and load the latest permissions from the server."}</Dialog.Description>
+      {mutation.isError && <p role="alert" className="mb-3 text-sm text-destructive">{apiErrorMessage(mutation.error)} Your draft is preserved.</p>}
+      <div className="flex justify-end gap-2"><Button variant="outline" disabled={mutation.isPending} onClick={() => setConfirmation(null)}>Cancel</Button><Button disabled={mutation.isPending} onClick={() => {
+        if (confirmation === "sync") save(true);
+        else if (confirmation === "reload") restore(remote);
+        else { if (selected && !saving.current) setEntries(previous => previous.filter(e => !sameTarget(e, selected) || !applicable.some(p => p.key === e.permission))); setConfirmation(null); }
+      }}>{confirmation === "sync" ? "Sync permissions" : confirmation === "clear" ? "Clear Permissions" : "Discard and load latest"}</Button></div>
+    </Dialog.Content></Dialog.Portal></Dialog.Root>
   </div>;
 }

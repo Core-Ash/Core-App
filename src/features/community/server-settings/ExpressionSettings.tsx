@@ -22,6 +22,7 @@ export function EmojiSettings({
   settings: ServerSettingsData;
   canManage: boolean;
 }) {
+  const canCreate = canManage || Boolean(settings.permissions.effective_permissions?.includes("expressions.create"));
   const emojis = useServerEmojis(settings.id);
   const createEmoji = useCreateServerEmoji(settings.id);
   const deleteEmoji = useDeleteServerEmoji(settings.id);
@@ -72,7 +73,7 @@ export function EmojiSettings({
         </div>
       </div>
 
-      {canManage && (
+      {canCreate && (
         <div>
           {!showAdd ? (
             <Button
@@ -158,6 +159,7 @@ export function StickerSettings({
   settings: ServerSettingsData;
   canManage: boolean;
 }) {
+  const canCreate = canManage || Boolean(settings.permissions.effective_permissions?.includes("expressions.create"));
   const stickers = useServerStickers(settings.id);
   const createSticker = useCreateServerSticker(settings.id);
   const deleteSticker = useDeleteServerSticker(settings.id);
@@ -210,7 +212,7 @@ export function StickerSettings({
         </div>
       </div>
 
-      {canManage && (
+      {canCreate && (
         <div>
           {!showAdd ? (
             <Button
@@ -308,6 +310,7 @@ export function SoundboardSettings({
   settings: ServerSettingsData;
   canManage: boolean;
 }) {
+  const canCreate = canManage || Boolean(settings.permissions.effective_permissions?.includes("expressions.create"));
   const sounds = useServerSoundboard(settings.id);
   const createSound = useCreateServerSoundboard(settings.id);
   const deleteSound = useDeleteServerSoundboard(settings.id);
@@ -368,7 +371,7 @@ export function SoundboardSettings({
         </div>
       </div>
 
-      {canManage && (
+      {canCreate && (
         <div>
           {!showAdd ? (
             <Button type="button" onClick={() => setShowAdd(true)}>

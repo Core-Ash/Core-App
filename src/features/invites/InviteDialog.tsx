@@ -13,14 +13,14 @@ const expirations = [
   [43200, "12 hours"], [86400, "1 day"], [604800, "7 days"], [0, "Never"],
 ] as const;
 
-function InviteContents({ community }: { community: Community }) {
+function InviteContents({ community, channelId }: { community: Community; channelId?: string }) {
   const id = useId();
-  const create = useCreateInvite(community.id);
+  const create = useCreateInvite(community.id, channelId);
   const generating = useRef(false);
   const title = useRef<HTMLHeadingElement>(null);
   const mounted = useRef(false);
   const cached = useQuery<CreatedInvite | null>({
-    queryKey: inviteKeys.link(community.id), queryFn: () => null, enabled: false,
+    queryKey: inviteKeys.link(community.id, channelId), queryFn: () => null, enabled: false,
   });
   const invite = cached.data;
   const preview = useInvitePreview(invite?.code ?? "");
@@ -155,8 +155,8 @@ function InviteContents({ community }: { community: Community }) {
   </>;
 }
 
-export function InviteDialog({ community, children, open, onOpenChange, returnFocusRef }: {
-  community: Community; children?: ReactElement; open?: boolean;
+export function InviteDialog({ community, children, open, onOpenChange, returnFocusRef, channelId }: {
+  community: Community; children?: ReactElement; open?: boolean; channelId?: string;
   onOpenChange?: (open: boolean) => void; returnFocusRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
@@ -167,7 +167,7 @@ export function InviteDialog({ community, children, open, onOpenChange, returnFo
       <Dialog.Content className="standard-dialog invite-dialog" onCloseAutoFocus={(event) => {
         if (returnFocusRef?.current) { event.preventDefault(); returnFocusRef.current.focus(); }
       }}>
-        <InviteContents key={community.id} community={community} />
+        <InviteContents key={`${community.id}:${channelId ?? "server"}`} community={community} channelId={channelId} />
         <Dialog.Close asChild><button className="icon-button dialog-close" aria-label="Close invitation dialog"><X size={22} strokeWidth={1.5} aria-hidden="true" /></button></Dialog.Close>
       </Dialog.Content>
     </Dialog.Portal>

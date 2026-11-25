@@ -16,6 +16,8 @@ export interface MemberRole {
   hoist?: boolean;
 }
 export interface ServerMember extends PublicProfile {
+  nickname?: string | null;
+  timeout_until?: string | null;
   community_id: string;
   joined_at: string;
   roles: MemberRole[];

@@ -143,7 +143,7 @@ export function MemberRoleSelector({
           <div className="max-h-56 overflow-y-auto space-y-0.5 custom-scrollbar pr-0.5" role="menu">
             {filteredRoles.map((role) => {
               const isAssigned = effectiveAssignedIds.includes(role.id);
-              const isDisabled = !canManage;
+              const isDisabled = !canManage || role.manageable === false;
 
               return (
                 <button

@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { AppDataContext } from "@/app/app-data-context";
 import { createApiClient } from "@/lib/api/client";
 import { PermissionsEditor } from "./PermissionsEditor";
-const snapshot={version:"v1",resource:{name:"general",kind:"text"},entries:[],roles:[{id:"everyone",name:"@everyone",is_default:true,color:null}],members:[{id:"member",name:"Ash",username:"ash",avatar_url:null}]};
+const snapshot={version:"v1",resource:{name:"general",kind:"text"},entries:[],grantable:["channels.view","channels.manage","roles.manage","messages.send","messages.read_history","invites.create"],roles:[{id:"everyone",name:"@everyone",is_default:true,color:null,manageable:true}],members:[{id:"member",name:"Ash",username:"ash",avatar_url:null,manageable:true}]};
 afterEach(()=>vi.unstubAllGlobals());
 function setup(fail=false){
  const fetcher=vi.fn(async(_url:string,options?:RequestInit)=>options?.method==="PUT"&&fail?Response.json({}, {status:403}):Response.json(snapshot));

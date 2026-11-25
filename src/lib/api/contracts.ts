@@ -211,6 +211,8 @@ function parseMember(value: unknown): ServerMember {
   if (!Array.isArray(data.roles)) throw new ApiError("invalid_response");
   return {
     ...parsePublicProfile(value), community_id: uuid(data.community_id), joined_at: timestamp(data.joined_at),
+    nickname: data.nickname === undefined || data.nickname === null ? null : string(data.nickname),
+    timeout_until: data.timeout_until === undefined || data.timeout_until === null ? null : timestamp(data.timeout_until),
     roles: data.roles.map((value) => {
       const role = record(value);
       return {
