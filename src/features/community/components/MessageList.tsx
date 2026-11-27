@@ -1,6 +1,7 @@
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, MessageSquare, Search } from "lucide-react";
 import { EmptyState } from "@/components/common/EmptyState";
+import type { SelectedEmoji } from "@/components/ui/emoji-picker";
 import type { ChatMessageData } from "@/features/community/types";
 import { ChatMessage } from "@/features/community/components/ChatMessage";
 import type { MentionContext } from "@/features/mentions/MentionMessageActions";
@@ -17,6 +18,16 @@ export function MessageList({
   currentUserId,
   currentUserRoleIds,
   mentionContext,
+  highlightedMessageId,
+  canSendMessages = true,
+  canAddReactions = true,
+  canCreateThreads = true,
+  onReply,
+  onForward,
+  onCreateThread,
+  onOpenThread,
+  onJumpToMessage,
+  onToggleReaction,
 }: {
   messages: readonly ChatMessageData[];
   channel: { name: string };
@@ -27,6 +38,16 @@ export function MessageList({
   currentUserId?: string;
   currentUserRoleIds?: ReadonlySet<string> | readonly string[];
   mentionContext?: MentionContext;
+  highlightedMessageId?: string | null;
+  canSendMessages?: boolean;
+  canAddReactions?: boolean;
+  canCreateThreads?: boolean;
+  onReply?: (message: ChatMessageData) => void;
+  onForward?: (message: ChatMessageData) => void;
+  onCreateThread?: (message: ChatMessageData) => void;
+  onOpenThread?: (threadId: string) => void;
+  onJumpToMessage?: (messageId: string) => void;
+  onToggleReaction?: (messageId: string, emoji: SelectedEmoji, remove: boolean) => void;
 }) {
   const scrollArea = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
@@ -100,6 +121,8 @@ export function MessageList({
                   : Infinity;
                 const grouped =
                   !searching &&
+                  !message.replyTo &&
+                  !message.forwarded &&
                   previous?.author.id === message.author.id &&
                   gap >= 0 &&
                   gap < 300_000 &&
@@ -118,7 +141,17 @@ export function MessageList({
                       mentionContext={mentionContext}
                       message={message}
                       grouped={grouped}
+                      highlighted={highlightedMessageId === message.id}
                       communityId={communityId}
+                      canSendMessages={canSendMessages}
+                      canAddReactions={canAddReactions}
+                      canCreateThreads={canCreateThreads}
+                      onReply={onReply}
+                      onForward={onForward}
+                      onCreateThread={onCreateThread}
+                      onOpenThread={onOpenThread}
+                      onJumpToMessage={onJumpToMessage}
+                      onToggleReaction={onToggleReaction}
                     />
                   </Fragment>
                 );

@@ -1,6 +1,6 @@
 import { ApiError, responseError } from "@/lib/api/errors";
 
-type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+type Json = string | number | boolean | null | undefined | Json[] | { [key: string]: Json };
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export interface RequestOptions {
   signal?: AbortSignal;

@@ -13,21 +13,26 @@ const message: ChatMessageData = {
 };
 
 describe("message actions", () => {
-  it("renders no permanent edit/delete links and a toolbar with unavailable and live controls", () => {
+  it("renders no permanent edit/delete links and a toolbar with live reaction, reply, and more controls", () => {
     render(<ol><ChatMessage message={message} grouped={false} currentUserId={me} mentionContext={context} /></ol>);
     expect(screen.queryByText("Edit message")).not.toBeInTheDocument();
     expect(screen.queryByText("Delete message")).not.toBeInTheDocument();
     const toolbar = screen.getByRole("toolbar", { name: "Message actions" });
-    expect(within(toolbar).getByRole("button", { name: "Add reaction (unavailable)" })).toBeDisabled();
-    expect(within(toolbar).getByRole("button", { name: "Reply (unavailable)" })).toBeDisabled();
+    expect(within(toolbar).getByRole("button", { name: "Add reaction" })).toBeEnabled();
+    expect(within(toolbar).getByRole("button", { name: "Reply" })).toBeEnabled();
     expect(within(toolbar).getByRole("button", { name: "More options" })).toBeEnabled();
   });
-  it("opens the same author menu by right-click and the three-dot button, then closes on Escape", async () => {
+  it("opens the same author menu by right-click and the three-dot button, with SOON removed from implemented actions, then closes on Escape", async () => {
     const { container } = render(<ol><ChatMessage message={message} grouped={false} currentUserId={me} mentionContext={context} /></ol>);
     fireEvent.contextMenu(container.querySelector(".message-body")!);
     let menu = await screen.findByRole("menu", { name: "Message actions" });
-    for (const name of ["Copy Text", "Edit Message", "Delete Message", "Copy Message ID"]) expect(within(menu).getByRole("menuitem", { name })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Reply/ })).toHaveAttribute("aria-disabled", "true");
+    for (const name of ["Add Reaction", "Reply", "Forward", "Create Thread", "Copy Text", "Edit Message", "Delete Message", "Copy Message ID"]) {
+      const item = within(menu).getByRole("menuitem", { name });
+      expect(item).toBeInTheDocument();
+      expect(item).not.toHaveAttribute("aria-disabled", "true");
+      expect(within(item).queryByText(/Soon/i)).not.toBeInTheDocument();
+    }
+    expect(within(menu).getByRole("menuitem", { name: /Pin Message/ })).toHaveAttribute("aria-disabled", "true");
     fireEvent.keyDown(menu, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "More options" }));

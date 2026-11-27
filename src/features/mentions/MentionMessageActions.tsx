@@ -10,14 +10,24 @@ import { parseMessage } from "@/lib/api/contracts";
 import { ChannelMentionComposer, ConversationMentionComposer } from "./MentionComposers";
 import { mentionPayload, type Mention } from "./model";
 
-export type MentionContext = { kind: "channel"; id: string; name: string; communityId: string } | { kind: "conversation"; id: string; name: string; participants: PublicProfile[] };
+export type MentionContext =
+  | { kind: "channel"; id: string; name: string; communityId: string; threadId?: string }
+  | { kind: "conversation"; id: string; name: string; participants: PublicProfile[] };
 
-// One implementation of edit/delete for server channels, DMs and group DMs.
+// One implementation of edit/delete for server channels, threads, DMs and group DMs.
 function useMessageMutations(message: ChatMessageData, context: MentionContext) {
   const { api } = useAppData();
   const queries = useQueryClient();
   const path = `/${context.kind === "channel" ? "channels" : "conversations"}/${context.id}/messages/${message.id}`;
-  const refresh = () => queries.invalidateQueries({ queryKey: [context.kind === "channel" ? "messages" : "conversation-messages", context.id] });
+  const refresh = () => {
+    void queries.invalidateQueries({
+      queryKey: [context.kind === "channel" ? "messages" : "conversation-messages", context.id],
+    });
+    if (context.kind === "channel" && context.threadId) {
+      void queries.invalidateQueries({ queryKey: ["thread-messages", context.threadId] });
+      void queries.invalidateQueries({ queryKey: ["thread", context.threadId] });
+    }
+  };
   return {
     async save(body: string, mentions: Mention[] = []) {
       parseMessage(await api.patch(path, { body, mentions: mentionPayload(mentions) }));

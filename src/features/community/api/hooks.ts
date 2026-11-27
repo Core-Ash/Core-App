@@ -8,8 +8,14 @@ import {
 import { useAppData } from "@/app/app-data-context";
 import { ApiError, apiErrorMessage } from "@/lib/api/errors";
 import { endpoints } from "@/lib/api/endpoints";
-import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
-import type { ChannelAccessFilters, MessageCursor, Message } from "@/lib/api/types";
+import { mergeConfirmedMessage, updateCachedMessage } from "@/features/community/api/message-cache";
+import type {
+  ChannelAccessFilters,
+  MessageAttachment,
+  MessageCursor,
+  Message,
+  MessageReplyReference,
+} from "@/lib/api/types";
 
 export const queryKeys = {
   profile: ["profile"] as const,
@@ -19,6 +25,9 @@ export const queryKeys = {
   messages: (channelId: string | undefined) => ["messages", channelId] as const,
   channelAccess: (communityId: string) => ["channel-access", communityId] as const,
   members: (communityId: string) => ["members", communityId] as const,
+  channelThreads: (channelId: string | undefined) => ["channel-threads", channelId] as const,
+  thread: (threadId: string | undefined) => ["thread", threadId] as const,
+  threadMessages: (threadId: string | undefined) => ["thread-messages", threadId] as const,
 };
 
 export function useCurrentUser() {
@@ -154,6 +163,12 @@ export interface LocalMessage {
   retryable?: boolean;
 }
 
+export interface SendMessageOptions {
+  replyTo?: MessageReplyReference | null;
+  replyMention?: boolean;
+  attachments?: MessageAttachment[];
+}
+
 export function useSendMessage(channelId: string) {
   const { api, ready } = useAppData();
   const queries = useQueryClient();
@@ -172,7 +187,14 @@ export function useSendMessage(channelId: string) {
     }));
   }
   const mutation = useMutation({
-    mutationFn: async (input: { body: string; client_nonce: string; mentions?: Mention[] }) => {
+    mutationFn: async (input: {
+      body: string;
+      client_nonce: string;
+      mentions?: Mention[];
+      reply_to_message_id?: string | null;
+      reply_mention?: boolean;
+      attachments?: MessageAttachment[];
+    }) => {
       if (!ready) throw new ApiError("unauthorized");
       const message = await endpoints.sendMessage(api, channelId, input);
       if (message.client_nonce !== input.client_nonce || message.author_id !== profile.data?.id) throw new ApiError("invalid_response");
@@ -197,19 +219,318 @@ export function useSendMessage(channelId: string) {
   });
   return {
     entries: outbox.data,
-    send: (body: string, mentions: Mention[] = []) => {
+    send: (body: string, mentions: Mention[] = [], options?: SendMessageOptions) => {
       if (!ready || !profile.isSuccess) throw new ApiError("unauthorized");
       const nonce = crypto.randomUUID();
-      const message: Message = { id: nonce, client_nonce: nonce, author_id: profile.data.id,
-        author: profile.data, body, mentions, created_at: new Date().toISOString(), edited_at: null, deleted_at: null };
+      const replyTo = options?.replyTo ?? null;
+      const replyMention = options?.replyMention ?? false;
+      const attachments = options?.attachments ?? [];
+      const message: Message = {
+        id: nonce,
+        client_nonce: nonce,
+        author_id: profile.data.id,
+        author: profile.data,
+        body,
+        mentions,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
+        ...(replyTo ? { reply_to_message_id: replyTo.id, reply_mention: replyMention, reply_to: replyTo } : {}),
+        ...(attachments.length ? { attachments } : {}),
+      };
       queries.setQueryData<LocalMessage[]>(key, (previous = []) => [...previous, { message, status: "pending" }]);
-      mutation.mutate({ body, client_nonce: nonce, ...(mentions.length ? { mentions: mentionPayload(mentions) } : {}) });
+      mutation.mutate({
+        body,
+        client_nonce: nonce,
+        ...(mentions.length ? { mentions: mentionPayload(mentions) } : {}),
+        ...(replyTo ? { reply_to_message_id: replyTo.id, reply_mention: replyMention } : {}),
+        ...(attachments.length ? { attachments } : {}),
+      });
     },
     retry: (nonce: string) => {
       const entry = queries.getQueryData<LocalMessage[]>(key)?.find((entry) => entry.message.client_nonce === nonce);
       if (!ready || entry?.status !== "failed" || !entry.retryable) return;
       update(nonce, (entry) => ({ ...entry, status: "pending", error: undefined }));
-      mutation.mutate({ body: entry.message.body!, client_nonce: nonce, ...(entry.message.mentions?.length ? { mentions: mentionPayload(entry.message.mentions) } : {}) });
+      mutation.mutate({
+        body: entry.message.body!,
+        client_nonce: nonce,
+        ...(entry.message.mentions?.length ? { mentions: mentionPayload(entry.message.mentions) } : {}),
+        ...(entry.message.reply_to_message_id ? { reply_to_message_id: entry.message.reply_to_message_id, reply_mention: entry.message.reply_mention } : {}),
+        ...(entry.message.attachments?.length ? { attachments: entry.message.attachments } : {}),
+      });
+    },
+  };
+}
+
+export function useToggleReaction(
+  scopeKind: "channel" | "conversation",
+  scopeId: string,
+  cacheKey: readonly unknown[],
+) {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  const profile = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async (input: {
+      messageId: string;
+      emoji: string;
+      emojiName?: string | null;
+      emojiUrl?: string | null;
+      remove: boolean;
+    }) => {
+      if (!ready) throw new ApiError("unauthorized");
+      if (input.remove) {
+        return endpoints.removeReaction(api, scopeKind, scopeId, input.messageId, input.emoji);
+      }
+      return endpoints.addReaction(api, scopeKind, scopeId, input.messageId, {
+        emoji: input.emoji,
+        emoji_name: input.emojiName,
+        emoji_url: input.emojiUrl,
+      });
+    },
+    onMutate: async (input) => {
+      await queries.cancelQueries({ queryKey: cacheKey });
+      const previous = queries.getQueryData<Parameters<typeof updateCachedMessage>[0]>(cacheKey);
+      const currentUser = profile.data;
+      if (currentUser) {
+        queries.setQueryData(
+          cacheKey,
+          (old: Parameters<typeof updateCachedMessage>[0]) =>
+            updateCachedMessage(old, input.messageId, (msg) => {
+              const current = msg.reactions ?? [];
+              const existingIdx = current.findIndex((r) => r.emoji === input.emoji);
+              const nextReactions = [...current];
+              if (input.remove) {
+                if (existingIdx >= 0) {
+                  const group = nextReactions[existingIdx]!;
+                  const nextCount = Math.max(0, group.count - 1);
+                  if (nextCount === 0) {
+                    nextReactions.splice(existingIdx, 1);
+                  } else {
+                    nextReactions[existingIdx] = {
+                      ...group,
+                      count: nextCount,
+                      me: false,
+                      users: group.users.filter((u) => u.id !== currentUser.id),
+                    };
+                  }
+                }
+              } else if (existingIdx >= 0) {
+                const group = nextReactions[existingIdx]!;
+                if (!group.me) {
+                  nextReactions[existingIdx] = {
+                    ...group,
+                    count: group.count + 1,
+                    me: true,
+                    users: [...group.users, currentUser],
+                  };
+                }
+              } else {
+                nextReactions.push({
+                  emoji: input.emoji,
+                  emoji_name: input.emojiName ?? null,
+                  emoji_url: input.emojiUrl ?? null,
+                  count: 1,
+                  me: true,
+                  users: [currentUser],
+                });
+              }
+              return { ...msg, reactions: nextReactions };
+            }),
+        );
+      }
+      return { previous };
+    },
+    onSuccess: (updatedMessage) => {
+      queries.setQueryData(
+        cacheKey,
+        (old: Parameters<typeof updateCachedMessage>[0]) =>
+          updateCachedMessage(old, updatedMessage.id, () => updatedMessage),
+      );
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) {
+        queries.setQueryData(cacheKey, context.previous);
+      }
+    },
+  });
+}
+
+export function useChannelThreads(channelId?: string) {
+  const { api, ready } = useAppData();
+  return useQuery({
+    queryKey: queryKeys.channelThreads(channelId),
+    queryFn: ({ signal }) => endpoints.channelThreads(api, channelId!, signal),
+    enabled: ready && Boolean(channelId),
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useThread(threadId?: string) {
+  const { api, ready } = useAppData();
+  return useQuery({
+    queryKey: queryKeys.thread(threadId),
+    queryFn: ({ signal }) => endpoints.thread(api, threadId!, signal),
+    enabled: ready && Boolean(threadId),
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useThreadMessages(threadId?: string) {
+  const { api, ready } = useAppData();
+  return useInfiniteQuery({
+    queryKey: queryKeys.threadMessages(threadId),
+    queryFn: ({ pageParam, signal }) =>
+      endpoints.threadMessages(api, threadId!, pageParam, signal),
+    initialPageParam: null as MessageCursor | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: ready && Boolean(threadId),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useSendThreadMessage(threadId: string, parentChannelId?: string) {
+  const { api, ready } = useAppData();
+  const queries = useQueryClient();
+  const profile = useCurrentUser();
+  const key = ["thread-message-outbox", threadId] as const;
+  const outbox = useQuery<LocalMessage[]>({
+    queryKey: key,
+    queryFn: () => [],
+    initialData: [],
+    enabled: false,
+    gcTime: Infinity,
+  });
+
+  function update(nonce: string, change: (entry: LocalMessage) => LocalMessage | null) {
+    queries.setQueryData<LocalMessage[]>(key, (previous) =>
+      previous?.flatMap((entry) => {
+        if (entry.message.client_nonce !== nonce) return [entry];
+        const next = change(entry);
+        return next ? [next] : [];
+      }),
+    );
+  }
+
+  const mutation = useMutation({
+    mutationFn: async (input: {
+      body: string;
+      client_nonce: string;
+      mentions?: Mention[];
+      reply_to_message_id?: string | null;
+      reply_mention?: boolean;
+      attachments?: MessageAttachment[];
+    }) => {
+      if (!ready) throw new ApiError("unauthorized");
+      const message = await endpoints.sendThreadMessage(api, threadId, input);
+      if (message.client_nonce !== input.client_nonce || message.author_id !== profile.data?.id)
+        throw new ApiError("invalid_response");
+      return message;
+    },
+    onSuccess: async (message, input) => {
+      await queries.cancelQueries({ queryKey: queryKeys.threadMessages(threadId) });
+      if (
+        !queries
+          .getQueryData<LocalMessage[]>(key)
+          ?.some((entry) => entry.message.client_nonce === input.client_nonce)
+      )
+        return;
+      queries.setQueryData(
+        queryKeys.threadMessages(threadId),
+        (previous: Parameters<typeof mergeConfirmedMessage>[0]) =>
+          mergeConfirmedMessage(previous, message),
+      );
+      update(input.client_nonce, () => null);
+      void queries.invalidateQueries({ queryKey: queryKeys.thread(threadId) });
+      if (parentChannelId) {
+        void queries.invalidateQueries({ queryKey: queryKeys.messages(parentChannelId) });
+        void queries.invalidateQueries({ queryKey: queryKeys.channelThreads(parentChannelId) });
+      }
+    },
+    onError: (error, input) => {
+      update(input.client_nonce, (entry) => ({
+        ...entry,
+        status: "failed",
+        error: apiErrorMessage(error),
+        retryable: !(
+          error instanceof ApiError &&
+          [
+            "unauthorized",
+            "session_transport",
+            "auth_unavailable",
+            "forbidden",
+            "validation",
+            "not_found",
+            "conflict",
+            "configuration",
+          ].includes(error.kind)
+        ),
+      }));
+    },
+  });
+
+  return {
+    entries: outbox.data,
+    send: (body: string, mentions: Mention[] = [], options?: SendMessageOptions) => {
+      if (!ready || !profile.isSuccess) throw new ApiError("unauthorized");
+      const nonce = crypto.randomUUID();
+      const replyTo = options?.replyTo ?? null;
+      const replyMention = options?.replyMention ?? false;
+      const attachments = options?.attachments ?? [];
+      const message: Message = {
+        id: nonce,
+        client_nonce: nonce,
+        author_id: profile.data.id,
+        author: profile.data,
+        body,
+        mentions,
+        thread_id: threadId,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
+        ...(replyTo
+          ? { reply_to_message_id: replyTo.id, reply_mention: replyMention, reply_to: replyTo }
+          : {}),
+        ...(attachments.length ? { attachments } : {}),
+      };
+      queries.setQueryData<LocalMessage[]>(key, (previous = []) => [
+        ...previous,
+        { message, status: "pending" },
+      ]);
+      mutation.mutate({
+        body,
+        client_nonce: nonce,
+        ...(mentions.length ? { mentions: mentionPayload(mentions) } : {}),
+        ...(replyTo ? { reply_to_message_id: replyTo.id, reply_mention: replyMention } : {}),
+        ...(attachments.length ? { attachments } : {}),
+      });
+    },
+    retry: (nonce: string) => {
+      const entry = queries
+        .getQueryData<LocalMessage[]>(key)
+        ?.find((entry) => entry.message.client_nonce === nonce);
+      if (!ready || entry?.status !== "failed" || !entry.retryable) return;
+      update(nonce, (entry) => ({ ...entry, status: "pending", error: undefined }));
+      mutation.mutate({
+        body: entry.message.body!,
+        client_nonce: nonce,
+        ...(entry.message.mentions?.length
+          ? { mentions: mentionPayload(entry.message.mentions) }
+          : {}),
+        ...(entry.message.reply_to_message_id
+          ? {
+              reply_to_message_id: entry.message.reply_to_message_id,
+              reply_mention: entry.message.reply_mention,
+            }
+          : {}),
+        ...(entry.message.attachments?.length ? { attachments: entry.message.attachments } : {}),
+      });
     },
   };
 }

@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { MentionAutocomplete } from "@/features/mentions/MentionAutocomplete";
 import { mentionQuery, reconcileMentionEdit, reconcileMentions, type Mention, type MentionSuggestion } from "@/features/mentions/model";
+import { ComposerReplyBanner } from "@/features/community/components/MessageReplyAndForward";
 import { parseMentions } from "@/lib/api/contracts";
+import type { MessageReplyReference } from "@/lib/api/types";
 import { Image, Lock, Plus, SendHorizontal, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmojiPicker } from "@/components/ui/emoji-picker";
@@ -10,6 +12,7 @@ import { apiErrorMessage } from "@/lib/api/errors";
 
 interface MessageComposerProps {
   channelName: string;
+  communityId?: string;
   canSendMessages?: boolean;
   disabledReason?: string;
   onSend: (body: string, mentions?: Mention[]) => void | Promise<void>;
@@ -20,10 +23,15 @@ interface MessageComposerProps {
   mentionsLoading?: boolean;
   onMentionSearch?: (search: string | null) => void;
   autoFocus?: boolean;
+  replyTo?: MessageReplyReference | null;
+  replyMention?: boolean;
+  onToggleReplyMention?: (enabled: boolean) => void;
+  onCancelReply?: () => void;
 }
 
 export function MessageComposer({
   channelName,
+  communityId,
   canSendMessages = true,
   disabledReason,
   onSend,
@@ -34,6 +42,10 @@ export function MessageComposer({
   initialMentions = [],
   submitLabel = "Send message",
   autoFocus = false,
+  replyTo = null,
+  replyMention = true,
+  onToggleReplyMention,
+  onCancelReply,
 }: MessageComposerProps) {
   const [draft, setDraft] = useState(initialBody);
   const [mentions, setMentions] = useState<Mention[]>(initialMentions);
@@ -67,8 +79,11 @@ export function MessageComposer({
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const element = input.current;
-    if (autoFocus && element) { element.focus(); element.setSelectionRange(element.value.length, element.value.length); }
-  }, [autoFocus]);
+    if ((autoFocus || replyTo) && element) {
+      element.focus();
+      element.setSelectionRange(element.value.length, element.value.length);
+    }
+  }, [autoFocus, replyTo]);
   const maximum = 4000;
   const ready = draft.trim().length > 0;
   async function send() {
@@ -147,6 +162,14 @@ export function MessageComposer({
   return (
     <div className="composer-area relative" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) closeMentions(); }}>
       {query && onMentionSearch && <MentionAutocomplete id={popupId} items={mentionSuggestions} selected={active} loading={mentionsLoading} onSelect={insertMention} onHighlight={setSelected} />}
+      {replyTo && onCancelReply && (
+        <ComposerReplyBanner
+          replyTo={replyTo}
+          mentionEnabled={replyMention}
+          onToggleMention={(enabled) => onToggleReplyMention?.(enabled)}
+          onCancel={onCancelReply}
+        />
+      )}
       <form
         className="message-composer"
         aria-label="Message composer"
@@ -254,9 +277,11 @@ export function MessageComposer({
           </Tooltip>
           <EmojiPicker
             label="Choose an emoji"
+            communityId={communityId}
             onSelect={(emoji) => {
               if (locked.current) return;
-              const value = Array.from(`${draft}${emoji.value}`).slice(0, maximum).join("");
+              const token = emoji.customId ? `:${emoji.label}:` : emoji.value;
+              const value = Array.from(`${draft}${token}`).slice(0, maximum).join("");
               setMentions(reconcileMentions(draft, value, mentions));
               setDraft(value); closeMentions();
               input.current?.focus();

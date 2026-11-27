@@ -8,12 +8,16 @@ import { ChatMessageSkeleton } from "@/components/common/skeleton/Skeletons";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 import {
+  queryKeys,
   useCurrentUser,
   useMembers,
   useMessages,
   useSendMessage,
+  useToggleReaction,
 } from "@/features/community/api/hooks";
+import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
 import { useCommunitySelection } from "@/features/community/api/use-community-selection";
 import { ApplicationProfileState } from "@/features/community/components/ApplicationProfile";
 import { ChatHeader } from "@/features/community/components/ChatHeader";
@@ -25,10 +29,13 @@ import {
   CreateChannelDialog,
 } from "@/features/community/components/CreateResourceDialog";
 import { AddServerDialog } from "@/features/community/components/AddServerDialog";
+import { ForwardMessageDialog } from "@/features/community/components/ForwardMessageDialog";
+import { CreateThreadDialog, ThreadPanel } from "@/features/community/components/ThreadPanel";
 import { ChannelMentionComposer } from "@/features/mentions/MentionComposers";
 import { MessageList } from "@/features/community/components/MessageList";
 import type { ChatMessageData } from "@/features/community/types";
-import type { Channel, Community } from "@/lib/api/types";
+import { endpoints } from "@/lib/api/endpoints";
+import type { Channel, Community, MessageReplyReference } from "@/lib/api/types";
 import { ApiError } from "@/lib/api/errors";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { displayName } from "@/lib/display-name";
@@ -58,6 +65,8 @@ function LiveConversation({
   community: Community;
   channel: Channel;
 }) {
+  const { api } = useAppData();
+  const queries = useQueryClient();
   const history = useMessages(channel.id);
   const currentProfile = useCurrentUser();
   const channelMembers = useMembers(
@@ -75,11 +84,58 @@ function LiveConversation({
     return member ? new Set(member.roles.map((role) => role.id)) : undefined;
   }, [channelMembers.data?.pages, currentProfile.data?.id]);
   const send = useSendMessage(channel.id);
+  const toggleReaction = useToggleReaction(
+    "channel",
+    channel.id,
+    queryKeys.messages(channel.id),
+  );
   const wide = useMediaQuery("(min-width: 1200px)");
   const [membersVisible, setMembersVisible] = useState(true);
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [replyingTo, setReplyingTo] = useState<MessageReplyReference | null>(null);
+  const [replyMention, setReplyMention] = useState(true);
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessageData | null>(null);
+  const [creatingThreadFrom, setCreatingThreadFrom] = useState<ChatMessageData | null>(null);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
   const membersButton = useRef<HTMLButtonElement>(null);
+
+  async function jumpToMessage(messageId: string) {
+    const element = document.getElementById(`message-${messageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedMessageId(messageId);
+      setTimeout(() => setHighlightedMessageId((cur) => (cur === messageId ? null : cur)), 2000);
+      return;
+    }
+    try {
+      const around = await endpoints.getMessageAround(api, "channel", channel.id, messageId);
+      queries.setQueryData(
+        queryKeys.messages(channel.id),
+        (previous: Parameters<typeof mergeConfirmedMessage>[0]) => {
+          let next = previous;
+          for (const item of around.items) {
+            next = mergeConfirmedMessage(next, item);
+          }
+          return next;
+        },
+      );
+      requestAnimationFrame(() => {
+        document.getElementById(`message-${messageId}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        setHighlightedMessageId(messageId);
+        setTimeout(() => setHighlightedMessageId((cur) => (cur === messageId ? null : cur)), 2000);
+      });
+    } catch {
+      setToastNotice("Original message is unavailable.");
+      setTimeout(() => setToastNotice(null), 2500);
+    }
+  }
+
   const messages = useMemo(() => {
     // Server history wins when a refresh confirms an in-flight or failed send.
     const unique = new Map(
@@ -105,7 +161,15 @@ function LiveConversation({
           mentions: item.mentions,
           createdAt: item.created_at,
           edited: Boolean(item.edited_at),
-          deleted: Boolean(item.deleted_at) || item.body === null,
+          deleted: Boolean(item.deleted_at) || (item.body === null && !item.forwarded && !item.attachments?.length),
+          attachments: item.attachments,
+          reactions: item.reactions,
+          replyToMessageId: item.reply_to_message_id,
+          replyMention: item.reply_mention,
+          replyTo: item.reply_to,
+          forwarded: item.forwarded,
+          threadId: item.thread_id,
+          thread: item.thread,
           author: {
             id: item.author_id,
             name,
@@ -128,10 +192,12 @@ function LiveConversation({
       : items;
   }, [history.data, search, send]);
   const membersOpen = wide ? membersVisible : membersDialogOpen;
+  const canCreateThreads =
+    channel.can_create_public_threads !== false || channel.can_create_private_threads !== false;
   return (
     <section
       className="chat-workspace"
-      data-members-visible={wide && membersVisible}
+      data-members-visible={wide && (membersVisible || Boolean(activeThreadId))}
       aria-label={`${community.name} community`}
     >
       <ChatHeader
@@ -168,6 +234,38 @@ function LiveConversation({
                   channel={channel}
                   messages={messages}
                   searching={Boolean(search.trim())}
+                  highlightedMessageId={highlightedMessageId}
+                  canSendMessages={channel.can_send_messages !== false}
+                  canAddReactions={channel.can_add_reactions !== false}
+                  canCreateThreads={canCreateThreads}
+                  onReply={(msg) =>
+                    setReplyingTo({
+                      id: msg.id,
+                      author_id: msg.author.id,
+                      author: msg.author.profile ?? {
+                        id: msg.author.id,
+                        username: msg.author.name,
+                        display_name: msg.author.name,
+                        avatar_url: msg.author.avatar ?? null,
+                      },
+                      body: msg.body,
+                      deleted: Boolean(msg.deleted),
+                      has_attachments: Boolean(msg.attachments?.length),
+                    })
+                  }
+                  onForward={(msg) => setForwardingMessage(msg)}
+                  onCreateThread={(msg) => setCreatingThreadFrom(msg)}
+                  onOpenThread={(tid) => setActiveThreadId(tid)}
+                  onJumpToMessage={(mid) => void jumpToMessage(mid)}
+                  onToggleReaction={(messageId, emoji, remove) =>
+                    toggleReaction.mutate({
+                      messageId,
+                      emoji: emoji.value,
+                      emojiName: emoji.label,
+                      emojiUrl: emoji.customUrl ?? null,
+                      remove,
+                    })
+                  }
                   historyControls={
                     history.hasNextPage && <div className="history-controls">
                         <Button
@@ -178,27 +276,79 @@ function LiveConversation({
                           }}
                         >
                           {history.isFetchingNextPage
-                            ? "Loadingâ€¦"
+                            ? "Loading…"
                             : "Load older messages"}
                         </Button>
                     </div>
                   }
                 />
+                {toastNotice && (
+                  <div role="status" className="px-4 py-1.5 text-xs text-primary bg-primary/10 border-t border-border">
+                    {toastNotice}
+                  </div>
+                )}
                 <ChannelMentionComposer
                   key={channel.id}
                   communityId={community.id}
                   channelId={channel.id}
                   channelName={channel.name}
                   canSendMessages={channel.can_send_messages !== false}
-                  onSend={send.send}
+                  replyTo={replyingTo}
+                  replyMention={replyMention}
+                  onToggleReplyMention={setReplyMention}
+                  onCancelReply={() => setReplyingTo(null)}
+                  onSend={(body, mentions) => {
+                    send.send(body, mentions, {
+                      replyTo: replyingTo,
+                      replyMention,
+                    });
+                    setReplyingTo(null);
+                  }}
                 />
               </>
             )}
       </div>
-      {wide && membersVisible && (
+      {activeThreadId ? (
+        <ThreadPanel
+          threadId={activeThreadId}
+          communityId={community.id}
+          parentChannelId={channel.id}
+          currentUserId={currentProfile.data?.id}
+          currentUserRoleIds={currentUserRoleIds}
+          onClose={() => setActiveThreadId(null)}
+          onForwardMessage={(msg) => setForwardingMessage(msg)}
+        />
+      ) : wide && membersVisible ? (
         <aside className="member-sidebar" aria-label="Community members">
           <div id="community-members" className="member-sidebar-content"><MemberDirectory communityId={community.id} channelId={channel.id} /></div>
         </aside>
+      ) : null}
+      {forwardingMessage && (
+        <ForwardMessageDialog
+          open
+          onClose={() => setForwardingMessage(null)}
+          message={forwardingMessage}
+          sourceKind={forwardingMessage.threadId ? "thread" : "channel"}
+          sourceId={forwardingMessage.threadId ?? channel.id}
+          onForwarded={(dest) => {
+            setToastNotice(`Forwarded to ${dest.label}`);
+            setTimeout(() => setToastNotice(null), 2500);
+          }}
+        />
+      )}
+      {creatingThreadFrom && (
+        <CreateThreadDialog
+          open
+          onClose={() => setCreatingThreadFrom(null)}
+          channelId={channel.id}
+          communityId={community.id}
+          starterMessage={creatingThreadFrom}
+          canCreatePublic={channel.can_create_public_threads !== false}
+          canCreatePrivate={channel.can_create_private_threads !== false}
+          onCreated={(created) => {
+            setActiveThreadId(created.id);
+          }}
+        />
       )}
       <Dialog.Root
         open={!wide && membersDialogOpen}

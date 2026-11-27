@@ -28,3 +28,17 @@ export function mergeConfirmedMessage(
   });
   return { ...previous, pages };
 }
+
+/** Updates an existing message in place across all loaded pages without inserting a new row. */
+export function updateCachedMessage(
+  previous: History | undefined,
+  messageId: string,
+  updater: (message: Message) => Message,
+): History | undefined {
+  if (!previous || previous.pages.length === 0) return previous;
+  const pages = previous.pages.map((page) => ({
+    ...page,
+    items: page.items.map((item) => (item.id === messageId ? updater(item) : item)),
+  }));
+  return { ...previous, pages };
+}

@@ -5,7 +5,7 @@ import { useMembers } from "@/features/community/api/hooks";
 import { MessageComposer } from "@/features/community/components/MessageComposer";
 import { parseList, record, string, uuid } from "@/lib/api/contracts";
 import { ApiError } from "@/lib/api/errors";
-import type { PublicProfile } from "@/lib/api/types";
+import type { MessageReplyReference, PublicProfile } from "@/lib/api/types";
 import type { Mention, MentionSuggestion } from "./model";
 
 function useSearch() {
@@ -17,7 +17,20 @@ function useSearch() {
 function userSuggestion(profile: PublicProfile): MentionSuggestion {
   return { kind: "user", id: profile.id, label: profile.display_name, detail: `${profile.username}${profile.discriminator ? `#${profile.discriminator}` : ""}`, profile };
 }
-interface Props { channelName: string; autoFocus?: boolean; canSendMessages?: boolean; initialBody?: string; initialMentions?: Mention[]; submitLabel?: string; onSend: (body: string, mentions?: Mention[]) => void | Promise<void> }
+interface Props {
+  channelName: string;
+  autoFocus?: boolean;
+  canSendMessages?: boolean;
+  disabledReason?: string;
+  initialBody?: string;
+  initialMentions?: Mention[];
+  submitLabel?: string;
+  replyTo?: MessageReplyReference | null;
+  replyMention?: boolean;
+  onToggleReplyMention?: (enabled: boolean) => void;
+  onCancelReply?: () => void;
+  onSend: (body: string, mentions?: Mention[]) => void | Promise<void>;
+}
 export function ChannelMentionComposer({ communityId, channelId, ...props }: Props & { communityId: string; channelId: string }) {
   const { api, ready } = useAppData();
   const { search, setSearch, settled } = useSearch();
@@ -36,7 +49,7 @@ export function ChannelMentionComposer({ communityId, channelId, ...props }: Pro
     ...(roles.data ?? []),
     ...(members.data?.pages.flatMap((page) => page.items).slice(0, 25).map((member) => ({ ...userSuggestion(member), label: member.nickname || member.display_name, color: member.roles.find((role) => role.color)?.color })) ?? []),
   ] : [];
-  return <MessageComposer {...props} onMentionSearch={setSearch} mentionSuggestions={suggestions} mentionsLoading={search !== settled || members.isFetching || roles.isFetching} />;
+  return <MessageComposer {...props} communityId={communityId} onMentionSearch={setSearch} mentionSuggestions={suggestions} mentionsLoading={search !== settled || members.isFetching || roles.isFetching} />;
 }
 export function ConversationMentionComposer({ participants, ...props }: Props & { participants: PublicProfile[] }) {
   const [search, setSearch] = useState<string | null>(null);

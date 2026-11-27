@@ -1,13 +1,18 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
+import { useAppData } from "@/app/app-data-context";
 import { Button } from "@/components/ui/button";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { ChatMessageSkeleton } from "@/components/common/skeleton/Skeletons";
-import { useCurrentUser } from "@/features/community/api/hooks";
+import { useCurrentUser, useToggleReaction } from "@/features/community/api/hooks";
+import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
+import { ForwardMessageDialog } from "@/features/community/components/ForwardMessageDialog";
 import { ConversationMentionComposer } from "@/features/mentions/MentionComposers";
 import { MessageList } from "@/features/community/components/MessageList";
 import type { ChatMessageData } from "@/features/community/types";
 import {
+  conversationQueryKeys,
   useConversation,
   useConversationMessages,
   useConversationNotices,
@@ -17,6 +22,8 @@ import { ConversationHeader } from "@/features/conversations/components/Conversa
 import { CoreBotNotice } from "@/features/conversations/components/CoreBotNotice";
 import { GroupMemberList } from "@/features/conversations/components/GroupMemberList";
 import { displayName } from "@/lib/display-name";
+import { endpoints } from "@/lib/api/endpoints";
+import type { MessageReplyReference } from "@/lib/api/types";
 import { useMediaQuery } from "@/lib/use-media-query";
 
 export function ConversationView({
@@ -24,18 +31,69 @@ export function ConversationView({
 }: {
   conversationId: string;
 }) {
+  const { api } = useAppData();
+  const queries = useQueryClient();
   const profile = useCurrentUser();
   const conversationQuery = useConversation(conversationId);
   const history = useConversationMessages(conversationId);
   const send = useSendConversationMessage(conversationId);
+  const toggleReaction = useToggleReaction(
+    "conversation",
+    conversationId,
+    conversationQueryKeys.messages(conversationId),
+  );
   const { notices, dismiss: dismissNotice } = useConversationNotices(conversationId);
 
   const wide = useMediaQuery("(min-width: 1200px)");
   const [membersVisible, setMembersVisible] = useState(true);
   const [search, setSearch] = useState("");
+  const [replyingTo, setReplyingTo] = useState<MessageReplyReference | null>(null);
+  const [replyMention, setReplyMention] = useState(true);
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessageData | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
 
   const conversation = conversationQuery.data;
   const currentUserId = profile.data?.id ?? "";
+
+  async function jumpToMessage(messageId: string) {
+    const element = document.getElementById(`message-${messageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedMessageId(messageId);
+      setTimeout(() => setHighlightedMessageId((cur) => (cur === messageId ? null : cur)), 2000);
+      return;
+    }
+    try {
+      const around = await endpoints.getMessageAround(
+        api,
+        "conversation",
+        conversationId,
+        messageId,
+      );
+      queries.setQueryData(
+        conversationQueryKeys.messages(conversationId),
+        (previous: Parameters<typeof mergeConfirmedMessage>[0]) => {
+          let next = previous;
+          for (const item of around.items) {
+            next = mergeConfirmedMessage(next, item);
+          }
+          return next;
+        },
+      );
+      requestAnimationFrame(() => {
+        document.getElementById(`message-${messageId}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        setHighlightedMessageId(messageId);
+        setTimeout(() => setHighlightedMessageId((cur) => (cur === messageId ? null : cur)), 2000);
+      });
+    } catch {
+      setToastNotice("Original message is unavailable.");
+      setTimeout(() => setToastNotice(null), 2500);
+    }
+  }
 
   const messages = useMemo(() => {
     const unique = new Map(
@@ -82,7 +140,13 @@ export function ConversationView({
           mentions: item.mentions,
           createdAt: item.created_at,
           edited: Boolean(item.edited_at),
-          deleted: Boolean(item.deleted_at) || item.body === null,
+          deleted: Boolean(item.deleted_at) || (item.body === null && !item.forwarded && !item.attachments?.length),
+          attachments: item.attachments,
+          reactions: item.reactions,
+          replyToMessageId: item.reply_to_message_id,
+          replyMention: item.reply_mention,
+          replyTo: item.reply_to,
+          forwarded: item.forwarded,
           author: {
             id: item.author_id,
             name,
@@ -177,6 +241,34 @@ export function ConversationView({
               channel={{ name: targetName }}
               messages={messages}
               searching={Boolean(search.trim())}
+              highlightedMessageId={highlightedMessageId}
+              canCreateThreads={false}
+              onReply={(msg) =>
+                setReplyingTo({
+                  id: msg.id,
+                  author_id: msg.author.id,
+                  author: msg.author.profile ?? {
+                    id: msg.author.id,
+                    username: msg.author.name,
+                    display_name: msg.author.name,
+                    avatar_url: msg.author.avatar ?? null,
+                  },
+                  body: msg.body,
+                  deleted: Boolean(msg.deleted),
+                  has_attachments: Boolean(msg.attachments?.length),
+                })
+              }
+              onForward={(msg) => setForwardingMessage(msg)}
+              onJumpToMessage={(mid) => void jumpToMessage(mid)}
+              onToggleReaction={(messageId, emoji, remove) =>
+                toggleReaction.mutate({
+                  messageId,
+                  emoji: emoji.value,
+                  emojiName: emoji.label,
+                  emojiUrl: emoji.customUrl ?? null,
+                  remove,
+                })
+              }
               historyControls={
                 history.hasNextPage && (
                   <div className="history-controls">
@@ -204,7 +296,27 @@ export function ConversationView({
                 ))
               }
             />
-            <ConversationMentionComposer key={conversationId} participants={conversation.members.map((m) => m.profile)} channelName={targetName} onSend={send.send} />
+            {toastNotice && (
+              <div role="status" className="px-4 py-1.5 text-xs text-primary bg-primary/10 border-t border-border">
+                {toastNotice}
+              </div>
+            )}
+            <ConversationMentionComposer
+              key={conversationId}
+              participants={conversation.members.map((m) => m.profile)}
+              channelName={targetName}
+              replyTo={replyingTo}
+              replyMention={replyMention}
+              onToggleReplyMention={setReplyMention}
+              onCancelReply={() => setReplyingTo(null)}
+              onSend={(body, mentions) => {
+                send.send(body, mentions, {
+                  replyTo: replyingTo,
+                  replyMention,
+                });
+                setReplyingTo(null);
+              }}
+            />
           </>
         )}
       </div>
@@ -221,6 +333,19 @@ export function ConversationView({
             currentUserRole={conversation.role}
           />
         </aside>
+      )}
+      {forwardingMessage && (
+        <ForwardMessageDialog
+          open
+          onClose={() => setForwardingMessage(null)}
+          message={forwardingMessage}
+          sourceKind="conversation"
+          sourceId={conversationId}
+          onForwarded={(dest) => {
+            setToastNotice(`Forwarded to ${dest.label}`);
+            setTimeout(() => setToastNotice(null), 2500);
+          }}
+        />
       )}
     </section>
   );

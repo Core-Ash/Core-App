@@ -1,11 +1,11 @@
 import { mentionPayload, type Mention } from "@/features/mentions/model";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppData } from "@/app/app-data-context";
-import { useCurrentUser } from "@/features/community/api/hooks";
+import { useCurrentUser, type SendMessageOptions } from "@/features/community/api/hooks";
 import { mergeConfirmedMessage } from "@/features/community/api/message-cache";
 import { endpoints } from "@/lib/api/endpoints";
 import { ApiError, apiErrorMessage } from "@/lib/api/errors";
-import type { ConversationSummary, Message, MessageCursor } from "@/lib/api/types";
+import type { ConversationSummary, Message, MessageAttachment, MessageCursor } from "@/lib/api/types";
 
 export const conversationQueryKeys = {
   conversations: ["conversations"] as const,
@@ -98,7 +98,14 @@ export function useSendConversationMessage(conversationId: string) {
   }
 
   const mutation = useMutation({
-    mutationFn: async (input: { body: string; client_nonce: string; mentions?: Mention[] }) => {
+    mutationFn: async (input: {
+      body: string;
+      client_nonce: string;
+      mentions?: Mention[];
+      reply_to_message_id?: string | null;
+      reply_mention?: boolean;
+      attachments?: MessageAttachment[];
+    }) => {
       if (!ready) throw new ApiError("unauthorized");
       const message = await endpoints.sendConversationMessage(api, conversationId, input);
       if (
@@ -172,9 +179,12 @@ export function useSendConversationMessage(conversationId: string) {
 
   return {
     entries: outbox.data,
-    send: (body: string, mentions: Mention[] = []) => {
+    send: (body: string, mentions: Mention[] = [], options?: SendMessageOptions) => {
       if (!ready || !profile.isSuccess) throw new ApiError("unauthorized");
       const nonce = crypto.randomUUID();
+      const replyTo = options?.replyTo ?? null;
+      const replyMention = options?.replyMention ?? false;
+      const attachments = options?.attachments ?? [];
       const message: Message = {
         id: nonce,
         client_nonce: nonce,
@@ -185,12 +195,22 @@ export function useSendConversationMessage(conversationId: string) {
         created_at: new Date().toISOString(),
         edited_at: null,
         deleted_at: null,
+        ...(replyTo
+          ? { reply_to_message_id: replyTo.id, reply_mention: replyMention, reply_to: replyTo }
+          : {}),
+        ...(attachments.length ? { attachments } : {}),
       };
       queries.setQueryData<LocalConversationMessage[]>(key, (previous = []) => [
         ...previous,
         { message, status: "pending" },
       ]);
-      mutation.mutate({ body, client_nonce: nonce, ...(mentions.length ? { mentions: mentionPayload(mentions) } : {}) });
+      mutation.mutate({
+        body,
+        client_nonce: nonce,
+        ...(mentions.length ? { mentions: mentionPayload(mentions) } : {}),
+        ...(replyTo ? { reply_to_message_id: replyTo.id, reply_mention: replyMention } : {}),
+        ...(attachments.length ? { attachments } : {}),
+      });
     },
     retry: (nonce: string) => {
       const entry = queries
@@ -202,7 +222,18 @@ export function useSendConversationMessage(conversationId: string) {
         status: "pending",
         error: undefined,
       }));
-      mutation.mutate({ body: entry.message.body!, client_nonce: nonce, ...(entry.message.mentions?.length ? { mentions: mentionPayload(entry.message.mentions) } : {}) });
+      mutation.mutate({
+        body: entry.message.body!,
+        client_nonce: nonce,
+        ...(entry.message.mentions?.length ? { mentions: mentionPayload(entry.message.mentions) } : {}),
+        ...(entry.message.reply_to_message_id
+          ? {
+              reply_to_message_id: entry.message.reply_to_message_id,
+              reply_mention: entry.message.reply_mention,
+            }
+          : {}),
+        ...(entry.message.attachments?.length ? { attachments: entry.message.attachments } : {}),
+      });
     },
   };
 }

@@ -18,6 +18,14 @@ import type {
   ConversationParticipant,
   ConversationSummary,
   ConversationType,
+  ForwardedMessageSnapshot,
+  MessageAttachment,
+  MessageReactionGroup,
+  MessageReplyReference,
+  ReactionUserEntry,
+  ReactionUsersPage,
+  ThreadDetail,
+  ThreadSummary,
 } from "@/lib/api/types";
 
 export function record(value: unknown): Record<string, unknown> {
@@ -117,22 +125,130 @@ export function parseChannel(value: unknown): Channel {
     kind: data.kind === "voice" ? "voice" : "text",
     is_muted: Boolean(data.is_muted),
     can_send_messages: typeof data.can_send_messages === "boolean" ? data.can_send_messages : true,
+    can_add_reactions: typeof data.can_add_reactions === "boolean" ? data.can_add_reactions : true,
+    can_create_public_threads: typeof data.can_create_public_threads === "boolean" ? data.can_create_public_threads : true,
+    can_create_private_threads: typeof data.can_create_private_threads === "boolean" ? data.can_create_private_threads : true,
+    can_send_in_threads: typeof data.can_send_in_threads === "boolean" ? data.can_send_in_threads : true,
+    can_manage_threads: typeof data.can_manage_threads === "boolean" ? data.can_manage_threads : false,
+  };
+}
+export function parseMessageAttachment(value: unknown): MessageAttachment {
+  const data = record(value);
+  return {
+    id: uuid(data.id),
+    name: string(data.name),
+    content_type: string(data.content_type),
+    size_bytes: count(data.size_bytes),
+    url: avatarUrl(data.url)!,
+  };
+}
+export function parseMessageReactionGroup(value: unknown): MessageReactionGroup {
+  const data = record(value);
+  return {
+    emoji: string(data.emoji),
+    emoji_name: data.emoji_name == null ? null : string(data.emoji_name),
+    emoji_url: data.emoji_url == null ? null : avatarUrl(data.emoji_url),
+    count: count(data.count),
+    me: Boolean(data.me),
+    users: Array.isArray(data.users) ? data.users.map(parsePublicProfile) : [],
+  };
+}
+export function parseReactionUserEntry(value: unknown): ReactionUserEntry {
+  const data = record(value);
+  return {
+    user: parsePublicProfile(data.user),
+    emoji: string(data.emoji),
+    emoji_name: data.emoji_name == null ? null : string(data.emoji_name),
+    emoji_url: data.emoji_url == null ? null : avatarUrl(data.emoji_url),
+    created_at: timestamp(data.created_at),
+  };
+}
+export function parseReactionUsersPage(value: unknown): ReactionUsersPage {
+  const data = record(value);
+  return {
+    items: parseList(value, parseReactionUserEntry),
+    next_cursor: data.next_cursor == null ? null : uuid(data.next_cursor),
+  };
+}
+export function parseMessageReplyReference(value: unknown): MessageReplyReference {
+  const data = record(value);
+  return {
+    id: uuid(data.id),
+    author_id: data.author_id == null ? null : uuid(data.author_id),
+    author: data.author == null ? null : parsePublicProfile(data.author),
+    body: data.body == null ? null : string(data.body),
+    deleted: Boolean(data.deleted),
+    has_attachments: Boolean(data.has_attachments),
+  };
+}
+export function parseForwardedMessageSnapshot(value: unknown): ForwardedMessageSnapshot {
+  const data = record(value);
+  return {
+    message_id: data.message_id == null ? null : uuid(data.message_id),
+    author_id: data.author_id == null ? null : uuid(data.author_id),
+    author: data.author == null ? null : parsePublicProfile(data.author),
+    body: data.body == null ? "" : string(data.body),
+    created_at: timestamp(data.created_at),
+    forwarded_at: data.forwarded_at == null ? null : timestamp(data.forwarded_at),
+    attachments: Array.isArray(data.attachments) ? data.attachments.map(parseMessageAttachment) : [],
+  };
+}
+export function parseThreadSummary(value: unknown): ThreadSummary {
+  const data = record(value);
+  const threadType = string(data.thread_type);
+  if (threadType !== "public" && threadType !== "private") throw new ApiError("invalid_response");
+  return {
+    id: uuid(data.id),
+    parent_channel_id: uuid(data.parent_channel_id),
+    starter_message_id: data.starter_message_id == null ? null : uuid(data.starter_message_id),
+    name: string(data.name),
+    creator_id: uuid(data.creator_id),
+    thread_type: threadType,
+    created_at: timestamp(data.created_at),
+    last_activity_at: timestamp(data.last_activity_at),
+    archived: Boolean(data.archived),
+    locked: Boolean(data.locked),
+    message_count: count(data.message_count),
+    participants: Array.isArray(data.participants) ? data.participants.map(parsePublicProfile) : [],
+  };
+}
+export function parseThreadDetail(value: unknown): ThreadDetail {
+  const data = record(value);
+  const summary = parseThreadSummary(value);
+  return {
+    ...summary,
+    community_id: uuid(data.community_id),
+    starter_message: data.starter_message == null ? null : parseMessage(data.starter_message),
+    is_joined: Boolean(data.is_joined),
+    can_manage: Boolean(data.can_manage),
+    can_lock: Boolean(data.can_lock),
+    can_delete: Boolean(data.can_delete),
+    can_send: data.can_send === undefined ? true : Boolean(data.can_send),
   };
 }
 export function parseMessage(value: unknown): Message {
   const data = record(value);
   const author = data.author === null ? null : parsePublicProfile(data.author);
   if (author && author.id !== data.author_id) throw new ApiError("invalid_response");
+  const body = data.body === null ? null : string(data.body);
   return {
     id: uuid(data.id),
     author_id: uuid(data.author_id),
-    body: data.body === null ? null : string(data.body),
+    body,
     created_at: timestamp(data.created_at),
     edited_at: data.edited_at === null ? null : timestamp(data.edited_at),
     deleted_at: data.deleted_at === null ? null : timestamp(data.deleted_at),
     client_nonce: uuid(data.client_nonce),
     author,
-    ...(data.mentions === undefined ? {} : { mentions: parseMentions(data.mentions, data.body === null ? "" : string(data.body)) }),
+    ...(data.mentions === undefined ? {} : { mentions: parseMentions(data.mentions, body ?? "") }),
+    ...(Array.isArray(data.attachments) ? { attachments: data.attachments.map(parseMessageAttachment) } : {}),
+    ...(Array.isArray(data.reactions) ? { reactions: data.reactions.map(parseMessageReactionGroup) } : {}),
+    ...(data.reply_to_message_id === undefined ? {} : { reply_to_message_id: data.reply_to_message_id === null ? null : uuid(data.reply_to_message_id) }),
+    ...(typeof data.reply_mention === "boolean" ? { reply_mention: data.reply_mention } : {}),
+    ...(data.reply_to === undefined ? {} : { reply_to: data.reply_to === null ? null : parseMessageReplyReference(data.reply_to) }),
+    ...(data.forwarded === undefined ? {} : { forwarded: data.forwarded === null ? null : parseForwardedMessageSnapshot(data.forwarded) }),
+    ...(data.thread_id === undefined ? {} : { thread_id: data.thread_id === null ? null : uuid(data.thread_id) }),
+    ...(data.thread === undefined ? {} : { thread: data.thread === null ? null : parseThreadSummary(data.thread) }),
   };
 }
 export function parseMentions(value: unknown, body: string): Mention[] {

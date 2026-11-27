@@ -36,7 +36,10 @@ function savedBody(fetcher: ReturnType<typeof setup>["fetcher"]) { return JSON.p
 it("shows all applicable text options using channel labels and honest implementation status", async () => {
   setup(); await screen.findByRole("group", { name: "View Channel" });
   for (const name of ["Manage Channel", "Manage Permissions", "Manage Webhooks", "Create Invite", "Send Messages in Threads", "Create Public Threads", "Create Private Threads", "Embed Links", "Attach Files", "Add Reactions", "Use External Emojis", "Use External Stickers", "Mention @everyone, @here, and All Roles", "Manage Messages", "Pin Messages", "Bypass Slowmode", "Manage Threads", "Read Message History", "Send Text-to-Speech Messages", "Send Voice Messages", "Create Polls", "Use Application Commands", "Use Activities", "Use External Apps"]) expect(screen.getByRole("group", { name })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Allow Attach Files" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Allow Embed Links" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Allow Attach Files" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Allow Add Reactions" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Allow Send Messages in Threads" })).toBeEnabled();
   expect(screen.queryByRole("group", { name: "Connect" })).not.toBeInTheDocument();
   expect(screen.queryByRole("group", { name: "Administrator" })).not.toBeInTheDocument();
 });

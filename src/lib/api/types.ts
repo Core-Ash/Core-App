@@ -52,6 +52,77 @@ export interface Channel {
   kind?: "text" | "voice";
   is_muted?: boolean;
   can_send_messages?: boolean;
+  can_add_reactions?: boolean;
+  can_create_public_threads?: boolean;
+  can_create_private_threads?: boolean;
+  can_send_in_threads?: boolean;
+  can_manage_threads?: boolean;
+}
+export interface MessageAttachment {
+  id: string;
+  name: string;
+  content_type: string;
+  size_bytes: number;
+  url: string;
+}
+export interface MessageReactionGroup {
+  emoji: string;
+  emoji_name?: string | null;
+  emoji_url?: string | null;
+  count: number;
+  me: boolean;
+  users: PublicProfile[];
+}
+export interface ReactionUserEntry {
+  user: PublicProfile;
+  emoji: string;
+  emoji_name?: string | null;
+  emoji_url?: string | null;
+  created_at: string;
+}
+export interface ReactionUsersPage {
+  items: ReactionUserEntry[];
+  next_cursor: string | null;
+}
+export interface MessageReplyReference {
+  id: string;
+  author_id: string | null;
+  author: PublicProfile | null;
+  body: string | null;
+  deleted: boolean;
+  has_attachments?: boolean;
+}
+export interface ForwardedMessageSnapshot {
+  message_id?: string | null;
+  author_id?: string | null;
+  author: PublicProfile | null;
+  body: string;
+  created_at: string;
+  forwarded_at?: string | null;
+  attachments?: MessageAttachment[];
+}
+export interface ThreadSummary {
+  id: string;
+  parent_channel_id: string;
+  starter_message_id: string | null;
+  name: string;
+  creator_id: string;
+  thread_type: "public" | "private";
+  created_at: string;
+  last_activity_at: string;
+  archived: boolean;
+  locked: boolean;
+  message_count: number;
+  participants: PublicProfile[];
+}
+export interface ThreadDetail extends ThreadSummary {
+  community_id: string;
+  starter_message?: Message | null;
+  is_joined: boolean;
+  can_manage: boolean;
+  can_lock: boolean;
+  can_delete: boolean;
+  can_send: boolean;
 }
 export interface Message {
   mentions?: Mention[];
@@ -63,6 +134,14 @@ export interface Message {
   deleted_at: string | null;
   client_nonce: string;
   author: PublicProfile | null;
+  attachments?: MessageAttachment[];
+  reactions?: MessageReactionGroup[];
+  reply_to_message_id?: string | null;
+  reply_mention?: boolean;
+  reply_to?: MessageReplyReference | null;
+  forwarded?: ForwardedMessageSnapshot | null;
+  thread_id?: string | null;
+  thread?: ThreadSummary | null;
 }
 export interface MessageCursor {
   before_time: string;

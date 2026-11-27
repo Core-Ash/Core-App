@@ -15,8 +15,21 @@ import {
   parseConversationSummary,
   parseConversationDetail,
   parseConversationParticipant,
+  parseReactionUsersPage,
+  parseThreadDetail,
+  record,
 } from "@/lib/api/contracts";
-import type { ChannelAccessFilters, MessageCursor } from "@/lib/api/types";
+import type { ChannelAccessFilters, MessageAttachment, MessageCursor } from "@/lib/api/types";
+
+function attachmentPayload(items: MessageAttachment[]) {
+  return items.map((a) => ({
+    id: a.id,
+    name: a.name,
+    content_type: a.content_type,
+    size_bytes: a.size_bytes,
+    url: a.url,
+  }));
+}
 
 export const endpoints = {
   members: async (api: ApiClient, communityId: string, channelId: string | undefined, search: string, afterId: string | null, signal?: AbortSignal) => {
@@ -160,8 +173,169 @@ export const endpoints = {
   sendMessage: async (
     api: ApiClient,
     channelId: string,
-    input: { body: string; client_nonce: string; mentions?: Mention[] },
-  ) => parseMessage(await api.post(`/channels/${channelId}/messages`, { ...input, ...(input.mentions ? { mentions: mentionPayload(input.mentions) } : {}) })),
+    input: {
+      body: string;
+      client_nonce: string;
+      mentions?: Mention[];
+      reply_to_message_id?: string | null;
+      reply_mention?: boolean;
+      attachments?: MessageAttachment[];
+    },
+  ) =>
+    parseMessage(
+      await api.post(`/channels/${channelId}/messages`, {
+        body: input.body,
+        client_nonce: input.client_nonce,
+        ...(input.mentions ? { mentions: mentionPayload(input.mentions) } : {}),
+        ...(input.reply_to_message_id ? { reply_to_message_id: input.reply_to_message_id } : {}),
+        ...(input.reply_mention !== undefined ? { reply_mention: input.reply_mention } : {}),
+        ...(input.attachments?.length ? { attachments: attachmentPayload(input.attachments) } : {}),
+      }),
+    ),
+  getMessageAround: async (
+    api: ApiClient,
+    scopeKind: "channel" | "conversation",
+    scopeId: string,
+    messageId: string,
+    signal?: AbortSignal,
+  ) => {
+    const prefix = scopeKind === "channel" ? "channels" : "conversations";
+    const res = record(await api.get(`/${prefix}/${scopeId}/messages/${messageId}`, { signal }));
+    return {
+      message: parseMessage(res.message),
+      items: Array.isArray(res.items) ? res.items.map(parseMessage) : [],
+    };
+  },
+  addReaction: async (
+    api: ApiClient,
+    scopeKind: "channel" | "conversation",
+    scopeId: string,
+    messageId: string,
+    input: { emoji: string; emoji_name?: string | null; emoji_url?: string | null },
+  ) => {
+    const prefix = scopeKind === "channel" ? "channels" : "conversations";
+    return parseMessage(
+      await api.post(`/${prefix}/${scopeId}/messages/${messageId}/reactions`, {
+        emoji: input.emoji,
+        ...(input.emoji_name ? { emoji_name: input.emoji_name } : {}),
+        ...(input.emoji_url ? { emoji_url: input.emoji_url } : {}),
+      }),
+    );
+  },
+  removeReaction: async (
+    api: ApiClient,
+    scopeKind: "channel" | "conversation",
+    scopeId: string,
+    messageId: string,
+    emoji: string,
+  ) => {
+    const prefix = scopeKind === "channel" ? "channels" : "conversations";
+    return parseMessage(
+      await api.delete(`/${prefix}/${scopeId}/messages/${messageId}/reactions`, {
+        query: { emoji },
+      }),
+    );
+  },
+  reactionUsers: async (
+    api: ApiClient,
+    scopeKind: "channel" | "conversation",
+    scopeId: string,
+    messageId: string,
+    query: { emoji?: string; limit?: number; after_id?: string | null },
+    signal?: AbortSignal,
+  ) => {
+    const prefix = scopeKind === "channel" ? "channels" : "conversations";
+    return parseReactionUsersPage(
+      await api.get(`/${prefix}/${scopeId}/messages/${messageId}/reactions`, {
+        signal,
+        query: {
+          emoji: query.emoji,
+          limit: query.limit ?? 50,
+          after_id: query.after_id ?? undefined,
+        },
+      }),
+    );
+  },
+  forwardMessage: async (
+    api: ApiClient,
+    input: {
+      source_kind: "channel" | "conversation" | "thread";
+      source_id: string;
+      message_id: string;
+      destination_kind: "channel" | "conversation";
+      destination_id: string;
+      client_nonce: string;
+      comment?: string;
+    },
+  ) => parseMessage(await api.post("/messages/forward", input)),
+  channelThreads: async (api: ApiClient, channelId: string, signal?: AbortSignal) =>
+    parseList(await api.get(`/channels/${channelId}/threads`, { signal }), parseThreadDetail),
+  createThread: async (
+    api: ApiClient,
+    channelId: string,
+    input: {
+      name: string;
+      starter_message_id: string;
+      thread_type?: "public" | "private";
+      initial_message?: string;
+      client_nonce?: string;
+      participant_ids?: string[];
+    },
+  ) => parseThreadDetail(await api.post(`/channels/${channelId}/threads`, input)),
+  thread: async (api: ApiClient, threadId: string, signal?: AbortSignal) =>
+    parseThreadDetail(await api.get(`/threads/${threadId}`, { signal })),
+  updateThread: async (
+    api: ApiClient,
+    threadId: string,
+    input: { name?: string; archived?: boolean; locked?: boolean },
+  ) => parseThreadDetail(await api.patch(`/threads/${threadId}`, input)),
+  deleteThread: async (api: ApiClient, threadId: string) => {
+    await api.delete(`/threads/${threadId}`);
+  },
+  joinThread: async (api: ApiClient, threadId: string, userId?: string) =>
+    parseThreadDetail(
+      await api.post(`/threads/${threadId}/join`, userId ? { user_id: userId } : {}),
+    ),
+  leaveThread: async (api: ApiClient, threadId: string) =>
+    parseThreadDetail(await api.post(`/threads/${threadId}/leave`, {})),
+  threadMessages: async (
+    api: ApiClient,
+    threadId: string,
+    cursor: MessageCursor | null,
+    signal?: AbortSignal,
+  ) =>
+    parseMessagePage(
+      await api.get(`/threads/${threadId}/messages`, {
+        signal,
+        query: {
+          limit: 50,
+          before_time: cursor?.before_time,
+          before_id: cursor?.before_id,
+        },
+      }),
+    ),
+  sendThreadMessage: async (
+    api: ApiClient,
+    threadId: string,
+    input: {
+      body: string;
+      client_nonce: string;
+      mentions?: Mention[];
+      reply_to_message_id?: string | null;
+      reply_mention?: boolean;
+      attachments?: MessageAttachment[];
+    },
+  ) =>
+    parseMessage(
+      await api.post(`/threads/${threadId}/messages`, {
+        body: input.body,
+        client_nonce: input.client_nonce,
+        ...(input.mentions ? { mentions: mentionPayload(input.mentions) } : {}),
+        ...(input.reply_to_message_id ? { reply_to_message_id: input.reply_to_message_id } : {}),
+        ...(input.reply_mention !== undefined ? { reply_mention: input.reply_mention } : {}),
+        ...(input.attachments?.length ? { attachments: attachmentPayload(input.attachments) } : {}),
+      }),
+    ),
   conversations: async (api: ApiClient, signal?: AbortSignal) =>
     parseList(await api.get("/conversations", { signal }), parseConversationSummary),
   conversation: async (api: ApiClient, id: string, signal?: AbortSignal) =>
@@ -216,6 +390,23 @@ export const endpoints = {
   sendConversationMessage: async (
     api: ApiClient,
     id: string,
-    input: { body: string; client_nonce: string; mentions?: Mention[] },
-  ) => parseMessage(await api.post(`/conversations/${id}/messages`, { ...input, ...(input.mentions ? { mentions: mentionPayload(input.mentions) } : {}) })),
+    input: {
+      body: string;
+      client_nonce: string;
+      mentions?: Mention[];
+      reply_to_message_id?: string | null;
+      reply_mention?: boolean;
+      attachments?: MessageAttachment[];
+    },
+  ) =>
+    parseMessage(
+      await api.post(`/conversations/${id}/messages`, {
+        body: input.body,
+        client_nonce: input.client_nonce,
+        ...(input.mentions ? { mentions: mentionPayload(input.mentions) } : {}),
+        ...(input.reply_to_message_id ? { reply_to_message_id: input.reply_to_message_id } : {}),
+        ...(input.reply_mention !== undefined ? { reply_mention: input.reply_mention } : {}),
+        ...(input.attachments?.length ? { attachments: attachmentPayload(input.attachments) } : {}),
+      }),
+    ),
 };
