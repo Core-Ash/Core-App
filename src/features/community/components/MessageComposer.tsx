@@ -12,6 +12,7 @@ import { apiErrorMessage } from "@/lib/api/errors";
 
 interface MessageComposerProps {
   channelName: string;
+  placeholder?: string;
   communityId?: string;
   canSendMessages?: boolean;
   disabledReason?: string;
@@ -31,6 +32,7 @@ interface MessageComposerProps {
 
 export function MessageComposer({
   channelName,
+  placeholder,
   communityId,
   canSendMessages = true,
   disabledReason,
@@ -190,7 +192,7 @@ export function MessageComposer({
         </Tooltip>
         <span className="composer-divider" />
         <label className="sr-only" htmlFor={inputId}>
-          Message #{channelName}
+          {placeholder ?? `Message #${channelName}`}
         </label>
         <textarea
           ref={input}
@@ -198,7 +200,7 @@ export function MessageComposer({
           disabled={submitting}
           rows={1}
           maxLength={maximum * 2}
-          placeholder={`Message #${channelName}`}
+          placeholder={placeholder ?? `Message #${channelName}`}
           value={draft}
           aria-autocomplete={onMentionSearch ? "list" : undefined}
           aria-expanded={onMentionSearch ? Boolean(query) : undefined}

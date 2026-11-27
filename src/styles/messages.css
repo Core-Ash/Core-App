@@ -443,64 +443,171 @@
   background: var(--surface-hover);
 }
 
-/* Thread Indicator Pill & Right-side Thread Panel */
-.message-thread-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+/* Discord-style Attached Thread Card & Spine */
+.discord-thread-attached-wrapper {
+  position: relative;
   margin-top: 6px;
-  padding: 4px 10px;
-  border-radius: 6px;
+}
+.discord-thread-attached-spine {
+  position: absolute;
+  left: -32px;
+  top: -8px;
+  width: 26px;
+  height: 24px;
+  border-left: 2px solid #4e4c57;
+  border-bottom: 2px solid #4e4c57;
+  border-bottom-left-radius: 8px;
+  pointer-events: none;
+}
+.discord-thread-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: fit-content;
+  max-width: min(460px, 100%);
+  padding: 7px 12px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--surface-secondary);
-  font-size: 12px;
-  color: var(--muted-foreground);
+  background: #232329;
+  text-align: left;
   transition: background-color 120ms, border-color 120ms;
 }
-.message-thread-indicator:hover {
+.discord-thread-card:hover {
   background: var(--surface-hover);
   border-color: #45434d;
-  color: var(--foreground);
 }
-.message-thread-indicator-name {
+.discord-thread-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  min-width: 0;
+}
+.discord-thread-card-title {
   font-weight: 600;
   color: var(--foreground);
-  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 240px;
 }
-.message-thread-indicator-count {
-  color: var(--link);
+.discord-thread-card-count {
   font-weight: 600;
+  font-size: 12px;
+  color: #5865f2;
+  color: var(--link);
+  white-space: nowrap;
 }
-.message-thread-indicator-link {
+.discord-thread-card-preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
   color: var(--muted-foreground);
+  min-width: 0;
+}
+.discord-thread-card-preview .member-avatar {
+  width: 16px;
+  height: 16px;
+}
+.discord-thread-card-preview .sample-avatar {
+  font-size: 9px;
+}
+.discord-thread-card-author {
+  font-weight: 600;
+  color: var(--foreground);
+  white-space: nowrap;
+}
+.discord-thread-card-snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  min-width: 0;
+}
+.discord-thread-card-time {
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
+/* Discord-style Right-side Thread Panel & Hero Banner */
 .thread-panel {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  width: 340px;
+  width: 420px;
   border-left: 1px solid var(--core-divider);
-  background: var(--sidebar);
+  background: var(--background);
+}
+.thread-panel--expanded {
+  width: 560px;
 }
 .chat-workspace:has(.thread-panel) {
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 420px;
+}
+.chat-workspace:has(.thread-panel--expanded) {
+  grid-template-columns: minmax(0, 1fr) 560px;
+}
+.chat-workspace:has(.thread-panel) > .chat-header {
+  grid-column: 1;
 }
 .thread-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  height: 48px;
-  padding: 0 12px;
+  height: var(--chat-header-height);
+  padding: 0 14px;
   border-bottom: 1px solid var(--core-divider);
+  background: var(--background);
   flex-shrink: 0;
+}
+.thread-panel-heading {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.thread-options-menu {
+  width: 224px;
+}
+.discord-thread-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 28px 12px 16px;
+}
+.discord-thread-hero-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #2b2b33;
+  color: var(--foreground);
+  margin-bottom: 14px;
+}
+.discord-thread-hero-title {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--foreground);
+  word-break: break-word;
+}
+.discord-thread-hero-subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.discord-thread-hero-subtitle strong {
+  color: var(--foreground);
+  font-weight: 600;
 }
 .thread-badge {
   display: inline-flex;
@@ -517,7 +624,7 @@
   background: var(--primary-subtle);
   color: var(--link);
 }
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .thread-panel {
     position: absolute;
     inset: 0;

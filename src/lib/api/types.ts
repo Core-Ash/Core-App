@@ -101,12 +101,21 @@ export interface ForwardedMessageSnapshot {
   forwarded_at?: string | null;
   attachments?: MessageAttachment[];
 }
+export interface ThreadMessagePreview {
+  id: string;
+  author_id: string | null;
+  author: PublicProfile | null;
+  body: string | null;
+  created_at: string;
+}
 export interface ThreadSummary {
   id: string;
   parent_channel_id: string;
   starter_message_id: string | null;
   name: string;
   creator_id: string;
+  creator?: PublicProfile | null;
+  last_message?: ThreadMessagePreview | null;
   thread_type: "public" | "private";
   created_at: string;
   last_activity_at: string;

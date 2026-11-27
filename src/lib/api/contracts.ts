@@ -197,12 +197,25 @@ export function parseThreadSummary(value: unknown): ThreadSummary {
   const data = record(value);
   const threadType = string(data.thread_type);
   if (threadType !== "public" && threadType !== "private") throw new ApiError("invalid_response");
+  let lastMessage: ThreadSummary["last_message"] = null;
+  if (data.last_message && typeof data.last_message === "object") {
+    const lm = record(data.last_message);
+    lastMessage = {
+      id: uuid(lm.id),
+      author_id: lm.author_id == null ? null : uuid(lm.author_id),
+      author: lm.author == null ? null : parsePublicProfile(lm.author),
+      body: lm.body == null ? null : string(lm.body),
+      created_at: timestamp(lm.created_at),
+    };
+  }
   return {
     id: uuid(data.id),
     parent_channel_id: uuid(data.parent_channel_id),
     starter_message_id: data.starter_message_id == null ? null : uuid(data.starter_message_id),
     name: string(data.name),
     creator_id: uuid(data.creator_id),
+    creator: data.creator == null ? null : parsePublicProfile(data.creator),
+    last_message: lastMessage,
     thread_type: threadType,
     created_at: timestamp(data.created_at),
     last_activity_at: timestamp(data.last_activity_at),

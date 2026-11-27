@@ -19,6 +19,7 @@ function userSuggestion(profile: PublicProfile): MentionSuggestion {
 }
 interface Props {
   channelName: string;
+  placeholder?: string;
   autoFocus?: boolean;
   canSendMessages?: boolean;
   disabledReason?: string;

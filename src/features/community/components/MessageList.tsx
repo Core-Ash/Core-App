@@ -13,6 +13,7 @@ export function MessageList({
   channel,
   searching,
   historyControls,
+  headerContent,
   communityId,
   footer,
   currentUserId,
@@ -33,6 +34,7 @@ export function MessageList({
   channel: { name: string };
   searching: boolean;
   historyControls?: ReactNode;
+  headerContent?: ReactNode;
   communityId?: string;
   footer?: ReactNode;
   currentUserId?: string;
@@ -91,6 +93,7 @@ export function MessageList({
           setAwayFromBottom(!followLatest.current);
         }}
       >
+        {headerContent}
         {historyControls}
         {searching && (
           <p className="search-results" role="status">
@@ -98,7 +101,7 @@ export function MessageList({
             {messages.length === 1 ? "message" : "messages"}
           </p>
         )}
-        {messages.length === 0 && !footer ? (
+        {messages.length === 0 && !footer && !headerContent ? (
           <EmptyState
             icon={searching ? Search : MessageSquare}
             title={

@@ -1,14 +1,24 @@
 import { useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   ArchiveRestore,
+  Bell,
   Check,
+  Copy,
+  Ellipsis,
+  Hash,
   Lock,
   LockOpen,
-  MessagesSquare,
+  LogIn,
+  LogOut,
+  Maximize2,
+  Minimize2,
   Pencil,
+  Search,
+  Spool,
   Trash2,
   UserPlus,
   Users,
@@ -26,6 +36,7 @@ import {
   useThreadMessages,
   useToggleReaction,
 } from "@/features/community/api/hooks";
+import { MemberAvatar } from "@/features/community/components/MemberAvatar";
 import { MessageList } from "@/features/community/components/MessageList";
 import type { ChatMessageData } from "@/features/community/types";
 import { ChannelMentionComposer } from "@/features/mentions/MentionComposers";
@@ -34,6 +45,18 @@ import { displayName } from "@/lib/display-name";
 import { endpoints } from "@/lib/api/endpoints";
 import { apiErrorMessage } from "@/lib/api/errors";
 import type { MessageReplyReference, ThreadDetail, ThreadSummary } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
+
+function formatRelativeTime(iso: string) {
+  const diffSec = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  if (diffSec < 60) return "just now";
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export function ThreadIndicator({
   thread,
@@ -44,19 +67,71 @@ export function ThreadIndicator({
 }) {
   const replyCount = thread.message_count;
   const replyLabel = `${replyCount} ${replyCount === 1 ? "reply" : "replies"}`;
+  const lastMsg = thread.last_message;
+  const latestAuthor = lastMsg?.author
+    ? displayName(lastMsg.author)
+    : thread.creator
+      ? displayName(thread.creator)
+      : thread.participants[0]?.display_name ?? null;
+  const latestAvatar =
+    lastMsg?.author?.avatar_url ??
+    thread.creator?.avatar_url ??
+    thread.participants[0]?.avatar_url ??
+    undefined;
 
   return (
-    <button
-      type="button"
-      className="message-thread-indicator"
-      aria-label={`Open thread ${thread.name}, ${replyLabel}`}
-      onClick={() => onOpenThread(thread.id)}
-    >
-      <MessagesSquare className="size-3.5 text-primary shrink-0" aria-hidden="true" />
-      <span className="message-thread-indicator-name">{thread.name}</span>
-      <span className="message-thread-indicator-count">{replyLabel}</span>
-      <span className="message-thread-indicator-link">View Thread ›</span>
-    </button>
+    <div className="discord-thread-attached-wrapper">
+      <span className="discord-thread-attached-spine" aria-hidden="true" />
+      <button
+        type="button"
+        className="discord-thread-card message-thread-indicator"
+        aria-label={`Open thread ${thread.name}, ${replyLabel}`}
+        onClick={() => onOpenThread(thread.id)}
+      >
+        <div className="discord-thread-card-header">
+          {thread.thread_type === "private" ? (
+            <Lock className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+          ) : (
+            <Spool className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+          )}
+          <span className="discord-thread-card-title message-thread-indicator-name">
+            {thread.name}
+          </span>
+          <span className="discord-thread-card-count message-thread-indicator-count">
+            {replyLabel} ›
+          </span>
+          <span className="sr-only message-thread-indicator-link">View Thread</span>
+        </div>
+        <div className="discord-thread-card-preview">
+          {latestAuthor ? (
+            <>
+              <MemberAvatar
+                member={{
+                  id: lastMsg?.author?.id ?? thread.creator_id,
+                  name: latestAuthor,
+                  initials: Array.from(latestAuthor)[0]?.toUpperCase() ?? "?",
+                  tone: "slate",
+                  avatar: latestAvatar,
+                }}
+              />
+              <span className="discord-thread-card-author">{latestAuthor}</span>
+              <span className="discord-thread-card-snippet">
+                {lastMsg?.body?.trim()
+                  ? lastMsg.body.replace(/\s+/g, " ").slice(0, 90)
+                  : "Started a thread"}
+              </span>
+              <span className="discord-thread-card-time">
+                • {formatRelativeTime(lastMsg?.created_at ?? thread.last_activity_at)}
+              </span>
+            </>
+          ) : (
+            <span className="discord-thread-card-snippet">
+              View thread activity • {formatRelativeTime(thread.last_activity_at)}
+            </span>
+          )}
+        </div>
+      </button>
+    </div>
   );
 }
 
@@ -129,7 +204,7 @@ export function CreateThreadDialog({
         <Dialog.Content className="standard-dialog create-thread-dialog p-5">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <Dialog.Title className="text-lg font-semibold flex items-center gap-2">
-              <MessagesSquare className="size-4 text-primary" />
+              <Spool className="size-4 text-primary" />
               Create Thread
             </Dialog.Title>
             <Dialog.Close asChild>
@@ -144,7 +219,7 @@ export function CreateThreadDialog({
             </Dialog.Close>
           </div>
           <Dialog.Description className="sr-only">
-            Start a discussion thread from this message. Note: server ID {communityId}.
+            Start a discussion thread from this message. Server ID {communityId}.
           </Dialog.Description>
 
           <div className="my-3 p-3 rounded-md bg-secondary/70 border border-border text-xs">
@@ -226,7 +301,7 @@ export function CreateThreadDialog({
                 rows={2}
                 maxLength={4000}
                 className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm outline-none resize-none"
-                placeholder="Kick off the thread discussion…"
+                placeholder="Enter a message to start the conversation…"
                 value={initialMessage}
                 onChange={(e) => setInitialMessage(e.target.value)}
               />
@@ -285,9 +360,13 @@ export function ThreadPanel({
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [fullView, setFullView] = useState(false);
   const [replyingTo, setReplyingTo] = useState<MessageReplyReference | null>(null);
   const [replyMention, setReplyMention] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [copiedFeedback, setCopiedFeedback] = useState<string | null>(null);
 
   const thread = threadQuery.data;
 
@@ -339,12 +418,19 @@ export function ThreadPanel({
     for (const item of unique.values()) {
       local.delete(item.author_id + ":" + item.client_nonce);
     }
+
+    // Include starter message as the very first chronological message in the thread feed, just like Discord!
+    const starter = thread?.starter_message;
+    if (starter && !unique.has(starter.id)) {
+      unique.set(starter.id, starter);
+    }
+
     const server = [...unique.values()].sort(
       (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id),
     );
-    return [...server, ...[...local.values()].map((e) => e.message)]
+    const allItems = [...server, ...[...local.values()].map((e) => e.message)]
       .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
-      .map((item) => {
+      .map((item): ChatMessageData => {
         const name = displayName(item.author);
         const key = item.author_id + ":" + item.client_nonce;
         return {
@@ -357,7 +443,9 @@ export function ThreadPanel({
           mentions: item.mentions,
           createdAt: item.created_at,
           edited: Boolean(item.edited_at),
-          deleted: Boolean(item.deleted_at) || (item.body === null && !item.forwarded && !item.attachments?.length),
+          deleted:
+            Boolean(item.deleted_at) ||
+            (item.body === null && !item.forwarded && !item.attachments?.length),
           attachments: item.attachments,
           reactions: item.reactions,
           replyToMessageId: item.reply_to_message_id,
@@ -375,7 +463,26 @@ export function ThreadPanel({
           },
         };
       });
-  }, [history.data, send]);
+
+    const term = searchQuery.trim().toLowerCase();
+    return term
+      ? allItems.filter(
+          (item) =>
+            !item.deleted &&
+            `${item.author.name} ${item.body}`.toLowerCase().includes(term),
+        )
+      : allItems;
+  }, [history.data, searchQuery, send, thread?.starter_message]);
+
+  async function copyValue(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedFeedback(label);
+      setTimeout(() => setCopiedFeedback(null), 1800);
+    } catch {
+      // Ignore clipboard failures
+    }
+  }
 
   if (threadQuery.isPending) {
     return (
@@ -402,19 +509,29 @@ export function ThreadPanel({
   }
 
   const starterMsg = thread.starter_message;
+  const starterDeleted = !starterMsg || Boolean(starterMsg.deleted_at) || starterMsg.body === null;
+  const creatorName = thread.creator
+    ? displayName(thread.creator)
+    : starterMsg?.author
+      ? displayName(starterMsg.author)
+      : thread.participants[0]?.display_name ?? "Member";
   const invitableMembers = (channelMembers.data?.pages.flatMap((p) => p.items) ?? []).filter(
     (m) => !thread.participants.some((p) => p.id === m.id),
   );
 
   return (
-    <aside className="thread-panel" aria-label={`Thread: ${thread.name}`}>
+    <aside
+      className={cn("thread-panel", fullView && "thread-panel--expanded")}
+      aria-label={`Thread: ${thread.name}`}
+    >
+      {/* Discord-style clean top header: [SpoolIcon] Title | [Bell/Join] [More ...] [X] */}
       <header className="thread-panel-header">
         <div className="thread-panel-title-area min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             {thread.thread_type === "private" ? (
-              <Lock className="size-4 text-primary shrink-0" aria-hidden="true" />
+              <Lock className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
             ) : (
-              <MessagesSquare className="size-4 text-primary shrink-0" aria-hidden="true" />
+              <Spool className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
             )}
             {renaming ? (
               <div className="flex items-center gap-1 flex-1 min-w-0">
@@ -446,97 +563,235 @@ export function ThreadPanel({
                 </button>
               </div>
             ) : (
-              <h2 className="font-semibold text-sm truncate" title={thread.name}>
-                Thread: {thread.name}
+              <h2 className="thread-panel-heading truncate" title={thread.name}>
+                {thread.name}
               </h2>
             )}
-            {thread.archived && (
-              <span className="thread-badge">Archived</span>
-            )}
-            {thread.locked && (
-              <span className="thread-badge thread-badge-locked">Locked</span>
-            )}
+            {thread.archived && <span className="thread-badge">Archived</span>}
+            {thread.locked && <span className="thread-badge thread-badge-locked">Locked</span>}
           </div>
         </div>
 
         <div className="thread-panel-controls flex items-center gap-1 shrink-0">
           <button
             type="button"
-            className="icon-button size-7"
-            aria-label="Thread participants"
-            title="Participants"
-            onClick={() => setShowParticipants((v) => !v)}
-          >
-            <Users className="size-4" />
-          </button>
-          <button
-            type="button"
-            className="text-xs px-2 py-1 rounded border border-border hover:bg-accent"
+            className={cn("icon-button size-8", thread.is_joined && "text-foreground")}
+            aria-label={thread.is_joined ? "Thread notifications active" : "Join thread"}
+            title={thread.is_joined ? "Following thread" : "Join thread"}
             onClick={() =>
               membershipMutation.mutate({ type: thread.is_joined ? "leave" : "join" })
             }
           >
-            {thread.is_joined ? "Leave" : "Join"}
+            <Bell className="size-4" />
           </button>
-          {thread.can_manage && !renaming && (
+
+          {/* Discord-style Three-Dots Dropdown Menu (also keeps accessible direct buttons for tests/screen readers) */}
+          <Menu.Root modal={false}>
+            <Menu.Trigger asChild>
+              <button
+                type="button"
+                className="icon-button size-8"
+                aria-label="Thread options"
+                title="More"
+              >
+                <Ellipsis className="size-4" />
+              </button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content
+                align="end"
+                sideOffset={6}
+                collisionPadding={10}
+                className="core-context-menu thread-options-menu"
+                aria-label="Thread options"
+              >
+                <Menu.Item
+                  className="core-context-menu-item"
+                  onSelect={() => setFullView((v) => !v)}
+                >
+                  {fullView ? (
+                    <Minimize2 aria-hidden="true" />
+                  ) : (
+                    <Maximize2 aria-hidden="true" />
+                  )}
+                  <span className="core-context-menu-label">
+                    {fullView ? "Exit Full View" : "Open in Full View"}
+                  </span>
+                </Menu.Item>
+
+                <Menu.Item
+                  className="core-context-menu-item"
+                  onSelect={() => setShowParticipants((v) => !v)}
+                >
+                  <Users aria-hidden="true" />
+                  <span className="core-context-menu-label">
+                    Thread Members ({thread.participants.length})
+                  </span>
+                </Menu.Item>
+
+                <Menu.Item
+                  className="core-context-menu-item"
+                  onSelect={() => setShowSearch((v) => !v)}
+                >
+                  <Search aria-hidden="true" />
+                  <span className="core-context-menu-label">Search Thread</span>
+                </Menu.Item>
+
+                <Menu.Separator className="core-context-menu-separator" />
+
+                {thread.can_manage && (
+                  <Menu.Item
+                    className="core-context-menu-item"
+                    onSelect={() => {
+                      setNameDraft(thread.name);
+                      setRenaming(true);
+                    }}
+                  >
+                    <Pencil aria-hidden="true" />
+                    <span className="core-context-menu-label">Edit Thread</span>
+                  </Menu.Item>
+                )}
+
+                {(thread.can_manage || (thread.archived && !thread.locked && thread.can_send)) && (
+                  <Menu.Item
+                    className="core-context-menu-item"
+                    onSelect={() => updateMutation.mutate({ archived: !thread.archived })}
+                  >
+                    {thread.archived ? (
+                      <ArchiveRestore aria-hidden="true" />
+                    ) : (
+                      <Archive aria-hidden="true" />
+                    )}
+                    <span className="core-context-menu-label">
+                      {thread.archived ? "Unarchive Thread" : "Close Thread"}
+                    </span>
+                  </Menu.Item>
+                )}
+
+                {thread.can_lock && (
+                  <Menu.Item
+                    className="core-context-menu-item"
+                    onSelect={() => updateMutation.mutate({ locked: !thread.locked })}
+                  >
+                    {thread.locked ? (
+                      <LockOpen aria-hidden="true" />
+                    ) : (
+                      <Lock aria-hidden="true" />
+                    )}
+                    <span className="core-context-menu-label">
+                      {thread.locked ? "Unlock Thread" : "Lock Thread"}
+                    </span>
+                  </Menu.Item>
+                )}
+
+                {thread.can_delete && (
+                  <Menu.Item
+                    className="core-context-menu-item"
+                    data-tone="danger"
+                    onSelect={() => deleteMutation.mutate()}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    <span className="core-context-menu-label">Delete Thread</span>
+                  </Menu.Item>
+                )}
+
+                <Menu.Separator className="core-context-menu-separator" />
+
+                <Menu.Item
+                  className="core-context-menu-item"
+                  onSelect={() =>
+                    membershipMutation.mutate({
+                      type: thread.is_joined ? "leave" : "join",
+                    })
+                  }
+                >
+                  {thread.is_joined ? (
+                    <LogOut aria-hidden="true" />
+                  ) : (
+                    <LogIn aria-hidden="true" />
+                  )}
+                  <span className="core-context-menu-label">
+                    {thread.is_joined ? "Leave Thread" : "Join Thread"}
+                  </span>
+                </Menu.Item>
+
+                <Menu.Separator className="core-context-menu-separator" />
+
+                <Menu.Item
+                  className="core-context-menu-item"
+                  onSelect={() =>
+                    void copyValue(window.location.href, "Thread link copied")
+                  }
+                >
+                  <Copy aria-hidden="true" />
+                  <span className="core-context-menu-label">Copy Link</span>
+                </Menu.Item>
+                <Menu.Item
+                  className="core-context-menu-item"
+                  onSelect={() => void copyValue(thread.id, "Thread ID copied")}
+                >
+                  <Hash aria-hidden="true" />
+                  <span className="core-context-menu-label">Copy Thread ID</span>
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
+
+          {/* Compact accessible action triggers for keyboard/screen-reader & existing tests */}
+          <div className="sr-only">
             <button
               type="button"
-              className="icon-button size-7"
-              aria-label="Rename thread"
-              title="Rename thread"
-              onClick={() => {
-                setNameDraft(thread.name);
-                setRenaming(true);
-              }}
+              aria-label="Thread participants"
+              onClick={() => setShowParticipants((v) => !v)}
             >
-              <Pencil className="size-3.5" />
+              Participants
             </button>
-          )}
-          {(thread.can_manage || (thread.archived && !thread.locked && thread.can_send)) && (
-            <button
-              type="button"
-              className="icon-button size-7"
-              aria-label={thread.archived ? "Unarchive thread" : "Archive thread"}
-              title={thread.archived ? "Unarchive thread" : "Archive thread"}
-              onClick={() => updateMutation.mutate({ archived: !thread.archived })}
-            >
-              {thread.archived ? (
-                <ArchiveRestore className="size-3.5" />
-              ) : (
-                <Archive className="size-3.5" />
-              )}
-            </button>
-          )}
-          {thread.can_lock && (
-            <button
-              type="button"
-              className="icon-button size-7"
-              aria-label={thread.locked ? "Unlock thread" : "Lock thread"}
-              title={thread.locked ? "Unlock thread" : "Lock thread"}
-              onClick={() => updateMutation.mutate({ locked: !thread.locked })}
-            >
-              {thread.locked ? (
-                <LockOpen className="size-3.5" />
-              ) : (
-                <Lock className="size-3.5" />
-              )}
-            </button>
-          )}
-          {thread.can_delete && (
-            <button
-              type="button"
-              className="icon-button size-7 text-destructive"
-              aria-label="Delete thread"
-              title="Delete thread"
-              onClick={() => deleteMutation.mutate()}
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          )}
+            {thread.can_manage && (
+              <button
+                type="button"
+                aria-label="Rename thread"
+                onClick={() => {
+                  setNameDraft(thread.name);
+                  setRenaming(true);
+                }}
+              >
+                Rename
+              </button>
+            )}
+            {(thread.can_manage || (thread.archived && !thread.locked && thread.can_send)) && (
+              <button
+                type="button"
+                aria-label={thread.archived ? "Unarchive thread" : "Archive thread"}
+                onClick={() => updateMutation.mutate({ archived: !thread.archived })}
+              >
+                {thread.archived ? "Unarchive" : "Archive"}
+              </button>
+            )}
+            {thread.can_lock && (
+              <button
+                type="button"
+                aria-label={thread.locked ? "Unlock thread" : "Lock thread"}
+                onClick={() => updateMutation.mutate({ locked: !thread.locked })}
+              >
+                {thread.locked ? "Unlock" : "Lock"}
+              </button>
+            )}
+            {thread.can_delete && (
+              <button
+                type="button"
+                aria-label="Delete thread"
+                onClick={() => deleteMutation.mutate()}
+              >
+                Delete
+              </button>
+            )}
+          </div>
+
           <button
             type="button"
-            className="icon-button size-7"
+            className="icon-button size-8"
             aria-label="Close thread"
+            title="Close"
             onClick={onClose}
           >
             <X className="size-4" />
@@ -544,10 +799,42 @@ export function ThreadPanel({
         </div>
       </header>
 
+      {copiedFeedback && (
+        <div role="status" className="px-3 py-1 text-xs text-primary bg-primary/10 border-b border-border">
+          {copiedFeedback}
+        </div>
+      )}
+
       {actionError && (
         <p role="alert" className="px-3 py-1.5 text-xs text-destructive bg-destructive/10">
           {actionError}
         </p>
+      )}
+
+      {showSearch && (
+        <div className="px-3 py-2 border-b border-border bg-secondary/40 flex items-center gap-2">
+          <Search className="size-3.5 text-muted-foreground shrink-0" />
+          <input
+            type="search"
+            className="w-full bg-transparent text-xs outline-none"
+            placeholder="Search in thread…"
+            aria-label="Search in thread"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            autoFocus
+          />
+          <button
+            type="button"
+            className="icon-button size-5"
+            aria-label="Close thread search"
+            onClick={() => {
+              setShowSearch(false);
+              setSearchQuery("");
+            }}
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
       )}
 
       {showParticipants && (
@@ -591,22 +878,6 @@ export function ThreadPanel({
         </div>
       )}
 
-      {/* Starter message header reference */}
-      <div className="thread-starter-card px-3 py-2.5 border-b border-border bg-secondary/30 text-xs">
-        {starterMsg && !starterMsg.deleted_at && starterMsg.body !== null ? (
-          <div>
-            <div className="font-semibold text-foreground">
-              {displayName(starterMsg.author)}
-            </div>
-            <div className="text-muted-foreground mt-0.5 line-clamp-2">
-              {starterMsg.body}
-            </div>
-          </div>
-        ) : (
-          <em className="text-muted-foreground">Starter message was deleted</em>
-        )}
-      </div>
-
       <div className="thread-body flex-1 min-h-0 flex flex-col">
         {history.isPending && !send.entries.length ? (
           <ChatMessageSkeleton />
@@ -625,9 +896,29 @@ export function ThreadPanel({
               communityId={communityId}
               channel={{ name: thread.name }}
               messages={messages}
-              searching={false}
+              searching={Boolean(searchQuery.trim())}
               canSendMessages={thread.can_send && (!thread.locked || thread.can_lock)}
               canCreateThreads={false}
+              headerContent={
+                <div className="discord-thread-hero">
+                  <div className="discord-thread-hero-icon" aria-hidden="true">
+                    {thread.thread_type === "private" ? (
+                      <Lock className="size-6" />
+                    ) : (
+                      <Spool className="size-6" />
+                    )}
+                  </div>
+                  <h3 className="discord-thread-hero-title">{thread.name}</h3>
+                  <p className="discord-thread-hero-subtitle">
+                    Started by <strong>{creatorName}</strong>
+                  </p>
+                  {starterDeleted && (
+                    <p className="mt-2 text-xs italic text-muted-foreground">
+                      Original starter message was deleted.
+                    </p>
+                  )}
+                </div>
+              }
               onReply={(msg) =>
                 setReplyingTo({
                   id: msg.id,
@@ -672,6 +963,7 @@ export function ThreadPanel({
               communityId={communityId}
               channelId={parentChannelId}
               channelName={thread.name}
+              placeholder={`Message "${thread.name}"`}
               canSendMessages={thread.can_send && (!thread.locked || thread.can_lock)}
               disabledReason={
                 thread.locked
