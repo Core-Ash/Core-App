@@ -1,3 +1,4 @@
+import { mentionPayload, type Mention } from "@/features/mentions/model";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppData } from "@/app/app-data-context";
 import { useCurrentUser } from "@/features/community/api/hooks";
@@ -97,7 +98,7 @@ export function useSendConversationMessage(conversationId: string) {
   }
 
   const mutation = useMutation({
-    mutationFn: async (input: { body: string; client_nonce: string }) => {
+    mutationFn: async (input: { body: string; client_nonce: string; mentions?: Mention[] }) => {
       if (!ready) throw new ApiError("unauthorized");
       const message = await endpoints.sendConversationMessage(api, conversationId, input);
       if (
@@ -171,7 +172,7 @@ export function useSendConversationMessage(conversationId: string) {
 
   return {
     entries: outbox.data,
-    send: (body: string) => {
+    send: (body: string, mentions: Mention[] = []) => {
       if (!ready || !profile.isSuccess) throw new ApiError("unauthorized");
       const nonce = crypto.randomUUID();
       const message: Message = {
@@ -180,6 +181,7 @@ export function useSendConversationMessage(conversationId: string) {
         author_id: profile.data.id,
         author: profile.data,
         body,
+        mentions,
         created_at: new Date().toISOString(),
         edited_at: null,
         deleted_at: null,
@@ -188,7 +190,7 @@ export function useSendConversationMessage(conversationId: string) {
         ...previous,
         { message, status: "pending" },
       ]);
-      mutation.mutate({ body, client_nonce: nonce });
+      mutation.mutate({ body, client_nonce: nonce, ...(mentions.length ? { mentions: mentionPayload(mentions) } : {}) });
     },
     retry: (nonce: string) => {
       const entry = queries
@@ -200,7 +202,7 @@ export function useSendConversationMessage(conversationId: string) {
         status: "pending",
         error: undefined,
       }));
-      mutation.mutate({ body: entry.message.body!, client_nonce: nonce });
+      mutation.mutate({ body: entry.message.body!, client_nonce: nonce, ...(entry.message.mentions?.length ? { mentions: mentionPayload(entry.message.mentions) } : {}) });
     },
   };
 }

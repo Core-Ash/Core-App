@@ -1,0 +1,57 @@
+/* Text highlights share the surrounding line box, including wrapped fragments. */
+.message-mention {
+  display: inline;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 500;
+  line-height: inherit;
+  vertical-align: baseline;
+  white-space: inherit;
+  overflow-wrap: anywhere;
+  color: var(--core-mention-text);
+  background: var(--core-mention-bg);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.message-mention--personal,
+.message-mention--mass,
+.message-mention--role {
+  color: var(--core-mention-text);
+  background: var(--core-mention-bg);
+}
+.message-mention:hover,
+.message-mention[data-state="open"] {
+  color: var(--core-mention-text);
+  background: var(--core-mention-hover-bg);
+}
+.message-mention[role="button"] { cursor: pointer; }
+.message-mention:focus-visible {
+  color: var(--core-mention-text);
+  background: var(--core-mention-hover-bg);
+  outline: 2px solid var(--core-mentioned-message-border);
+  outline-offset: 1px;
+}
+/* Left accent stripe and row highlight preserve grid dimensions and grouped-message indentation. */
+.chat-message.message-mentioned {
+  position: relative;
+  background: var(--core-mentioned-message-bg);
+  border-radius: 6px;
+}
+.chat-message.message-mentioned::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  border-radius: 4px 2px 2px 4px;
+  background: var(--core-mentioned-message-border);
+  pointer-events: none;
+}
+.chat-message.message-mentioned:hover { background: var(--mention-row-hover); }
+@media (prefers-reduced-motion: reduce) {
+  .message-mention { transition: none; }
+}

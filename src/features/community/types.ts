@@ -1,3 +1,4 @@
+import type { Mention } from "@/features/mentions/model";
 export type AvatarTone = "rose" | "teal" | "amber" | "violet" | "slate";
 export type CommunityView = "channel" | "overview" | "events" | "members" | "invites";
 export interface CommunityMember {
@@ -9,6 +10,8 @@ export interface CommunityMember {
   profile?: PublicProfile | null;
 }
 export interface ChatMessageData {
+  mentions?: Mention[];
+  currentUserId?: string;
   id: string;
   renderKey?: string;
   delivery?: "pending" | "failed";

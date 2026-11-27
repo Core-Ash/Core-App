@@ -10,6 +10,7 @@ import type { WorkspaceNavigation } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import {
   useCurrentUser,
+  useMembers,
   useMessages,
   useSendMessage,
 } from "@/features/community/api/hooks";
@@ -24,7 +25,7 @@ import {
   CreateChannelDialog,
 } from "@/features/community/components/CreateResourceDialog";
 import { AddServerDialog } from "@/features/community/components/AddServerDialog";
-import { MessageComposer } from "@/features/community/components/MessageComposer";
+import { ChannelMentionComposer } from "@/features/mentions/MentionComposers";
 import { MessageList } from "@/features/community/components/MessageList";
 import type { ChatMessageData } from "@/features/community/types";
 import type { Channel, Community } from "@/lib/api/types";
@@ -58,6 +59,21 @@ function LiveConversation({
   channel: Channel;
 }) {
   const history = useMessages(channel.id);
+  const currentProfile = useCurrentUser();
+  const channelMembers = useMembers(
+    community.id,
+    channel.id,
+    "",
+    currentProfile.isSuccess,
+  );
+  const currentUserRoleIds = useMemo(() => {
+    const userId = currentProfile.data?.id;
+    if (!userId) return undefined;
+    const member = channelMembers.data?.pages
+      .flatMap((page) => page.items)
+      .find((item) => item.id === userId);
+    return member ? new Set(member.roles.map((role) => role.id)) : undefined;
+  }, [channelMembers.data?.pages, currentProfile.data?.id]);
   const send = useSendMessage(channel.id);
   const wide = useMediaQuery("(min-width: 1200px)");
   const [membersVisible, setMembersVisible] = useState(true);
@@ -86,6 +102,7 @@ function LiveConversation({
           deliveryError: local.get(item.author_id + ':' + item.client_nonce)?.error,
           onRetry: local.get(item.author_id + ':' + item.client_nonce)?.retryable ? () => send.retry(item.client_nonce) : undefined,
           body: item.body ?? "",
+          mentions: item.mentions,
           createdAt: item.created_at,
           edited: Boolean(item.edited_at),
           deleted: Boolean(item.deleted_at) || item.body === null,
@@ -144,6 +161,9 @@ function LiveConversation({
             ) : (
               <>
                 <MessageList
+                  currentUserId={currentProfile.data?.id}
+                  currentUserRoleIds={currentUserRoleIds}
+                  mentionContext={{ kind: "channel", id: channel.id, communityId: community.id, name: channel.name }}
                   communityId={community.id}
                   channel={channel}
                   messages={messages}
@@ -164,7 +184,10 @@ function LiveConversation({
                     </div>
                   }
                 />
-                <MessageComposer
+                <ChannelMentionComposer
+                  key={channel.id}
+                  communityId={community.id}
+                  channelId={channel.id}
                   channelName={channel.name}
                   canSendMessages={channel.can_send_messages !== false}
                   onSend={send.send}

@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/api/errors";
+import type { Mention, MentionKind } from "@/features/mentions/model";
 import type {
   Channel,
   ChannelCategory,
@@ -131,7 +132,24 @@ export function parseMessage(value: unknown): Message {
     deleted_at: data.deleted_at === null ? null : timestamp(data.deleted_at),
     client_nonce: uuid(data.client_nonce),
     author,
+    ...(data.mentions === undefined ? {} : { mentions: parseMentions(data.mentions, data.body === null ? "" : string(data.body)) }),
   };
+}
+export function parseMentions(value: unknown, body: string): Mention[] {
+  if (!Array.isArray(value) || value.length > 100) throw new ApiError("invalid_response");
+  let previous = 0;
+  return value.map((raw) => {
+    const m = record(raw);
+    const kind = string(m.kind) as MentionKind;
+    if (!["user", "role", "everyone", "here"].includes(kind) || !Number.isInteger(m.start) || !Number.isInteger(m.end)) throw new ApiError("invalid_response");
+    const start = m.start as number, end = m.end as number;
+    if (start < previous || end <= start || end > body.length || body[start] !== "@") throw new ApiError("invalid_response");
+    previous = end;
+    const profile = m.profile === undefined ? undefined : parsePublicProfile(m.profile);
+    const id = kind === "user" || kind === "role" ? uuid(m.id) : undefined;
+    if (profile && (kind !== "user" || profile.id !== id)) throw new ApiError("invalid_response");
+    return { kind, ...(id ? { id } : {}), start, end, label: typeof m.label === "string" ? m.label : undefined, color: typeof m.color === "string" && /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : null, profile };
+  });
 }
 export function parseList<T>(value: unknown, parse: (item: unknown) => T): T[] {
   const { items } = record(value);

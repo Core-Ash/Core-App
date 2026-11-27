@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ApiNotice } from "@/components/common/ApiNotice";
 import { ChatMessageSkeleton } from "@/components/common/skeleton/Skeletons";
 import { useCurrentUser } from "@/features/community/api/hooks";
-import { MessageComposer } from "@/features/community/components/MessageComposer";
+import { ConversationMentionComposer } from "@/features/mentions/MentionComposers";
 import { MessageList } from "@/features/community/components/MessageList";
 import type { ChatMessageData } from "@/features/community/types";
 import {
@@ -79,6 +79,7 @@ export function ConversationView({
             ? () => send.retry(item.client_nonce)
             : undefined,
           body: item.body ?? "",
+          mentions: item.mentions,
           createdAt: item.created_at,
           edited: Boolean(item.edited_at),
           deleted: Boolean(item.deleted_at) || item.body === null,
@@ -171,6 +172,8 @@ export function ConversationView({
         ) : (
           <>
             <MessageList
+              currentUserId={currentUserId}
+              mentionContext={{ kind: "conversation", id: conversationId, name: targetName, participants: conversation.members.map((m) => m.profile) }}
               channel={{ name: targetName }}
               messages={messages}
               searching={Boolean(search.trim())}
@@ -201,7 +204,7 @@ export function ConversationView({
                 ))
               }
             />
-            <MessageComposer channelName={targetName} onSend={send.send} />
+            <ConversationMentionComposer key={conversationId} participants={conversation.members.map((m) => m.profile)} channelName={targetName} onSend={send.send} />
           </>
         )}
       </div>

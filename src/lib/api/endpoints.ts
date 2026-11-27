@@ -1,3 +1,4 @@
+import { mentionPayload, type Mention } from "@/features/mentions/model";
 import type { ApiClient } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import {
@@ -159,8 +160,8 @@ export const endpoints = {
   sendMessage: async (
     api: ApiClient,
     channelId: string,
-    input: { body: string; client_nonce: string },
-  ) => parseMessage(await api.post(`/channels/${channelId}/messages`, input)),
+    input: { body: string; client_nonce: string; mentions?: Mention[] },
+  ) => parseMessage(await api.post(`/channels/${channelId}/messages`, { ...input, ...(input.mentions ? { mentions: mentionPayload(input.mentions) } : {}) })),
   conversations: async (api: ApiClient, signal?: AbortSignal) =>
     parseList(await api.get("/conversations", { signal }), parseConversationSummary),
   conversation: async (api: ApiClient, id: string, signal?: AbortSignal) =>
@@ -215,6 +216,6 @@ export const endpoints = {
   sendConversationMessage: async (
     api: ApiClient,
     id: string,
-    input: { body: string; client_nonce: string },
-  ) => parseMessage(await api.post(`/conversations/${id}/messages`, input)),
+    input: { body: string; client_nonce: string; mentions?: Mention[] },
+  ) => parseMessage(await api.post(`/conversations/${id}/messages`, { ...input, ...(input.mentions ? { mentions: mentionPayload(input.mentions) } : {}) })),
 };

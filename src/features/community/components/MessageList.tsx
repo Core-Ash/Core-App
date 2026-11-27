@@ -1,8 +1,11 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, MessageSquare, Search } from "lucide-react";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { ChatMessageData } from "@/features/community/types";
 import { ChatMessage } from "@/features/community/components/ChatMessage";
+import type { MentionContext } from "@/features/mentions/MentionMessageActions";
+
+const dayLabel = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
 
 export function MessageList({
   messages,
@@ -11,6 +14,9 @@ export function MessageList({
   historyControls,
   communityId,
   footer,
+  currentUserId,
+  currentUserRoleIds,
+  mentionContext,
 }: {
   messages: readonly ChatMessageData[];
   channel: { name: string };
@@ -18,6 +24,9 @@ export function MessageList({
   historyControls?: ReactNode;
   communityId?: string;
   footer?: ReactNode;
+  currentUserId?: string;
+  currentUserRoleIds?: ReadonlySet<string> | readonly string[];
+  mentionContext?: MentionContext;
 }) {
   const scrollArea = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
@@ -97,12 +106,21 @@ export function MessageList({
                   new Date(previous.createdAt).toDateString() ===
                     new Date(message.createdAt).toDateString();
                 return (
-                  <ChatMessage
-                    key={message.renderKey ?? message.id}
-                    message={message}
-                    grouped={grouped}
-                    communityId={communityId}
-                  />
+                  <Fragment key={message.renderKey ?? message.id}>
+                    {(!previous || new Date(previous.createdAt).toDateString() !== new Date(message.createdAt).toDateString()) && (
+                      <li role="separator" className="message-date-divider" aria-label={dayLabel.format(new Date(message.createdAt))}>
+                        <span>{dayLabel.format(new Date(message.createdAt))}</span>
+                      </li>
+                    )}
+                    <ChatMessage
+                      currentUserId={currentUserId}
+                      currentUserRoleIds={currentUserRoleIds}
+                      mentionContext={mentionContext}
+                      message={message}
+                      grouped={grouped}
+                      communityId={communityId}
+                    />
+                  </Fragment>
                 );
               })}
               {footer}

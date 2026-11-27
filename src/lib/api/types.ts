@@ -1,3 +1,4 @@
+import type { Mention } from "@/features/mentions/model";
 export interface PublicProfile {
   id: string;
   username: string;
@@ -53,6 +54,7 @@ export interface Channel {
   can_send_messages?: boolean;
 }
 export interface Message {
+  mentions?: Mention[];
   id: string;
   author_id: string;
   body: string | null;

@@ -31,6 +31,18 @@
   --primary-action: #c72c39;
   --primary-action-hover: #d3303e;
   --link: #ff808a;
+  --core-mention-bg: #9f3036;
+  --core-mention-text: #ffe0e0;
+  --core-mention-hover-bg: #b83b43;
+  --core-mentioned-message-bg: #342d2e;
+  --core-mentioned-message-border: #f43f46;
+  --mention-text: var(--core-mention-text);
+  --mention-background: var(--core-mention-bg);
+  --mention-hover: var(--core-mention-hover-bg);
+  --mention-personal: var(--core-mention-bg);
+  --mention-row: var(--core-mentioned-message-bg);
+  --mention-row-hover: color-mix(in srgb, var(--core-mentioned-message-bg) 95%, var(--foreground));
+  --mention-row-accent: var(--core-mentioned-message-border);
   --muted: var(--surface-secondary);
   --accent: var(--surface-hover);
   --input: var(--border);

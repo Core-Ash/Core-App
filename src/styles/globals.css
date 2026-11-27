@@ -3,6 +3,8 @@
 @import "./app.css";
 @import "./auth.css";
 @import "./friends.css";
+@import "./mentions.css";
+@import "./messages.css";
 
 @custom-variant dark (&:is(.dark *));
 

@@ -408,7 +408,7 @@
       "text",
       "category"
     ],
-    "status": "unsupported",
+    "status": "enforced",
     "overwrite": true,
     "dependencies": [
       "channels.view",

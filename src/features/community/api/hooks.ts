@@ -1,3 +1,4 @@
+import { mentionPayload, type Mention } from "@/features/mentions/model";
 import {
   useInfiniteQuery,
   useMutation,
@@ -171,7 +172,7 @@ export function useSendMessage(channelId: string) {
     }));
   }
   const mutation = useMutation({
-    mutationFn: async (input: { body: string; client_nonce: string }) => {
+    mutationFn: async (input: { body: string; client_nonce: string; mentions?: Mention[] }) => {
       if (!ready) throw new ApiError("unauthorized");
       const message = await endpoints.sendMessage(api, channelId, input);
       if (message.client_nonce !== input.client_nonce || message.author_id !== profile.data?.id) throw new ApiError("invalid_response");
@@ -196,19 +197,19 @@ export function useSendMessage(channelId: string) {
   });
   return {
     entries: outbox.data,
-    send: (body: string) => {
+    send: (body: string, mentions: Mention[] = []) => {
       if (!ready || !profile.isSuccess) throw new ApiError("unauthorized");
       const nonce = crypto.randomUUID();
       const message: Message = { id: nonce, client_nonce: nonce, author_id: profile.data.id,
-        author: profile.data, body, created_at: new Date().toISOString(), edited_at: null, deleted_at: null };
+        author: profile.data, body, mentions, created_at: new Date().toISOString(), edited_at: null, deleted_at: null };
       queries.setQueryData<LocalMessage[]>(key, (previous = []) => [...previous, { message, status: "pending" }]);
-      mutation.mutate({ body, client_nonce: nonce });
+      mutation.mutate({ body, client_nonce: nonce, ...(mentions.length ? { mentions: mentionPayload(mentions) } : {}) });
     },
     retry: (nonce: string) => {
       const entry = queries.getQueryData<LocalMessage[]>(key)?.find((entry) => entry.message.client_nonce === nonce);
       if (!ready || entry?.status !== "failed" || !entry.retryable) return;
       update(nonce, (entry) => ({ ...entry, status: "pending", error: undefined }));
-      mutation.mutate({ body: entry.message.body!, client_nonce: nonce });
+      mutation.mutate({ body: entry.message.body!, client_nonce: nonce, ...(entry.message.mentions?.length ? { mentions: mentionPayload(entry.message.mentions) } : {}) });
     },
   };
 }
