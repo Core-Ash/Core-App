@@ -24,7 +24,7 @@ export function LogoutButton() {
       }
       appData?.clearPrivateData();
       await refresh();
-      navigate("/login", { replace: true });
+      navigate("/login", { replace: true, state: null });
     } catch {
       setError("Couldn't reach the service. Please try again.");
     } finally {

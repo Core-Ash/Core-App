@@ -120,11 +120,17 @@ describe("channel access settings", () => {
     expect(screen.queryByText(profileFixture.display_name)).not.toBeInTheDocument();
   });
   it("preserves channel access inspection alongside member administration without reference admission", async () => {
-    setup(<>
+    const { request } = setup(<>
       <ChannelAccess communityId={communityFixture.id} channelId={channelFixture.id} />
       <CommunityMembers community={communityFixture} profile={profileFixture} />
     </>);
     await screen.findByText("2 members can view this channel");
     expect(screen.queryByRole("form", { name: "Add community member" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Inspect permission" }), {
+      target: { value: "messages.send" },
+    });
+    await waitFor(() =>
+      expect(request.mock.calls.some(([url]) => url.includes("permission=messages.send"))).toBe(true),
+    );
   });
 });

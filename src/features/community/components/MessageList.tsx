@@ -23,6 +23,7 @@ export function MessageList({
   canSendMessages = true,
   canAddReactions = true,
   canCreateThreads = true,
+  canModerateMessages = false,
   onReply,
   onForward,
   onCreateThread,
@@ -44,6 +45,7 @@ export function MessageList({
   canSendMessages?: boolean;
   canAddReactions?: boolean;
   canCreateThreads?: boolean;
+  canModerateMessages?: boolean;
   onReply?: (message: ChatMessageData) => void;
   onForward?: (message: ChatMessageData) => void;
   onCreateThread?: (message: ChatMessageData) => void;
@@ -149,6 +151,7 @@ export function MessageList({
                       canSendMessages={canSendMessages}
                       canAddReactions={canAddReactions}
                       canCreateThreads={canCreateThreads}
+                      canModerateMessages={canModerateMessages}
                       onReply={onReply}
                       onForward={onForward}
                       onCreateThread={onCreateThread}

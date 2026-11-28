@@ -29,9 +29,11 @@ export function useCommunitySelection() {
   const channels = useChannels(community?.id);
   const channelItems =
     profile.isSuccess && channels.isSuccess ? channels.data : [];
+  const defaultChannel =
+    channelItems.find((item) => item.kind !== "voice") ?? channelItems[0];
   const channel =
     channelItems.find((item) => item.id === params.get("channel")) ??
-    channelItems[0];
+    defaultChannel;
   const requestedView = params.get("view");
   const view: CommunityView =
     requestedView === "overview" || requestedView === "events" || requestedView === "members" || requestedView === "invites"

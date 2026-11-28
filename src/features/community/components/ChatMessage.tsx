@@ -44,6 +44,7 @@ export function ChatMessage({
   canSendMessages = true,
   canAddReactions = true,
   canCreateThreads = true,
+  canModerateMessages = false,
   onReply,
   onForward,
   onCreateThread,
@@ -61,6 +62,7 @@ export function ChatMessage({
   canSendMessages?: boolean;
   canAddReactions?: boolean;
   canCreateThreads?: boolean;
+  canModerateMessages?: boolean;
   onReply?: (message: ChatMessageData) => void;
   onForward?: (message: ChatMessageData) => void;
   onCreateThread?: (message: ChatMessageData) => void;
@@ -256,7 +258,7 @@ export function ChatMessage({
           canCopyText={Boolean(text.trim())}
           canCopyId={settled}
           canEdit={own && !message.forwarded}
-          canDelete={own}
+          canDelete={own || (Boolean(mentionContext) && mentionContext?.kind === "channel" && canModerateMessages && settled)}
           returnFocus={returnFocus}
           onDismiss={() => setMenu(null)}
           onQuickReact={(emoji) => handleReactionPick(emoji)}

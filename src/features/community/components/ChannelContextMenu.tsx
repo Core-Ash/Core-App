@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -64,11 +64,13 @@ export function ChannelContextMenu({ channel, communityId, position, canManage, 
       {preferences.isError && <div className="core-context-menu-error" role="alert"><p>{preferences.error instanceof ApiError && preferences.error.status === 404 ? "Channel preferences are unavailable on this backend." : preferences.error instanceof ApiError && preferences.error.status === 403 ? "You no longer have access to channel preferences." : "Could not load preferences."}</p><button type="button" onClick={() => { void preferences.refetch(); }} disabled={preferences.isFetching}><RefreshCw aria-hidden="true" />{preferences.isFetching ? "Retrying..." : "Retry"}</button></div>}
       {preferences.isPending && <p role="status" className="core-context-menu-status">Loading preferences...</p>}
       {error && <p role="alert" className="px-2.5 py-1 text-xs text-destructive">{apiErrorMessage(mute.error)}</p>}
-      {canManage && <><Menu.Separator className="core-context-menu-separator" />
+      {(canManage || channel.can_manage_channel || channel.can_manage_permissions) && <><Menu.Separator className="core-context-menu-separator" />
         <Menu.Item className={item} onSelect={onEdit}><Pencil aria-hidden="true" />Edit Channel</Menu.Item>
-        <Menu.Item className={item} onSelect={(e)=>{e.preventDefault();setAction("duplicate");}}><Copy aria-hidden="true" />Duplicate Channel</Menu.Item>
-        <Menu.Item className={item} onSelect={onCreate}>{channel.kind === "voice" ? <Volume2 aria-hidden="true" /> : <Hash aria-hidden="true" />}Create {channel.kind === "voice" ? "Voice" : "Text"} Channel</Menu.Item>
-        <Menu.Separator className="core-context-menu-separator" /><Menu.Item className={item} data-tone="danger" onSelect={(e)=>{e.preventDefault();setAction("delete");}}><Trash2 aria-hidden="true" />Delete Channel</Menu.Item>
+        {(canManage || channel.can_manage_channel) && <>
+          <Menu.Item className={item} onSelect={(e)=>{e.preventDefault();setAction("duplicate");}}><Copy aria-hidden="true" />Duplicate Channel</Menu.Item>
+          {canManage && <Menu.Item className={item} onSelect={onCreate}>{channel.kind === "voice" ? <Volume2 aria-hidden="true" /> : <Hash aria-hidden="true" />}Create {channel.kind === "voice" ? "Voice" : "Text"} Channel</Menu.Item>}
+          <Menu.Separator className="core-context-menu-separator" /><Menu.Item className={item} data-tone="danger" onSelect={(e)=>{e.preventDefault();setAction("delete");}}><Trash2 aria-hidden="true" />Delete Channel</Menu.Item>
+        </>}
       </>}
     </Menu.Content></Menu.Portal>
   </Menu.Root>;

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useChannelAccess } from "@/features/community/api/hooks";
 import { useCategories, useUpdateChannel } from "@/features/community/categories/api";
+import { channelPermissions } from "@/features/community/permissions/registry";
 import type { AccessSource, Channel, Community } from "@/lib/api/types";
 
 function sourceLabel(source: AccessSource): string {
@@ -24,6 +25,9 @@ function sourceLabel(source: AccessSource): string {
     case "role_deny": return `Channel denial through ${source.role_name}`;
     case "inherited": return `Inherited from ${source.role_name}`;
     case "no_grant": return "No view permission granted";
+    case "timeout": return "Denied by active member timeout";
+    case "missing_view_channel": return "Denied because View Channel is not granted";
+    case "missing_send_messages": return "Denied because Send Messages is not granted";
   }
 }
 
@@ -204,14 +208,21 @@ export function ChannelAccess({ communityId, channelId }: { communityId: string;
   const [search, setSearch] = useState("");
   const [settledSearch, setSettledSearch] = useState("");
   const [roleId, setRoleId] = useState("");
+  const [permission, setPermission] = useState("channels.view");
   const [access, setAccess] = useState<"allowed" | "denied">("allowed");
+  const inspectablePermissions = channelPermissions("text").filter((p) => p.status === "enforced");
   const normalizedSearch = search.trim();
   useEffect(() => {
     const timer = setTimeout(() => setSettledSearch(normalizedSearch), 300);
     return () => clearTimeout(timer);
   }, [normalizedSearch]);
   const settled = normalizedSearch === settledSearch;
-  const query = useChannelAccess(communityId, channelId, { search: normalizedSearch, roleId, access }, settled);
+  const query = useChannelAccess(
+    communityId,
+    channelId,
+    { search: normalizedSearch, roleId, access, ...(permission !== "channels.view" ? { permission } : {}) },
+    settled,
+  );
   const overview = query.data?.pages[0];
   const members = [...new Map(query.data?.pages.flatMap((page) => page.items).map((member) => [member.id, member])).values()];
   // Hide cached sensitive results after any failed revalidation, including 403.
@@ -233,7 +244,7 @@ export function ChannelAccess({ communityId, channelId }: { communityId: string;
         Owners always have access. Member overrides take precedence over role overrides; role allows override other role denials.
         Inherited access comes from a community role.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <label htmlFor={`${id}-search`} className="mb-1 block text-sm">Search members</label>
           <Input id={`${id}-search`} type="search" maxLength={100} value={search} placeholder="Name or username"
@@ -245,6 +256,14 @@ export function ChannelAccess({ communityId, channelId }: { communityId: string;
             <option value="">All roles</option>
             {overview?.roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
             {roleId && !overview?.roles.some((role) => role.id === roleId) && <option value={roleId}>Selected role</option>}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${id}-permission`} className="mb-1 block text-sm">Inspect permission</label>
+          <select id={`${id}-permission`} className="access-role-select" value={permission} onChange={(event) => setPermission(event.target.value)}>
+            {inspectablePermissions.map((item) => (
+              <option key={item.key} value={item.key}>{item.label}</option>
+            ))}
           </select>
         </div>
       </div>

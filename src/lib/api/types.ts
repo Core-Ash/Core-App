@@ -57,6 +57,11 @@ export interface Channel {
   can_create_private_threads?: boolean;
   can_send_in_threads?: boolean;
   can_manage_threads?: boolean;
+  can_read_history?: boolean;
+  can_manage_channel?: boolean;
+  can_manage_permissions?: boolean;
+  can_attach_files?: boolean;
+  can_moderate_messages?: boolean;
 }
 export interface MessageAttachment {
   id: string;
@@ -161,7 +166,18 @@ export interface MessagePage {
   next_cursor: MessageCursor | null;
 }
 
-export type AccessSourceKind = "owner" | "administrator" | "member_allow" | "member_deny" | "role_allow" | "role_deny" | "inherited" | "no_grant";
+export type AccessSourceKind =
+  | "owner"
+  | "administrator"
+  | "member_allow"
+  | "member_deny"
+  | "role_allow"
+  | "role_deny"
+  | "inherited"
+  | "no_grant"
+  | "timeout"
+  | "missing_view_channel"
+  | "missing_send_messages";
 export interface AccessSource {
   kind: AccessSourceKind;
   role_id?: string;
@@ -193,6 +209,7 @@ export interface ChannelAccessFilters {
   search: string;
   roleId: string;
   access: "allowed" | "denied";
+  permission?: string;
 }
 
 export type ConversationType = "direct" | "group";

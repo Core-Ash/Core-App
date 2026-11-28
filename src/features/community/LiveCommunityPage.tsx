@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Compass, Hash, Menu, X } from "lucide-react";
+import { Compass, Hash, Lock, Menu, X } from "lucide-react";
 import { useOutletContext } from "react-router";
 import { useAppData } from "@/app/app-data-context";
 import { ApiNotice } from "@/components/common/ApiNotice";
@@ -67,7 +67,8 @@ function LiveConversation({
 }) {
   const { api } = useAppData();
   const queries = useQueryClient();
-  const history = useMessages(channel.id);
+  const canReadHistory = channel.can_read_history !== false;
+  const history = useMessages(channel.id, canReadHistory);
   const currentProfile = useCurrentUser();
   const channelMembers = useMembers(
     community.id,
@@ -194,6 +195,11 @@ function LiveConversation({
   const membersOpen = wide ? membersVisible : membersDialogOpen;
   const canCreateThreads =
     channel.can_create_public_threads !== false || channel.can_create_private_threads !== false;
+  const isOwner = Boolean(currentProfile.data && community.owner_id === currentProfile.data.id);
+  const canOpenChannelSettings =
+    isOwner ||
+    channel.can_manage_channel !== false ||
+    channel.can_manage_permissions !== false;
   return (
     <section
       className="chat-workspace"
@@ -212,10 +218,44 @@ function LiveConversation({
           else setMembersDialogOpen((value) => !value);
         }}
         membersButtonRef={membersButton}
-        settings={<ChannelSettings key={channel.id} community={community} channel={channel} />}
+        settings={
+          canOpenChannelSettings ? (
+            <ChannelSettings key={channel.id} community={community} channel={channel} />
+          ) : undefined
+        }
       />
       <div className="chat-column">
-            {history.isPending && !send.entries.length ? (
+            {!canReadHistory && !send.entries.length ? (
+              <>
+                <div className="message-list-container">
+                  <div className="message-scroll" tabIndex={0} role="region" aria-label={`${channel.name} message history`}>
+                    <EmptyState
+                      icon={Lock}
+                      title="Message history unavailable"
+                      description={`You do not have permission to view message history in #${channel.name}.`}
+                    />
+                  </div>
+                </div>
+                <ChannelMentionComposer
+                  key={channel.id}
+                  communityId={community.id}
+                  channelId={channel.id}
+                  channelName={channel.name}
+                  canSendMessages={channel.can_send_messages !== false}
+                  replyTo={replyingTo}
+                  replyMention={replyMention}
+                  onToggleReplyMention={setReplyMention}
+                  onCancelReply={() => setReplyingTo(null)}
+                  onSend={(body, mentions) => {
+                    send.send(body, mentions, {
+                      replyTo: replyingTo,
+                      replyMention,
+                    });
+                    setReplyingTo(null);
+                  }}
+                />
+              </>
+            ) : history.isPending && !send.entries.length ? (
               <ChatMessageSkeleton />
             ) : history.error && ((!history.data && !send.entries.length) || (history.error instanceof ApiError && ["unauthorized", "forbidden", "session_transport", "auth_unavailable"].includes(history.error.kind))) ? (
               <ApiNotice
@@ -238,6 +278,7 @@ function LiveConversation({
                   canSendMessages={channel.can_send_messages !== false}
                   canAddReactions={channel.can_add_reactions !== false}
                   canCreateThreads={canCreateThreads}
+                  canModerateMessages={isOwner || Boolean(channel.can_moderate_messages)}
                   onReply={(msg) =>
                     setReplyingTo({
                       id: msg.id,

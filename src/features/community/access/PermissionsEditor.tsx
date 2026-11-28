@@ -132,7 +132,12 @@ function Editor({ remote, communityId, resourceId, kind, path, onDirtyChange }: 
             {([false, null, true] as const).map((value, i) => {
               const name = ["Deny", "Neutral", "Allow"][i]!;
               const deniedGrant = value === true && !base.grantable.includes(permission.key);
-              return <button key={name} type="button" data-state={name.toLowerCase()} aria-label={`${name} ${permission.label}`} title={deniedGrant ? "You cannot grant a permission you do not have." : value === null ? "Neutral: keep earlier permission grants" : `${name} for this target`} aria-pressed={state === value} disabled={!manageable(selected) || mutation.isPending || Boolean(unavailable) || deniedGrant} onClick={() => { if (selected) setState(selected, permission.key, value); }}>{i === 0 ? <X aria-hidden="true" /> : i === 1 ? <Slash aria-hidden="true" /> : <Check aria-hidden="true" />}</button>;
+              const tooltip = deniedGrant
+                ? "You cannot grant a permission you do not have."
+                : value === null
+                  ? "Not explicitly configured. The effective permission is determined by other applicable server and channel permissions."
+                  : `${name} for this target`;
+              return <button key={name} type="button" data-state={name.toLowerCase()} aria-label={`${name} ${permission.label}`} title={tooltip} aria-pressed={state === value} disabled={!manageable(selected) || mutation.isPending || Boolean(unavailable) || deniedGrant} onClick={() => { if (selected) setState(selected, permission.key, value); }}>{i === 0 ? <X aria-hidden="true" /> : i === 1 ? <Slash aria-hidden="true" /> : <Check aria-hidden="true" />}</button>;
             })}
           </div></div>
         </div>;

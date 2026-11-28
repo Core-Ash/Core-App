@@ -40,6 +40,10 @@ it("shows all applicable text options using channel labels and honest implementa
   expect(screen.getByRole("button", { name: "Allow Attach Files" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "Allow Add Reactions" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "Allow Send Messages in Threads" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Neutral Send Messages" })).toHaveAttribute(
+    "title",
+    "Not explicitly configured. The effective permission is determined by other applicable server and channel permissions.",
+  );
   expect(screen.queryByRole("group", { name: "Connect" })).not.toBeInTheDocument();
   expect(screen.queryByRole("group", { name: "Administrator" })).not.toBeInTheDocument();
 });

@@ -18,7 +18,9 @@ Rust owns the canonical `Core/src/permission_catalog.json`. `node scripts/sync-p
 
 Migration `Core/migrations/0017_permission_catalog.sql` adds permission definitions and server-local nickname/timeout fields. Existing role assignments, base grants and overwrites are not changed. It preserves the existing resolver and adds a central View Channel dependency and expiring timeout restrictions. Timed-out members retain only View Channel and Read Message History; owners and Administrators are exempt.
 
-Read Message History now guards the historical-message endpoint independently of View Channel. New server creation explicitly grants history access. **Existing servers receive no new default grants: owners must deliberately enable Read Message History for appropriate roles.** Deploying this migration without configuring that grant will restrict ordinary members' history retrieval.
+Migration `Core/migrations/0021_permission_dependencies_and_history.sql` extends `core.permission_decisions` to enforce secondary channel dependencies (`messages.send` is required for `messages.attach_files` and `messages.mention_everyone`) and backfills `messages.read_history` onto existing `@everyone` and `Member` roles that already have both `channels.view` and `messages.send`.
+
+In `Core/src/authorization.rs`, `PermissionSet`, `PermissionOverride` (`Deny`, `Inherit`, `Allow`), `PermissionOverwrite`, and `compute_channel_permissions` implement the deterministic 8-stage Discord permission resolution algorithm (Stage 1 membership/resource validation, Stage 2 server owner bypass, Stage 3 `@everyone` + assigned roles logical OR, Stage 4 Administrator bypass, Stage 5 `@everyone` channel override, Stage 6 aggregated assigned-role channel overrides where `Allow` wins over `Deny` regardless of role hierarchy position, Stage 7 member-specific channel override, and Stage 8 contextual dependencies and timeout restrictions).
 
 The existing owner, Administrator, implicit @everyone and overwrite layers are retained. Role Allow wins at the aggregated role layer; explicit member overwrites take precedence. Category synchronization remains distinct from Neutral.
 

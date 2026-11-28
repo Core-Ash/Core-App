@@ -75,8 +75,8 @@ export function useChannels(communityId?: string) {
     enabled: ready && Boolean(communityId),
   });
 }
-export function useMessages(channelId?: string) {
-  const live = useRealtimeConversation('channel', channelId);
+export function useMessages(channelId?: string, canReadHistory = true) {
+  const live = useRealtimeConversation('channel', canReadHistory ? channelId : undefined);
   const { api, ready } = useAppData();
   return useInfiniteQuery({
     queryKey: queryKeys.messages(channelId),
@@ -84,7 +84,7 @@ export function useMessages(channelId?: string) {
       endpoints.messages(api, channelId!, pageParam, signal),
     initialPageParam: null as MessageCursor | null,
     getNextPageParam: (last) => last.next_cursor ?? undefined,
-    enabled: ready && Boolean(channelId),
+    enabled: ready && Boolean(channelId) && canReadHistory,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     // Preserve HTTP fallback until the socket acknowledges this subscription.

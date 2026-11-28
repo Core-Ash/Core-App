@@ -47,7 +47,8 @@ export const endpoints = {
   ) => {
     const result = parseChannelAccess(await api.get(`/communities/${communityId}/channels/${channelId}/access`, {
       signal, query: { limit: 50, after_id: afterId ?? undefined, search: filters.search,
-        role_id: filters.roleId || undefined, access: filters.access },
+        role_id: filters.roleId || undefined, access: filters.access,
+        ...(filters.permission && filters.permission !== "channels.view" ? { permission: filters.permission } : {}) },
     }));
     if (result.channel.id !== channelId || result.channel.community_id !== communityId)
       throw new ApiError("invalid_response");

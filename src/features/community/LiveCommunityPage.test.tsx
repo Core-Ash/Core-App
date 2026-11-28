@@ -549,4 +549,29 @@ describe("Rust-backed community workspace", () => {
       await screen.findByRole("button", { name: `View profile for ${profileFixture.display_name}` }),
     ).toBeInTheDocument();
   });
+  it("displays a clean history-unavailable state when can_read_history is false without calling the messages endpoint", async () => {
+    const { request, queries } = setup({ owner: false });
+    await screen.findByText(messageFixture.body!);
+    const countBefore = request.mock.calls.filter(([url]) => url.includes("/messages")).length;
+    await act(async () => {
+      queries.setQueryData(queryKeys.channels(communityFixture.id), [
+        {
+          ...channelFixture,
+          id: "77777777-7777-4777-8777-777777777777",
+          name: "restricted-history",
+          can_read_history: false,
+          can_send_messages: false,
+          can_manage_channel: false,
+          can_manage_permissions: false,
+        },
+      ]);
+    });
+    expect(await screen.findByText("Message history unavailable")).toBeInTheDocument();
+    expect(
+      screen.getByText("You do not have permission to view message history in #restricted-history."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Channel settings" })).not.toBeInTheDocument();
+    const countAfter = request.mock.calls.filter(([url]) => url.includes("/messages")).length;
+    expect(countAfter).toBe(countBefore);
+  });
 });

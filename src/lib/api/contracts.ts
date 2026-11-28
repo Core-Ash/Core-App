@@ -130,6 +130,11 @@ export function parseChannel(value: unknown): Channel {
     can_create_private_threads: typeof data.can_create_private_threads === "boolean" ? data.can_create_private_threads : true,
     can_send_in_threads: typeof data.can_send_in_threads === "boolean" ? data.can_send_in_threads : true,
     can_manage_threads: typeof data.can_manage_threads === "boolean" ? data.can_manage_threads : false,
+    can_read_history: typeof data.can_read_history === "boolean" ? data.can_read_history : true,
+    can_manage_channel: typeof data.can_manage_channel === "boolean" ? data.can_manage_channel : false,
+    can_manage_permissions: typeof data.can_manage_permissions === "boolean" ? data.can_manage_permissions : false,
+    can_attach_files: typeof data.can_attach_files === "boolean" ? data.can_attach_files : true,
+    can_moderate_messages: typeof data.can_moderate_messages === "boolean" ? data.can_moderate_messages : false,
   };
 }
 export function parseMessageAttachment(value: unknown): MessageAttachment {
@@ -325,7 +330,21 @@ function accessRole(value: unknown): AccessRole {
 function accessSource(value: unknown): AccessSource {
   const data = record(value);
   const kind = string(data.kind);
-  if (!["owner", "administrator", "member_allow", "member_deny", "role_allow", "role_deny", "inherited", "no_grant"].includes(kind))
+  if (
+    ![
+      "owner",
+      "administrator",
+      "member_allow",
+      "member_deny",
+      "role_allow",
+      "role_deny",
+      "inherited",
+      "no_grant",
+      "timeout",
+      "missing_view_channel",
+      "missing_send_messages",
+    ].includes(kind)
+  )
     throw new ApiError("invalid_response");
   if (["role_allow", "role_deny", "inherited"].includes(kind))
     return { kind: kind as AccessSource["kind"], role_id: uuid(data.role_id), role_name: string(data.role_name) };
