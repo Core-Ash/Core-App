@@ -7,6 +7,7 @@ import type { ChatMessageData } from "@/features/community/types";
 import type { PublicProfile } from "@/lib/api/types";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { parseMessage } from "@/lib/api/contracts";
+import { applyMessageEvent } from "@/lib/realtime/cache";
 import { ChannelMentionComposer, ConversationMentionComposer } from "./MentionComposers";
 import { mentionPayload, type Mention } from "./model";
 
@@ -19,23 +20,18 @@ function useMessageMutations(message: ChatMessageData, context: MentionContext) 
   const { api } = useAppData();
   const queries = useQueryClient();
   const path = `/${context.kind === "channel" ? "channels" : "conversations"}/${context.id}/messages/${message.id}`;
-  const refresh = () => {
-    void queries.invalidateQueries({
-      queryKey: [context.kind === "channel" ? "messages" : "conversation-messages", context.id],
-    });
-    if (context.kind === "channel" && context.threadId) {
-      void queries.invalidateQueries({ queryKey: ["thread-messages", context.threadId] });
-      void queries.invalidateQueries({ queryKey: ["thread", context.threadId] });
-    }
+  const update = (data: ReturnType<typeof parseMessage>, type: "message.updated" | "message.deleted") => {
+    const conversation = context.kind === "channel" && context.threadId
+      ? { type: "thread" as const, id: context.threadId }
+      : { type: context.kind === "channel" ? "channel" as const : "direct" as const, id: context.id };
+    applyMessageEvent(queries, { version: 1, event_id: crypto.randomUUID(), seq: 0, type, conversation, data });
   };
   return {
     async save(body: string, mentions: Mention[] = []) {
-      parseMessage(await api.patch(path, { body, mentions: mentionPayload(mentions) }));
-      await refresh();
+      update(parseMessage(await api.patch(path, { body, mentions: mentionPayload(mentions) })), "message.updated");
     },
     async remove() {
-      parseMessage(await api.delete(path));
-      await refresh();
+      update(parseMessage(await api.delete(path)), "message.deleted");
     },
   };
 }

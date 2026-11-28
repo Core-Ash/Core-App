@@ -58,6 +58,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
                 ? {
                     "^/api/v1(?:/|$)": {
                       target: apiProxyTarget,
+                      ws: true,
                       changeOrigin: true,
                       secure: true,
                       // Cookie, browser Origin, and X-Core-CSRF reach Rust unchanged.

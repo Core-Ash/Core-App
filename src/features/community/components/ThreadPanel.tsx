@@ -959,6 +959,7 @@ export function ThreadPanel({
               }
             />
             <ChannelMentionComposer
+              realtimeConversation={{ type: "thread", id: threadId }}
               key={threadId}
               communityId={communityId}
               channelId={parentChannelId}

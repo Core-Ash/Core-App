@@ -2,6 +2,8 @@
 
 React + TypeScript frontend for Core. Better Auth owns authentication and sessions; the Rust REST API owns application profiles, communities, channels, messages, and authorization. The frontend never connects to PostgreSQL.
 
+Native WebSocket messaging, authentication, deployment settings, delivery guarantees, and validation notes are documented in [real-time messaging](docs/realtime.md).
+
 The existing Core layout is preserved. The workspace loads communities, text channels, paginated messages, and the Rust application profile. It supports community/channel creation, message sending, and owner-managed member admission. A missing API URL shows a configuration notice; an unavailable backend shows an error. There are no sample communities, simulated message sends, or local-only reactions in the application.
 
 ## Run locally

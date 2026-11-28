@@ -21,7 +21,8 @@ export function mergeConfirmedMessage(
       if (!matches(item)) return [item];
       if (inserted) return [];
       inserted = true;
-      return [message];
+      // Late HTTP confirmations must not undo a newer realtime edit or deletion.
+      return [item.deleted_at || (item.edited_at && (!message.edited_at || item.edited_at > message.edited_at)) ? item : message];
     });
     if (!exists && index === 0) items.unshift(message);
     return { ...page, items };

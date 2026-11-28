@@ -302,6 +302,7 @@ export function ConversationView({
               </div>
             )}
             <ConversationMentionComposer
+              realtimeConversation={{ type: conversation?.type ?? "direct", id: conversationId }}
               key={conversationId}
               participants={conversation.members.map((m) => m.profile)}
               channelName={targetName}

@@ -1,3 +1,4 @@
+import { useRealtimeConversation } from '@/lib/realtime/context';
 import { mentionPayload, type Mention } from "@/features/mentions/model";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppData } from "@/app/app-data-context";
@@ -57,6 +58,7 @@ export function useConversationMembers(conversationId?: string) {
 }
 
 export function useConversationMessages(conversationId?: string) {
+  const live = useRealtimeConversation('direct', conversationId);
   const { api, ready } = useAppData();
   return useInfiniteQuery({
     queryKey: conversationQueryKeys.messages(conversationId),
@@ -67,7 +69,7 @@ export function useConversationMessages(conversationId?: string) {
     enabled: ready && Boolean(conversationId),
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchInterval: live ? false : 30_000,
   });
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ConversationRef } from "@/lib/realtime/RealtimeClient";
 import { useQuery } from "@tanstack/react-query";
 import { useAppData } from "@/app/app-data-context";
 import { useMembers } from "@/features/community/api/hooks";
@@ -18,6 +19,7 @@ function userSuggestion(profile: PublicProfile): MentionSuggestion {
   return { kind: "user", id: profile.id, label: profile.display_name, detail: `${profile.username}${profile.discriminator ? `#${profile.discriminator}` : ""}`, profile };
 }
 interface Props {
+  realtimeConversation?: ConversationRef;
   channelName: string;
   placeholder?: string;
   autoFocus?: boolean;
@@ -50,7 +52,7 @@ export function ChannelMentionComposer({ communityId, channelId, ...props }: Pro
     ...(roles.data ?? []),
     ...(members.data?.pages.flatMap((page) => page.items).slice(0, 25).map((member) => ({ ...userSuggestion(member), label: member.nickname || member.display_name, color: member.roles.find((role) => role.color)?.color })) ?? []),
   ] : [];
-  return <MessageComposer {...props} communityId={communityId} onMentionSearch={setSearch} mentionSuggestions={suggestions} mentionsLoading={search !== settled || members.isFetching || roles.isFetching} />;
+  return <MessageComposer {...props} realtimeConversation={props.realtimeConversation ?? { type: "channel", id: channelId }} communityId={communityId} onMentionSearch={setSearch} mentionSuggestions={suggestions} mentionsLoading={search !== settled || members.isFetching || roles.isFetching} />;
 }
 export function ConversationMentionComposer({ participants, ...props }: Props & { participants: PublicProfile[] }) {
   const [search, setSearch] = useState<string | null>(null);

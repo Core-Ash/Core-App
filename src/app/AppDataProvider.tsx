@@ -1,3 +1,4 @@
+import { RealtimeProvider } from '@/lib/realtime/RealtimeProvider';
 import { useLayoutEffect, useState, type ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AppDataContext } from "@/app/app-data-context";
@@ -56,7 +57,7 @@ function DataScope({ children }: { children: ReactNode }) {
           },
         }}
       >
-        {children}
+        <RealtimeProvider>{children}</RealtimeProvider>
       </AppDataContext.Provider>
     </QueryClientProvider>
   );

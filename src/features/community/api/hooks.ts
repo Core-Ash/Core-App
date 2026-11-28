@@ -1,3 +1,4 @@
+import { useRealtimeConversation } from '@/lib/realtime/context';
 import { mentionPayload, type Mention } from "@/features/mentions/model";
 import {
   useInfiniteQuery,
@@ -75,6 +76,7 @@ export function useChannels(communityId?: string) {
   });
 }
 export function useMessages(channelId?: string) {
+  const live = useRealtimeConversation('channel', channelId);
   const { api, ready } = useAppData();
   return useInfiniteQuery({
     queryKey: queryKeys.messages(channelId),
@@ -85,9 +87,8 @@ export function useMessages(channelId?: string) {
     enabled: ready && Boolean(channelId),
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    // Match member refresh cadence until a live-message transport is available.
-    // React Query pauses background polling while the window is hidden.
-    refetchInterval: 30_000,
+    // Preserve HTTP fallback until the socket acknowledges this subscription.
+    refetchInterval: live ? false : 30_000,
   });
 }
 export function useCreateCommunity() {
@@ -340,18 +341,21 @@ export function useToggleReaction(
             }),
         );
       }
-      return { previous };
+      const optimisticMessage = queries.getQueryData<Parameters<typeof updateCachedMessage>[0]>(cacheKey)?.pages.flatMap(page => page.items).find(message => message.id === input.messageId);
+      return { previous, optimisticMessage };
     },
-    onSuccess: (updatedMessage) => {
+    onSuccess: (updatedMessage, _input, context) => {
       queries.setQueryData(
         cacheKey,
         (old: Parameters<typeof updateCachedMessage>[0]) =>
-          updateCachedMessage(old, updatedMessage.id, () => updatedMessage),
+          updateCachedMessage(old, updatedMessage.id, current => current === context?.optimisticMessage ? updatedMessage : current),
       );
     },
-    onError: (_err, _input, context) => {
-      if (context?.previous) {
-        queries.setQueryData(cacheKey, context.previous);
+    onError: (_err, input, context) => {
+      const previousMessage = context?.previous?.pages.flatMap(page => page.items).find(message => message.id === input.messageId);
+      if (previousMessage) {
+        queries.setQueryData(cacheKey, (old: Parameters<typeof updateCachedMessage>[0]) =>
+          updateCachedMessage(old, input.messageId, current => current === context?.optimisticMessage ? previousMessage : current));
       }
     },
   });
@@ -381,6 +385,7 @@ export function useThread(threadId?: string) {
 }
 
 export function useThreadMessages(threadId?: string) {
+  const live = useRealtimeConversation('thread', threadId);
   const { api, ready } = useAppData();
   return useInfiniteQuery({
     queryKey: queryKeys.threadMessages(threadId),
@@ -391,7 +396,7 @@ export function useThreadMessages(threadId?: string) {
     enabled: ready && Boolean(threadId),
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: 15_000,
+    refetchInterval: live ? false : 30_000,
   });
 }
 

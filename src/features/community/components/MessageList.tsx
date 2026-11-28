@@ -70,7 +70,7 @@ export function MessageList({
         last === previous.current.last
       ) {
         element.scrollTop += element.scrollHeight - previous.current.height;
-      } else if (followLatest.current)
+      } else if (followLatest.current && (!previous.current.last || last !== previous.current.last))
         element.scrollTop = element.scrollHeight;
       previous.current = { first, last, height: element.scrollHeight };
     }

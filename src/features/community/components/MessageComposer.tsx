@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useTyping } from "@/lib/realtime/use-typing";
+import type { ConversationRef } from "@/lib/realtime/RealtimeClient";
 import { MentionAutocomplete } from "@/features/mentions/MentionAutocomplete";
 import { mentionQuery, reconcileMentionEdit, reconcileMentions, type Mention, type MentionSuggestion } from "@/features/mentions/model";
 import { ComposerReplyBanner } from "@/features/community/components/MessageReplyAndForward";
@@ -11,6 +13,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { apiErrorMessage } from "@/lib/api/errors";
 
 interface MessageComposerProps {
+  realtimeConversation?: ConversationRef;
   channelName: string;
   placeholder?: string;
   communityId?: string;
@@ -31,6 +34,7 @@ interface MessageComposerProps {
 }
 
 export function MessageComposer({
+  realtimeConversation,
   channelName,
   placeholder,
   communityId,
@@ -50,6 +54,7 @@ export function MessageComposer({
   onCancelReply,
 }: MessageComposerProps) {
   const [draft, setDraft] = useState(initialBody);
+  const typingNames = useTyping(realtimeConversation, draft);
   const [mentions, setMentions] = useState<Mention[]>(initialMentions);
   const [query, setQuery] = useState<ReturnType<typeof mentionQuery>>(null);
   const [selected, setSelected] = useState(0);
@@ -163,6 +168,7 @@ export function MessageComposer({
 
   return (
     <div className="composer-area relative" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) closeMentions(); }}>
+      {typingNames.length > 0 && <div role="status" className="px-4 text-xs text-muted-foreground">{typingNames.slice(0, 3).join(" and ")} {typingNames.length === 1 ? "is" : "are"} typing…</div>}
       {query && onMentionSearch && <MentionAutocomplete id={popupId} items={mentionSuggestions} selected={active} loading={mentionsLoading} onSelect={insertMention} onHighlight={setSelected} />}
       {replyTo && onCancelReply && (
         <ComposerReplyBanner
