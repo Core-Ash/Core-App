@@ -17,8 +17,21 @@ export function LiveNavigationRail() {
   const personal = pathname === "/app/friends" || pathname === "/app/messages";
   return (
     <nav className="navigation-rail" aria-label="Communities">
-      <Link to="/app/friends" className={cn("rail-logo", personal && "is-active")} aria-label="Core home" title="Friends and direct messages" aria-current={personal ? "page" : undefined}>
-        <Brand markOnly />
+      <Link
+        to="/app/friends"
+        className={cn("rail-logo", personal && "is-active")}
+        aria-label="Core Home"
+        title="Friends and direct messages"
+        aria-current={personal ? "page" : undefined}
+        onKeyDown={(event) => {
+          if (event.key !== " ") return;
+          event.preventDefault();
+          if (!event.repeat) event.currentTarget.click();
+        }}
+      >
+        <div className="rail-logo-surface">
+          <Brand markOnly />
+        </div>
       </Link>
       <div className="rail-links">
         {communityItems.map((item) => (

@@ -9,3 +9,6 @@ coverage/
 .npm-cache/
 .pnpm-store/
 .artifacts/
+
+# Local Graphify generated data
+graphify-out/

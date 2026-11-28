@@ -177,20 +177,94 @@
   padding: 16px 0;
 }
 .rail-logo {
+  --rail-logo-radius: 16px;
+  --rail-logo-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: relative;
   display: flex;
   width: 48px;
   height: 52px;
   flex-shrink: 0;
+  margin-bottom: 20px;
+  border-radius: var(--rail-logo-radius);
+}
+.rail-logo-surface {
+  display: flex;
+  width: 100%;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
   border: 1px solid #ffffff0a;
-  border-radius: 16px;
+  border-radius: inherit;
   background: #15131666;
+  transition: transform 120ms var(--rail-logo-ease), border-radius 220ms var(--rail-logo-ease),
+    background-color 180ms ease;
+}
+.rail-logo::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -5px;
+  width: 4px;
+  height: 32px;
+  margin-block: auto;
+  border-radius: 0 4px 4px 0;
+  background: var(--primary);
+  pointer-events: none;
+  opacity: 0;
+  transform: scaleY(0.25);
+  transition: transform 220ms var(--rail-logo-ease), opacity 180ms ease;
+}
+.rail-logo.is-active::before {
+  background: var(--foreground);
+  opacity: 1;
+  transform: none;
+}
+.rail-logo.is-active .rail-logo-surface {
+  background: var(--primary-subtle);
+}
+.rail-logo:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.rail-logo:active .rail-logo-surface {
+  transform: scale(0.95);
 }
 .rail-logo svg {
   width: 36px;
   height: 40px;
+  transition: transform 220ms var(--rail-logo-ease), filter 180ms ease;
+}
+@media (hover: hover) {
+  .rail-logo:hover .rail-logo-surface {
+    border-radius: calc(var(--rail-logo-radius) - 4px);
+    background: var(--primary-subtle);
+  }
+  .rail-logo:hover svg {
+    transform: scale(1.08) rotate(-4deg);
+    filter: brightness(1.12);
+  }
+  .rail-logo:hover:not(.is-active)::before {
+    opacity: 1;
+    transform: scaleY(0.5);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-logo::before,
+  .rail-logo:hover:not(.is-active)::before {
+    height: 16px;
+    transform: none;
+  }
+  .rail-logo.is-active::before {
+    height: 32px;
+  }
+  .rail-logo-surface,
+  .rail-logo::before,
+  .rail-logo svg {
+    transition: none;
+  }
+  .rail-logo:active .rail-logo-surface,
+  .rail-logo:hover svg {
+    transform: none;
+  }
 }
 .rail-links {
   display: flex;
@@ -2386,9 +2460,9 @@ html[data-motion="reduce"] *::after {
     padding-top: 20px;
   }
   .rail-logo {
+    --rail-logo-radius: 13px;
     width: 48px;
     height: 53px;
-    border-radius: 13px;
     margin-bottom: 25px;
   }
   .rail-logo svg {
